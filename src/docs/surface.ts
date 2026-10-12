@@ -2,7 +2,7 @@
 import type { BrowserFeature } from '../protocol.js';
 
 export const BROWSER_CAPABILITIES: Array<{ id: BrowserFeature; description: string; doc?: string }> = [
-  { id: 'chrome-api', description: 'Native Chrome API calls and on-demand signatures.', doc: 'capabilities/chrome' },
+  { id: 'chrome-api', description: 'Native Chrome APIs: organize tabs, groups and windows; on-demand signatures and result fields.', doc: 'capabilities/chrome' },
   { id: 'extension-logs', description: 'This extension service worker’s own logs.' },
   { id: 'cdp', description: 'Native Chrome DevTools Protocol via tab.cdp on an explicit Tab.', doc: 'capabilities/cdp' },
   { id: 'viewport', description: 'Temporarily override and reset viewport dimensions.' },

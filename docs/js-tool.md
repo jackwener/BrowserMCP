@@ -2,7 +2,7 @@
 
 `js` runs a persistent Node REPL with top-level `await`. End with an expression to return its value; do not use top-level `return` (it is only valid inside functions). Pre-bound `browser`, `sites`, `tools`, `recon`, `agent`, `session`, `nodeRepl`; no imports or bootstrap. Await API methods. Each call drains already-dispatched API work before returning; an ordinary error preserves bindings. Variables, functions and classes survive calls. Prefer `let` for working bindings; reuse bindings across calls; redeclaration is also supported.
 
-Use `browser.chrome.call(method, argsArray)` for native browser management, `tab.cdp.send(method, params)` for Tab-level CDP, and `tab.evaluate(script, {arg})` for Main World page code. These execute in different contexts from the host REPL. Query `browser.chrome.describe("tabs.query")` or read `capabilities/chrome` for native API signatures and events.
+Use `browser.chrome.call(method, argsArray)` for native browser management, `tab.cdp.send(method, params)` for Tab-level CDP, and `tab.evaluate(script, {arg})` for Main World page code. These execute in different contexts from the host REPL. Query `browser.chrome.describe("tabs.query")` or read `capabilities/chrome` for native API signatures, events, and tab/window/group organization recipes. Create groups with `tabs.group`; edit them with `tabGroups.update`.
 
 Open and inspect:
 ```js

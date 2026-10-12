@@ -12,7 +12,7 @@ import * as identity from './identity';
 export type Origin = 'agent' | 'user';
 export type Mark = 'deliverable' | 'handoff' | null;
 
-export interface Lease { tabId: number; origin: Origin; /** Raw Chrome controls presentation; ownership remains session-managed. */ nativePresentation?: boolean; mark: Mark; title?: string; url?: string; claimedAt: number; state: 'active' | 'handoff' }
+export interface Lease { tabId: number; origin: Origin; /** Keep native mute state instead of the session default; ownership remains session-managed. */ nativeMute?: boolean; mark: Mark; title?: string; url?: string; claimedAt: number; state: 'active' | 'handoff' }
 export interface Session {
   key: string;
   surface: 'browser' | 'adapter';
@@ -264,12 +264,20 @@ export class SessionManager {
     return { tabId, page, tab };
   }
 
-  async preserveNativePresentation(tabIds: number[]): Promise<void> {
-    for (const tabId of tabIds) {
-      const lease = this.ownerOf(tabId)?.leases.get(tabId);
-      if (lease) lease.nativePresentation = true;
-    }
+  async preserveNativeMute(tabId: number): Promise<void> {
+    const lease = this.ownerOf(tabId)?.leases.get(tabId);
+    if (!lease) return;
+    lease.nativeMute = true;
     await this.persist();
+  }
+
+  /** An explicitly arranged group is no longer a temporary session workspace. */
+  async releaseManagedGroup(groupId: number): Promise<void> {
+    let changed = false;
+    for (const s of this.sessions.values()) {
+      if (s.groupId === groupId) { s.groupId = null; changed = true; }
+    }
+    if (changed) await this.persist();
   }
 
   /** Record raw Chrome creations without changing focus, mute state, window or group. */
@@ -280,7 +288,7 @@ export class SessionManager {
     if (!live) return;
     const tabId = tab.id;
     this.released.delete(tabId);
-    s.leases.set(tabId, { tabId, origin: 'agent', nativePresentation: true, mark: null, url: live.url, title: live.title, claimedAt: Date.now(), state: 'active' });
+    s.leases.set(tabId, { tabId, origin: 'agent', nativeMute: true, mark: null, url: live.url, title: live.title, claimedAt: Date.now(), state: 'active' });
     s.preferredTabId = tabId;
     this.emit({ kind: 'tab_created', session: s.key, page: identity.pageId(tabId), tabId, url: live.url, title: live.title, origin: 'agent' });
     await this.touch(s);
@@ -330,9 +338,9 @@ export class SessionManager {
     if (owner && owner !== s) { owner.leases.delete(tabId); if (owner.preferredTabId === tabId) owner.preferredTabId = null; } // a handoff tab moves to whoever claims it
     s.windowId = s.windowId ?? tab.windowId;
     this.released.delete(tabId); // a claim is the one way a released tab comes back
-    // Reclaiming an existing lease preserves ownership and explicit native presentation.
+    // Reclaiming an existing lease preserves ownership and native mute state.
     const origin = prior?.origin ?? 'user';
-    s.leases.set(tabId, { tabId, origin, nativePresentation: prior?.nativePresentation, mark: null, url: tab.url, title: tab.title, claimedAt: Date.now(), state: 'active' });
+    s.leases.set(tabId, { tabId, origin, nativeMute: prior?.nativeMute, mark: null, url: tab.url, title: tab.title, claimedAt: Date.now(), state: 'active' });
     s.preferredTabId = tabId;
     const page = identity.pageId(tabId);
     this.emit({ kind: 'tab_acquired', session: s.key, page, tabId, url: tab.url, title: tab.title, origin });
@@ -406,11 +414,11 @@ export class SessionManager {
       }
       this.emit({ kind: 'tab_closed', session: s.key, page, tabId, origin: lease.origin });
     } else {
-      if (lease.origin === 'agent' && !lease.nativePresentation) {
+      if (lease.origin === 'agent') {
         try {
-          await chrome.tabs.update(tabId, { muted: false });
+          if (!lease.nativeMute) await chrome.tabs.update(tabId, { muted: false });
           const tab = await chrome.tabs.get(tabId);
-          if (tab.groupId !== undefined && tab.groupId >= 0) await chrome.tabs.ungroup(tabId);
+          if (tab.groupId !== undefined && [...this.sessions.values()].some(owner => owner.groupId === tab.groupId)) await chrome.tabs.ungroup(tabId);
         } catch (error) { throw new SessionError('tab_release_failed', `Could not release tab ${tabId}: ${String(error)}`, 'The tab is still controlled by this session. Retry tab_release or session_finalize.'); }
       }
       this.released.add(tabId);
@@ -484,9 +492,9 @@ export class SessionManager {
   }
   private async unmuteIfOurs(tabId: number): Promise<void> {
     const owner = this.ownerOf(tabId);
-    if (!owner || owner.leases.get(tabId)?.nativePresentation) return;
+    if (!owner || owner.leases.get(tabId)?.nativeMute) return;
     const t = await chrome.tabs.get(tabId).catch(() => null);
-    if (t?.mutedInfo?.muted && t.mutedInfo.reason === 'extension') await chrome.tabs.update(tabId, { muted: false }).catch(() => {});
+    if (!owner.leases.get(tabId)?.nativeMute && t?.mutedInfo?.muted && t.mutedInfo.reason === 'extension') await chrome.tabs.update(tabId, { muted: false }).catch(() => {});
   }
   private async onChildTab(sourceTabId: number, childId: number): Promise<ChildTab | null> {
     const s = this.ownerOf(sourceTabId);

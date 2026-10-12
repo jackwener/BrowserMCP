@@ -1,7 +1,7 @@
 import reference from '../../src/shared/chrome-reference.json';
 import type { Session, SessionManager } from './sessions';
 
-type MethodReference = { signatures: string[]; parameters?: unknown; callback: boolean; documentation: string };
+type MethodReference = { signatures: string[]; parameters?: unknown; resultFields?: Record<string, string>; callback: boolean; documentation: string };
 const methods = reference.methods as Record<string, MethodReference>;
 const fail = (code: string, message: string, hint?: string) => Object.assign(new Error(message), { code, hint });
 
@@ -33,18 +33,7 @@ export async function callChrome(method: string, args: unknown[], sessions: Sess
   }
   const { receiver, value } = chromeMember(method);
   if (typeof value !== 'function') throw fail('chrome_api_unavailable', `chrome.${method} is unavailable in this extension context`);
-  // Raw presentation choices must also survive activation/finalize on an existing session tab.
-  let presentationIds: number[] = [];
-  if (method === 'windows.create' && typeof (args[0] as { tabId?: number })?.tabId === 'number') await sessions.preserveNativePresentation([(args[0] as { tabId: number }).tabId]);
-  if (method === 'tabGroups.move' && typeof args[0] === 'number') await sessions.preserveNativePresentation((await chrome.tabs.query({ groupId: args[0] })).flatMap(t => t.id === undefined ? [] : [t.id]));
-  if (['tabs.update', 'tabs.move', 'tabs.group', 'tabs.ungroup'].includes(method)) {
-    const first = args[0] as number | number[] | { tabIds?: number | number[] } | undefined;
-    const ids = method === 'tabs.group' ? (first as { tabIds?: number | number[] })?.tabIds : first;
-    if (typeof ids === 'number') presentationIds = [ids];
-    else if (Array.isArray(ids)) presentationIds = ids;
-    else if (method === 'tabs.update') presentationIds = (await chrome.tabs.query({ active: true, currentWindow: true })).flatMap(t => t.id === undefined ? [] : [t.id]);
-    await sessions.preserveNativePresentation(presentationIds);
-  }
+  const editedGroup = ['tabGroups.move', 'tabGroups.update'].includes(method) && typeof args[0] === 'number' ? args[0] : undefined;
   let result: any;
   try {
     if (methods[method]?.callback) {
@@ -57,6 +46,11 @@ export async function callChrome(method: string, args: unknown[], sessions: Sess
       });
     } else result = await Reflect.apply(value, receiver, args);
   } catch (error) { throw fail('chrome_api_error', `chrome.${method}: ${error instanceof Error ? error.message : String(error)}`); }
+  // Commit lifecycle effects only after Chrome accepted the operation.
+  const update = method === 'tabs.update' ? args[args.length - 1] as { muted?: boolean } | undefined : undefined;
+  if (typeof update?.muted === 'boolean' && typeof result?.id === 'number') await sessions.preserveNativeMute(result.id);
+  if (editedGroup !== undefined) await sessions.releaseManagedGroup(editedGroup);
+  if (method === 'tabs.group' && typeof result === 'number') await sessions.releaseManagedGroup(result);
   // Attribute only resources returned by this command, never coincidentally created tabs.
   if (method === 'tabs.create' || method === 'tabs.duplicate') await sessions.adoptCreatedTab(session, result);
   if (method === 'windows.create' && result?.id !== undefined) {

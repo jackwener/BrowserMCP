@@ -13,6 +13,35 @@ nodeRepl.write({total: tabs.length, byWindow: counts});
 
 Tabs created by `tabs.create`, `tabs.duplicate` and `windows.create` belong to this session. Their original Chrome IDs work with `await browser.tabs.get(String(created.id))`. Moving an existing tab into a window does not adopt it. Popups observed from a claimed tab during a Main World script or CDP command also enter its session. Raw calls preserve explicit focus/mute/window/group settings. Finalize closes agent-created tabs unless kept; claimed user tabs are released. Chrome methods can act directly on existing numeric tab IDs without claiming them.
 
+### Organize tabs and groups
+
+Use native numeric `tab.id`, `group.id`, and `windowId` from query results, not session handles. These operations do not require claiming tabs or observing pages. Keep full inventories in REPL variables and return only the summary needed for the next decision.
+
+| Intent | Native call |
+| --- | --- |
+| List groups / read one | `tabGroups.query({})` / `tabGroups.get(groupId)` |
+| Read group members | `tabs.query({groupId})` |
+| Create a group / add members | `tabs.group({tabIds})` / `tabs.group({groupId, tabIds})` |
+| Rename, recolor, collapse or expand | `tabGroups.update(groupId, {title, color, collapsed})` |
+| Move a group | `tabGroups.move(groupId, {index, windowId})` |
+| Dissolve a group, keeping tabs | Query members, then `tabs.ungroup(tabIds)` |
+| Close a group's tabs | Query members, then `tabs.remove(tabIds)` |
+
+There is no `tabGroups.create` or `tabGroups.remove`. Group existing tabs by `windowId` before grouping unless a window transfer is intended. For moves, omit `windowId` to reorder locally; use `index: -1` for the end of the window. Chrome only supports group transfers between normal windows. Saved-group reopening, saving and sharing are not exposed by these methods; a readable `shared` property is not a sharing operation.
+
+```js
+let selectedTabs = await browser.chrome.call('tabs.query', [{windowId, url: 'https://docs.example.com/*'}]);
+let tabIds = selectedTabs.map(t => t.id);
+// windowId is from a prior query; only proceed with a non-empty selection.
+let groupId = await browser.chrome.call('tabs.group', [{tabIds}]);
+await browser.chrome.call('tabGroups.update', [groupId, {title: 'Research', color: 'blue'}]);
+await browser.chrome.call('tabGroups.get', [groupId]);
+```
+
+Each call is a separate operation: if updating the title fails after creation, `groupId` still identifies the created group. Inspect it and retry the failed step; do not recreate the group or claim the entire task succeeded. `describe` includes `resultFields` for object results (or array items), alongside parameter fields.
+
+Session groups are temporary workspaces. Successfully updating/moving a group, or explicitly grouping tabs into it, relinquishes any session's automatic management of that group: `nameSession` and subsequent new tabs will not change it. Release only ungroups tabs still in a managed workspace; user-arranged groups remain intact. This does **not** change tab ownership: agent-created tabs still need `release()` or a finalize `keep` entry to survive cleanup. Existing user tabs do not need a keep entry. Grouping, pinning and moving do not change the mute policy. Raw-created tabs keep their native mute state; on session-created tabs only an explicit `tabs.update` with `muted` overrides automatic unmuting.
+
 ### Events and logs
 
 ```js

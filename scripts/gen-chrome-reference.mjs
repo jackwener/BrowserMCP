@@ -9,6 +9,10 @@ const chromeNode = sf.statements.find(n => ts.isModuleDeclaration(n) && n.name.t
 const root = checker.getSymbolAtLocation(chromeNode.name);
 const namespaces = ['debugger', 'tabs', 'windows', 'tabGroups', 'downloads', 'cookies', 'bookmarks', 'history', 'sessions', 'runtime', 'permissions', 'webNavigation', 'scripting', 'storage.local', 'storage.session', 'storage.sync'];
 const catalog = {};
+// Keep Chrome-declared fields, including union/intersection properties, not built-in prototypes.
+const fieldsOf = type => type.getProperties().filter(p => !p.name.startsWith('__') &&
+  p.declarations?.some(d => !program.isSourceFileDefaultLibrary(d.getSourceFile())));
+
 for (const path of namespaces) {
   let symbol = root;
   for (const part of path.split('.')) {
@@ -31,15 +35,24 @@ for (const path of namespaces) {
       const pd = param.valueDeclaration;
       if (!pd || param.name === 'callback') continue;
       const pt = checker.getTypeOfSymbolAtLocation(param, pd);
-      const fields = pt.getProperties().filter(p => !p.name.startsWith('__'));
-      if (fields.length && !(pt.flags & ts.TypeFlags.StringLike) && !checker.isArrayType(pt)) {
+      const fields = fieldsOf(pt);
+      if (fields.length && !checker.isArrayType(pt) && !pt.getCallSignatures().length) {
         parameters[param.name] = Object.fromEntries(fields.slice(0, 60).map(p => {
           const d = p.valueDeclaration ?? p.declarations?.[0] ?? pd;
           return [p.name + (p.flags & ts.SymbolFlags.Optional ? '?' : ''), checker.typeToString(checker.getTypeOfSymbolAtLocation(p, d), d, ts.TypeFormatFlags.NoTruncation)];
         }));
       }
     }
-    catalog[`${path}.${member.name}`] = { signatures, ...(Object.keys(parameters).length && { parameters }), callback: !direct.length,
+    const returnType = checker.getReturnTypeOfSignature(chosen[0]);
+    const awaited = checker.getNonNullableType(checker.getAwaitedType(returnType));
+    const item = checker.isArrayType(awaited) ? checker.getTypeArguments(awaited)[0] : awaited;
+    const resultFields = item && !item.getCallSignatures().length
+      ? Object.fromEntries(fieldsOf(item).map(p => {
+        const d = p.valueDeclaration ?? p.declarations?.[0] ?? decl;
+        return [p.name + (p.flags & ts.SymbolFlags.Optional ? '?' : ''), checker.typeToString(checker.getTypeOfSymbolAtLocation(p, d), d, ts.TypeFormatFlags.NoTruncation)];
+      })) : {};
+    catalog[`${path}.${member.name}`] = { signatures,
+      ...(Object.keys(resultFields).length && { resultFields }), ...(Object.keys(parameters).length && { parameters }), callback: !direct.length,
       documentation: `https://developer.chrome.com/docs/extensions/reference/api/${path.split('.')[0]}#method-${member.name}` };
   }
 }
