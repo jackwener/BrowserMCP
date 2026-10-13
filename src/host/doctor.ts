@@ -6,7 +6,7 @@ import { inspectLaunch, LAUNCHER_PATH, type LaunchHealth } from './launch.js';
 import { NATIVE_HOST_NAME } from '../protocol.js';
 import { nativeHostDirs, runningProfileDirs } from './registration.js';
 import { EXTENSION_ID, EXTENSION_STORE_URL } from './extension.js';
-import { hostHealth, readHostState, HOST_STATE_FILE } from './state.js';
+import { hostHealth, discoverHost, readHostStates, RUN_DIR, type HostState, type HostHealth } from './state.js';
 
 export interface DoctorResult {
   ok: boolean;
@@ -14,7 +14,7 @@ export interface DoctorResult {
   launch: LaunchHealth;
   extension: { id: string; storeUrl: string };
   manifests: Array<{ browser: string; file: string; present: boolean; launcherExists: boolean; launcherMatches: boolean; authorized: boolean }>;
-  host: { stateFile: string; running: boolean; port?: number; backend?: string; extensionConnected?: boolean; protocolWarning?: string | null; error?: string };
+  host: { registryDirectory: string; running: boolean; browserId?: string; endpoint?: string; instances: HostState[]; backend?: string; extensionConnected?: boolean; protocolWarning?: string | null; error?: string };
   chromeRunning: boolean | null;
   advice: string[];
 }
@@ -35,8 +35,11 @@ export async function doctor(): Promise<DoctorResult> {
     } catch { /* absent or invalid */ }
     return { browser, file, present: fs.existsSync(file), launcherExists, launcherMatches, authorized };
   });
-  const state = readHostState();
-  const health = await hostHealth(state);
+  const hosts = readHostStates();
+  let state: HostState | null = null;
+  let discoveryError: string | undefined;
+  try { state = await discoverHost(); } catch (error) { discoveryError = (error as Error).message; }
+  const health: HostHealth = state ? await hostHealth(state) : { ok: false, error: discoveryError };
   let chromeRunning: boolean | null = null;
   if (process.platform !== 'win32') {
     try { const out = execFileSync('pgrep', ['-fl', 'Google Chrome|Chromium|Microsoft Edge|Brave Browser'], { encoding: 'utf8', stdio: 'pipe' }); chromeRunning = out.trim().length > 0; } catch { chromeRunning = false; }
@@ -56,7 +59,7 @@ export async function doctor(): Promise<DoctorResult> {
     launch,
     extension: { id: EXTENSION_ID, storeUrl: EXTENSION_STORE_URL },
     manifests,
-    host: { stateFile: HOST_STATE_FILE, running: health.ok, port: state?.port, backend: health.backend, extensionConnected: health.extensionConnected, protocolWarning: health.protocolWarning, error: health.error },
+    host: { registryDirectory: RUN_DIR, running: health.ok, browserId: state?.browserId, endpoint: state?.endpoint, instances: hosts, backend: health.backend, extensionConnected: health.extensionConnected, protocolWarning: health.protocolWarning, error: health.error },
     chromeRunning,
     advice,
   };

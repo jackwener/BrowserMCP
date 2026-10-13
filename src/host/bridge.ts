@@ -26,6 +26,7 @@ export interface BridgeEvents {
 export class ExtensionBridge extends EventEmitter<BridgeEvents> {
   private readonly pending = new Map<string, Pending>();
   extensionVersion: string | null = null;
+  browserId: string | null = null;
   protocolRevision: number | null = null;
   extensionFeatures: BrowserFeature[] = [];
   connected = false;
@@ -35,8 +36,8 @@ export class ExtensionBridge extends EventEmitter<BridgeEvents> {
     return `Extension protocol ${this.protocolRevision ?? 'unknown'} differs from host protocol ${PROTOCOL_REVISION}. Browser commands remain available; update the host or extension if an operation fails.`;
   }
 
-  /** Set by the host so the extension learns where MCP is served (informational). */
-  ready: { version: string; port: number } | null = null;
+  /** Set by the host so the extension learns its running version (informational). */
+  ready: { version: string } | null = null;
   /** Push the ready frame now (used when hello arrived before the host finished starting). */
   sendReady(): void { if (this.ready && this.connected) { try { this.channel.send({ type: 'ready', ...this.ready }); } catch { /* ignore */ } } }
 
@@ -60,6 +61,7 @@ export class ExtensionBridge extends EventEmitter<BridgeEvents> {
     if (!msg || typeof msg !== 'object') return;
     if (msg.type === 'hello') {
       this.connected = true;
+      this.browserId = msg.browserId;
       this.extensionVersion = msg.extensionVersion;
       this.protocolRevision = msg.protocolRevision ?? null;
       this.extensionFeatures = Array.isArray(msg.features) ? msg.features : [];

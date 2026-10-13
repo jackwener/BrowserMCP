@@ -17,7 +17,7 @@ async function harness() {
   rt.browserAvailable = () => true;
   rt.getAdapterPage = async () => ({}) as RuntimePage;
   rt.toolContext = async () => ({ tab: {}, sites: {}, recon: {} });
-  const session = createMcpServer(rt, `test-${Math.random().toString(36).slice(2)}`, { persistent: true });
+  const session = createMcpServer(rt, `test-${Math.random().toString(36).slice(2)}`);
   const [clientT, serverT] = InMemoryTransport.createLinkedPair();
   await session.server.connect(serverT);
   let elicits = 0;

@@ -53,7 +53,12 @@ export class NativeHost {
     this.status = 'connected';
     const features: BrowserFeature[] = ['chrome-api', 'streams', 'extension-logs', 'page-evaluate', 'frames', 'dialogs', 'console', 'downloads', 'visibility', 'webmcp'];
     if (chrome.debugger) features.push('cdp', 'viewport', 'network');
-    this.send({ type: 'hello', extensionVersion: chrome.runtime.getManifest().version, protocolRevision: PROTOCOL_REVISION, features });
+    // A profile keeps its identity across host and service-worker restarts.
+    void chrome.storage.local.get('opencliBrowserId').then(async stored => {
+      const browserId = typeof stored.opencliBrowserId === 'string' ? stored.opencliBrowserId : crypto.randomUUID();
+      if (browserId !== stored.opencliBrowserId) await chrome.storage.local.set({ opencliBrowserId: browserId });
+      if (this.port === port) this.send({ type: 'hello', browserId, extensionVersion: chrome.runtime.getManifest().version, protocolRevision: PROTOCOL_REVISION, features });
+    }).catch(error => { this.lastError = String(error); port.disconnect(); });
     return true;
   }
 
@@ -73,7 +78,7 @@ export class NativeHost {
 
   private async handle(msg: HostToExt): Promise<void> {
     if (!msg) return;
-    if (msg.type === 'ready') { console.log(`[opencli-mcp] host ${msg.version} ready on port ${msg.port}`); return; }
+    if (msg.type === 'ready') { console.log(`[opencli-mcp] host ${msg.version} ready`); return; }
     if (msg.type !== 'command') return;
     const cmd = msg.command;
     let result: Result;

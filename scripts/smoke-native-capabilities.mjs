@@ -1,4 +1,4 @@
-// MCP → REPL worker → real framed bridge → extension dispatcher → isolated Chromium.
+// MCP over local IPC → REPL worker → real framed bridge → extension dispatcher → isolated Chromium.
 // Only the native port bootstrap is replaced; no user profile or host registration is changed.
 import assert from 'node:assert/strict';
 import { mkdtemp, cp, rm, readdir } from 'node:fs/promises';
@@ -8,11 +8,13 @@ import { PassThrough } from 'node:stream';
 import { createServer } from 'node:http';
 import { build } from 'esbuild';
 import { chromium } from 'playwright-core';
-import { Client, InMemoryTransport } from '@modelcontextprotocol/client';
+import { Client } from '@modelcontextprotocol/client';
 import { ExtensionBridge } from '../dist/src/host/bridge.js';
 import { NativeChannel, FrameDecoder, encodeFrame } from '../dist/src/host/native-messaging.js';
 import { Runtime } from '../dist/src/runtime/runtime.js';
-import { createMcpServer } from '../dist/src/mcp/server.js';
+import { startIpcServer } from '../dist/src/host/ipc.js';
+import { connectSocket } from '../dist/src/host/socket.js';
+import { PROTOCOL_REVISION } from '../dist/src/protocol.js';
 import { timeline, searchUrl } from '../tests/fixtures/twitter-search.mjs';
 
 const scratch = await mkdtemp(join(tmpdir(), 'opencli-native-smoke-'));
@@ -64,13 +66,13 @@ try {
     }).catch(error => incoming.write(encodeFrame({ type: 'result', result: { id: message.command.id, ok: false, error: String(error) } })));
   } });
   const bridge = new ExtensionBridge(channel);
-  incoming.write(encodeFrame({ type: 'hello', extensionVersion: 'smoke', protocolRevision: 2,
+  incoming.write(encodeFrame({ type: 'hello', browserId: 'native-smoke-browser', extensionVersion: 'smoke', protocolRevision: PROTOCOL_REVISION,
     features: ['chrome-api', 'streams', 'extension-logs', 'page-evaluate', 'cdp', 'console', 'frames', 'network', 'dialogs'] }));
   const runtime = new Runtime({ bridge });
-  session = createMcpServer(runtime, 'native-smoke');
-  const [ct, st] = InMemoryTransport.createLinkedPair();
+  session = await startIpcServer(runtime, { version: 'native-smoke' });
+  const ct = await connectSocket(session.endpoint);
   client = new Client({ name: 'native-smoke', version: '1' }, { capabilities: {} });
-  await session.server.connect(st); await client.connect(ct);
+  await client.connect(ct);
   const call = async (name, args = {}, failure = false) => {
     const r = await client.callTool({ name, arguments: args });
     const raw = r.content.find(v => v.type === 'text')?.text;
@@ -133,7 +135,7 @@ try {
   for (let i = 0; i < 100; i++) { if ((await call('doctor')).javascript.state === 'idle') break; await new Promise(r => setTimeout(r, 20)); }
   assert.equal(await js('typeof consoleEvents'), 'undefined');
   for (const streamId of streamIds) {
-    const read = await bridge.send('stream-read', {session:'mcp:native-smoke', streamId});
+    const read = await bridge.send('stream-read', {session:`mcp:${[...runtime.sessions.keys()][0]}`, streamId});
     assert.equal(read.data.closed, true);
     assert.equal(read.data.reset, true);
   }

@@ -114,7 +114,7 @@ Each MCP client connection has its own tab and JavaScript session, so one client
 
 The MCP launcher can start before Chrome. It keeps the client connection open and reconnects when the Chrome-owned host appears or restarts. Browser operations and site adapters use that host; run `opencli-mcp doctor` if it stays unavailable.
 
-The host also supports Streamable HTTP for remote clients. See [remote access and configuration](docs/setup.md#remote-clients).
+Connections are local-only: standard MCP stdio to the launcher, then Unix domain socket (macOS/Linux) or named pipe (Windows) to the host. No port or token configuration. See [browser selection and configuration](docs/setup.md#local-connections-and-browser-selection).
 
 ## Browser access and permissions
 

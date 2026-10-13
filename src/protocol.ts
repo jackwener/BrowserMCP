@@ -199,12 +199,12 @@ export type BrowserEvent =
   | { kind: 'webmcp_changed'; page?: string }
   | { kind: 'session_released'; session: string; reason: string };
 
-export type HostToExt = { type: 'command'; command: Command } | { type: 'ready'; version: string; port: number };
+export type HostToExt = { type: 'command'; command: Command } | { type: 'ready'; version: string };
 /** Advisory contract revision; individual capabilities and command results decide what works. */
-export const PROTOCOL_REVISION = 2;
+export const PROTOCOL_REVISION = 3;
 export type BrowserFeature = 'chrome-api' | 'streams' | 'extension-logs' | 'page-evaluate' | 'cdp' | 'network' | 'frames' | 'dialogs' | 'console' | 'downloads' | 'viewport' | 'visibility' | 'webmcp';
 export type ExtToHost =
-  | { type: 'hello'; extensionVersion: string; protocolRevision?: number; features?: BrowserFeature[] }
+  | { type: 'hello'; browserId: string; extensionVersion: string; protocolRevision?: number; features?: BrowserFeature[] }
   | { type: 'result'; result: Result }
   | { type: 'event'; event: BrowserEvent };
 

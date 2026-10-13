@@ -163,7 +163,6 @@ try {
   const installationFile = path.join(stateDir, 'installation.json');
   assert.equal(JSON.parse(fs.readFileSync(installationFile, 'utf8')).node, path.join(opt, 'bin', 'node'));
   assert.equal(JSON.parse(await cli(['doctor', '--json'], 1)).launch.ready, true);
-  fs.writeFileSync(path.join(stateDir, 'config.json'), '{"port":0}');
   // Execute the actual generated launcher; preload only isolates its home and process discovery.
   const launcherEnv = { ...env, OPENCLI_SETUP_TEST_NODE: '', NODE_OPTIONS: `--import=${JSON.stringify(preload)}` };
   host = spawn(manifest.path, ['chrome-extension://' + storeId + '/'], { env: launcherEnv, stdio: ['pipe', 'pipe', 'pipe'] });
@@ -171,11 +170,11 @@ try {
   host.stdout.resume();
   const { encodeFrame } = await import('../dist/src/host/native-messaging.js');
   const { PROTOCOL_REVISION } = await import('../dist/src/protocol.js');
-  host.stdin.write(encodeFrame({ type: 'hello', extensionVersion: 'test', protocolRevision: PROTOCOL_REVISION + 1, features: [] }));
-  const stateFile = path.join(stateDir, 'run', 'host.json');
+  host.stdin.write(encodeFrame({ type: 'hello', browserId: 'setup-browser', extensionVersion: 'test', protocolRevision: PROTOCOL_REVISION + 1, features: [] }));
+  const hasHostState = () => fs.existsSync(path.join(stateDir, 'run')) && fs.readdirSync(path.join(stateDir, 'run')).some(f => /^[\da-f-]{36}\.json$/.test(f));
   const deadline = Date.now() + 10_000;
-  while (!fs.existsSync(stateFile) && Date.now() < deadline && host.exitCode === null) await new Promise((resolve) => setTimeout(resolve, 50));
-  assert(fs.existsSync(stateFile), stderr);
+  while (!hasHostState() && Date.now() < deadline && host.exitCode === null) await new Promise((resolve) => setTimeout(resolve, 50));
+  assert(hasHostState(), stderr);
 
   const connected = JSON.parse(await cli(['doctor', '--json']));
   assert.equal(connected.host.extensionConnected, true);

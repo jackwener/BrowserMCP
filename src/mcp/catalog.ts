@@ -7,7 +7,7 @@ export async function localCatalog(version: string) {
   // Reuse the real registrations so offline discovery cannot drift from the host's schemas.
   // This runtime only describes tools; it never handles an agent request or owns browser state.
   const rt = new Runtime();
-  const session = createMcpServer(rt, 'catalog', { version, persistent: false });
+  const session = createMcpServer(rt, 'catalog', { version });
   const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
   const client = new Client({ name: 'opencli-mcp-catalog', version }, { capabilities: {} });
   try {
@@ -22,5 +22,6 @@ export async function localCatalog(version: string) {
   } finally {
     await client.close().catch(() => {});
     await session.server.close().catch(() => {});
+    await session.close();
   }
 }

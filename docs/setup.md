@@ -140,20 +140,15 @@ Homebrew upgrades within the same formula normally need no configuration change:
 
 When configuring a client for the first time with the managed launcher, select it explicitly, for example `opencli-mcp setup --clients claude,codex`. For other clients, copy the configuration printed by `--clients manual`.
 
-Chrome updates the store extension independently. If the old host is still running, disable and re-enable the extension to start the updated program, then reconnect the MCP client. Use `doctor` to check both the live connection and the files needed for the next startup.
+Chrome updates the store extension independently. If the old host is still running, disable and re-enable the extension to start the updated program, the running MCP launcher reconnects automatically. Use `doctor` to check both the live connection and the files needed for the next startup.
 
-## Remote clients
+## Local connections and browser selection
 
-The host serves Streamable HTTP at `http://127.0.0.1:19991/mcp`. Configure the client with:
+MCP clients use the managed launcher's standard stdio command. The launcher connects to the Chrome-owned host through a Unix domain socket (macOS/Linux) or a named pipe (Windows). There is no HTTP endpoint, network port, bearer token, or remote MCP mode to configure.
 
-```text
-Authorization: Bearer <contents of ~/.opencli-mcp/token>
-X-OpenCLI-Session-ID: <a stable random UUID for this client connection>
-```
+Each connection owns one MCP/REPL session. Closing the client releases that session's resources. A host restart does not kill the client's stdio connection: the launcher reconnects to the **same browser profile**, reports `session_restarted` before running another tool, and requires fresh REPL bindings and Tab handles. Calls interrupted by a disconnect return an unknown-outcome error and are never automatically replayed.
 
-Each direct HTTP client needs its own `X-OpenCLI-Session-ID`; requests from the same client reuse that value. The stdio launcher creates it automatically. When a direct client is done, send `DELETE /session` with the same two headers to finalize its browser tabs. `session_finalize` also closes or releases tabs at the end of a task.
-
-For access from another machine, use an authenticated tunnel, such as SSH, cloudflared, or ngrok with authentication, and point the client at the tunneled `/mcp` endpoint. Keep bearer authentication enabled and treat the token as a secret. Chrome and the extension must stay running on the host machine.
+A single connected browser is selected automatically. If several profiles are connected, `opencli-mcp doctor --json` lists their `browserId` values and endpoints. Set `browserId` in the configuration below, or set `OPENCLI_MCP_BROWSER` in the MCP command's environment, to choose one. Each extension profile keeps its browser ID across host restarts; reinstalling the extension can change it. Once connected, a launcher remains pinned to that browser even if another profile opens or closes.
 
 ## Configuration
 
@@ -161,7 +156,6 @@ Settings live in `~/.opencli-mcp/config.json`. For example:
 
 ```json
 {
-  "port": 19991,
   "cursor": false,
   "sites": ["twitter", "reddit"],
   "sitesWrite": []
@@ -170,14 +164,14 @@ Settings live in `~/.opencli-mcp/config.json`. For example:
 
 | Setting | Effect |
 |---|---|
-| `port` | Local HTTP port; default `19991` |
+| `browserId` | Optional profile selection when several browser hosts are connected; listed by `doctor --json` |
 | `cursor` | Show the agent cursor overlay (default: `false`; enabling it inserts a visible DOM overlay) |
 | `sites` | Site commands to enable at startup, read-only |
 | `sitesWrite` | Sites whose write commands should also be enabled |
 
 Element refs and action targets are kept in the extension's isolated world, without DOM marker attributes. Screenshot annotations are also opt-in (`annotate: true`) and temporarily insert DOM overlays during capture. Leave cursor and annotations disabled when DOM overlays are unwanted.
 
-The same state directory contains the HTTP token, `run/host.json`, and user-defined adapters under `adapters/<site>/<name>.js`.
+The same state directory contains one discovery record per host under `run/<instanceId>.json`, and user-defined adapters under `adapters/<site>/<name>.js`. IPC endpoints are allocated automatically; do not put their paths in MCP client configuration.
 
 ## Troubleshooting
 

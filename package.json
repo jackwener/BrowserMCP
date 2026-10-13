@@ -53,7 +53,6 @@
   "dependencies": {
     "@modelcontextprotocol/client": "^2.0.0",
     "@modelcontextprotocol/core": "^2.0.0",
-    "@modelcontextprotocol/node": "^2.0.0",
     "@modelcontextprotocol/server": "^2.0.0",
     "jsonc-parser": "^3.3.1",
     "tree-sitter-javascript": "^0.25.0",

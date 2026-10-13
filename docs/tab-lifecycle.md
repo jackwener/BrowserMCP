@@ -10,6 +10,6 @@ To use an existing tab, call `await browser.user.openTabs({query:'…',limit:20}
 
 Finish with the MCP tool `session_finalize`, or `await browser.tabs.finalize({keep:[{tab,status:'deliverable'}]})` in `js`. `deliverable` tabs leave temporary session groups and stay open; explicitly arranged groups are preserved; `handoff` tabs stay grouped for a later turn; other agent tabs close. Failed tabs retain their lease for retry. After successful finalize, old handles are released; obtain fresh handles in a later turn. Let running JavaScript finish before calling the separate finalize tool.
 
-Resetting JavaScript leaves browser tabs open. The stdio launcher finalizes on disconnect; direct HTTP clients should call `session_finalize` or `DELETE /session`. An idle browser session is finalized after an hour.
+Resetting JavaScript leaves browser tabs open. Closing the MCP client closes its local IPC connection and finalizes only that connection’s session. A host restart creates a new session; `session_restarted` means rebuild REPL bindings and inspect the browser before continuing. An idle browser session is finalized after an hour.
 
 For grouping, renaming, moving, pinning and window organization, use `browser.chrome.call` without claiming tabs. Read `capabilities/chrome` for the task-to-method map and complete group workflow. Grouping does not automatically keep agent-created tabs.

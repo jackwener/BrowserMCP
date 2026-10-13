@@ -40,6 +40,6 @@ MCP client → stdio launcher → local host ⇄ Chrome extension → website
                                    Native Messaging
 ```
 
-host 由 Chrome 通过 Native Messaging 启动；extension 管理 tab lease、CDP 附着和虚拟光标。每个 MCP client 使用独立的 tab 与 JavaScript session，避免相互清理。`src/api/` 是 browser object model，`src/mcp/` 暴露 MCP tools 与 `js`，`src/sites/` 加载和执行 Adapter。
+MCP client 通过 stdio 连接 launcher，launcher 通过本地 Unix domain socket（Windows 使用 named pipe）连接 host，不提供远程 MCP 或 HTTP 服务。host 由 Chrome 通过 Native Messaging 启动；extension 管理 tab lease、CDP 附着和虚拟光标。每个 MCP client 使用独立的 tab 与 JavaScript session，避免相互清理。`src/api/` 是 browser object model，`src/mcp/` 暴露 MCP tools 与 `js`，`src/sites/` 加载和执行 Adapter。
 
 开发构建与测试命令见 [README](../README.md#development)。Browser 操作的错误代码见 [错误说明](errors.md)，`js` API 见 [生成的参考](api-reference.md)。

@@ -1,9 +1,10 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { Client, StreamableHTTPClientTransport } from '@modelcontextprotocol/client';
+import { Client } from '@modelcontextprotocol/client';
 import { Runtime } from '../src/runtime/runtime.js';
-import { SESSION_HEADER, startHttpServer } from '../src/host/http.js';
+import { startIpcServer } from '../src/host/ipc.js';
+import { connectSocket } from '../src/host/socket.js';
 
-describe('HTTP client sessions', () => {
+describe('Local IPC client sessions', () => {
   const open: Array<() => Promise<void>> = [];
   afterEach(async () => { for (const close of open.splice(0).reverse()) await close().catch(() => {}); });
 
@@ -11,13 +12,11 @@ describe('HTTP client sessions', () => {
     const rt = new Runtime();
     await rt.init();
     open.push(() => rt.shutdown());
-    const host = await startHttpServer(rt, { port: 0, token: 'test', version: '0.0.12' });
+    const host = await startIpcServer(rt, { version: 'test' });
     open.push(() => host.close());
-    const missing = await fetch(`http://${host.host}:${host.port}/mcp`, { method: 'POST', headers: { authorization: 'Bearer test' } });
-    expect(missing.status).toBe(400);
     const connect = async (id: string) => {
       const client = new Client({ name: id, version: '1' }, { capabilities: {} });
-      const transport = new StreamableHTTPClientTransport(new URL(`http://${host.host}:${host.port}/mcp`), { requestInit: { headers: { authorization: 'Bearer test', [SESSION_HEADER]: id } } });
+      const transport = await connectSocket(host.endpoint);
       await client.connect(transport);
       open.push(() => client.close());
       await client.callTool({ name: 'doctor', arguments: {} });
@@ -32,12 +31,19 @@ describe('HTTP client sessions', () => {
     expect(await js(first, 'let count = 1; function next() { return ++count }; next()')).toMatchObject({ ok: true, value: 2 });
     expect(await js(first, 'next()')).toMatchObject({ ok: true, value: 3 });
     expect(await js(second, 'typeof count')).toMatchObject({ ok: true, value: 'undefined' });
-    expect(rt.sessions.has('client-one')).toBe(true);
-    expect(rt.sessions.has('client-two')).toBe(true);
+    // Cancellation travels over IPC and leaves the other client usable.
+    const abort = new AbortController();
+    const pending = first.callTool({ name: 'js', arguments: { code: 'await new Promise(() => {})' } }, { signal: abort.signal });
+    const cancelled = expect(pending).rejects.toThrow();
+    await expect.poll(() => [...rt.sessions.values()].some(s => s.js?.status().state === 'running')).toBe(true);
+    abort.abort();
+    await cancelled;
+    await expect.poll(() => [...rt.sessions.values()].every(s => !s.js || s.js.status().state === 'idle')).toBe(true);
+    expect(rt.sessions.size).toBe(2);
     await first.close();
-    const response = await fetch(`http://${host.host}:${host.port}/session`, { method: 'DELETE', headers: { authorization: 'Bearer test', [SESSION_HEADER]: 'client-one' } });
-    expect(response.status).toBe(204);
-    expect(rt.sessions.has('client-one')).toBe(false);
-    expect(rt.sessions.has('client-two')).toBe(true);
+    await expect.poll(() => rt.sessions.size).toBe(1);
+    expect(await js(second, 'typeof count')).toMatchObject({ ok: true, value: 'undefined' });
+    await second.close();
+    await expect.poll(() => rt.sessions.size).toBe(0);
   });
 });
