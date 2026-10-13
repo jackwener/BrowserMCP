@@ -29,8 +29,8 @@
     "smoke:observation": "node scripts/smoke-observation.mjs",
     "prepare": "npm run build",
     "check": "npm run typecheck && npm run build && npm test",
-    "pack:store": "npm run build && node scripts/pack-store-extension.mjs",
-    "pack:manual": "npm run build && node scripts/pack-manual-extension.mjs",
+    "pack:store": "npm run build && node scripts/pack-extension.mjs store",
+    "pack:manual": "npm run build && node scripts/pack-extension.mjs manual",
     "smoke:native": "node scripts/smoke-native-capabilities.mjs",
     "generate:chrome": "node scripts/gen-chrome-reference.mjs"
   },
@@ -57,14 +57,12 @@
     "jsonc-parser": "^3.3.1",
     "tree-sitter-javascript": "^0.25.0",
     "web-tree-sitter": "^0.27.0",
-    "ws": "^8.21.3",
     "zod": "^4.6.5"
   },
   "devDependencies": {
     "@resvg/resvg-js": "^2.6.2",
     "@types/chrome": "^0.3.0",
     "@types/node": "^22.20.3",
-    "@types/ws": "^8.18.1",
     "esbuild": "^0.28.2",
     "playwright-core": "^1.63.0",
     "tsx": "^4.23.13",

@@ -80,7 +80,7 @@ class ExtensionPage implements ExtensionRuntimePage {
   }
 
   async goto(url: string, options?: { waitUntil?: 'load' | 'none'; settleMs?: number }): Promise<void> {
-    const result = await this.send('navigate', { url });
+    await this.send('navigate', { url });
     this._lastUrl = url;
     if (options?.waitUntil !== 'none') {
       // We drive the user's real Chrome via the extension — no anti-detection stealth needed; just wait for the DOM to settle.

@@ -11,7 +11,7 @@ import { ariaDiff } from './diff.js';
 import { networkDetail, networkSummary } from './network.js';
 import { ARIA_BUDGET, collapseAria } from '../shared/aria-collapse.js';
 import { targetToSelector, fallbackSelector, frameSteps } from '../shared/engine.js';
-import type { FindEntry, FindResult, QueryFindResult, ElementAtResult, Expectation, CheckResult, ReadTextResult, FrameObservation, FrameOwner, DomSnapshot, ElementDetails, ResolveFail } from '../shared/page-contract.js';
+import type { FindResult, QueryFindResult, ElementAtResult, Expectation, CheckResult, ReadTextResult, FrameObservation, FrameOwner, DomSnapshot, ElementDetails, ResolveFail } from '../shared/page-contract.js';
 import type { DialogInfo, DownloadWaitResult, FrameStep } from '../protocol.js';
 import type { SessionContext } from './context.js';
 

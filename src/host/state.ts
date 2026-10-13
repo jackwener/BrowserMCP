@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { Client } from '@modelcontextprotocol/client';
-import { connectSocket } from './socket.js';
+import { connectSocket, removeIpcEndpoint, type SocketTransport } from './socket.js';
 
 export const OPENCLI_MCP_DIR = path.join(os.homedir(), '.opencli-mcp');
 export const RUN_DIR = path.join(OPENCLI_MCP_DIR, 'run');
@@ -30,33 +30,36 @@ export function readHostStates(): HostState[] {
       const s = JSON.parse(fs.readFileSync(path.join(RUN_DIR, file), 'utf8')) as HostState;
       if (!Number.isSafeInteger(s.pid) || s.pid <= 0 || !s.browserId || !s.endpoint || `${s.instanceId}.json` !== file) return [];
       try { process.kill(s.pid, 0); } catch (error) {
-        if ((error as NodeJS.ErrnoException).code === 'ESRCH') { clearHostState(s.instanceId); return []; }
+        if ((error as NodeJS.ErrnoException).code === 'ESRCH') { removeIpcEndpoint(s.endpoint); clearHostState(s.instanceId); return []; }
       }
       return [s];
     } catch { return []; }
   });
 }
-export interface HostHealth { ok: boolean; backend?: string; sessions?: number; extensionConnected?: boolean; protocolWarning?: string | null; error?: string }
-export async function hostHealth(s: HostState | null, timeoutMs = 1500): Promise<HostHealth> {
-  if (!s) return { ok: false, error: 'No connected browser host' };
-  const client = new Client({ name: 'opencli-mcp-doctor', version: '1' });
-  try {
-    const transport = await connectSocket(s.endpoint, timeoutMs);
-    await client.connect(transport, { timeout: timeoutMs });
-    const result = await client.callTool({ name: 'doctor', arguments: {} }, { timeout: timeoutMs });
-    const text = result.content.find(item => item.type === 'text');
-    if (!text || text.type !== 'text' || result.isError) throw new Error('Invalid host status');
-    const report = JSON.parse(text.text) as { backend: string; sessions: number; extension: { connected: boolean; protocolWarning: string | null } };
-    return { ok: true, backend: report.backend, sessions: Math.max(0, report.sessions - 1), extensionConnected: report.extension.connected, protocolWarning: report.extension.protocolWarning };
-  } catch (error) { return { ok: false, error: (error as Error).message }; }
-  finally { await client.close().catch(() => {}); }
+export class HostConnectionError extends Error {
+  constructor(readonly code: 'host_unavailable' | 'browser_selection_required', message: string) { super(message); }
 }
+export interface HostConnection { state: HostState; client: Client; transport: SocketTransport }
 
-/** Never silently switch profiles. An existing launcher pins its first browser ID. */
-export async function discoverHost(browserId = process.env.OPENCLI_MCP_BROWSER ?? readConfig().browserId): Promise<HostState> {
-  const states = readHostStates().filter(s => !browserId || s.browserId === browserId);
-  const healthy = (await Promise.all(states.map(async s => (await hostHealth(s)).ok ? s : null))).filter((s): s is HostState => s !== null);
-  if (healthy.length === 1) return healthy[0];
-  if (!healthy.length) throw new Error(browserId ? `Browser ${browserId} is not connected. Open that profile and enable the extension.` : 'No browser host is connected. Open Chrome and enable the extension.');
-  throw new Error(`Multiple browser hosts are connected. Set browserId in ~/.opencli-mcp/config.json or OPENCLI_MCP_BROWSER to one of: ${[...new Set(healthy.map(s => s.browserId))].join(', ')}`);
+/** Initialize candidates once and retain the selected MCP connection for actual work. */
+export async function connectHost(browserId = process.env.OPENCLI_MCP_BROWSER ?? readConfig().browserId, states = readHostStates()): Promise<HostConnection> {
+  const candidates = states.filter(s => !browserId || s.browserId === browserId);
+  const connected = (await Promise.all(candidates.map(async state => {
+    const client = new Client({ name: 'opencli-mcp', version: '1' });
+    let transport: SocketTransport | undefined;
+    try {
+      transport = await connectSocket(state.endpoint);
+      await client.connect(transport, { timeout: 1500 });
+      return { state, client, transport };
+    } catch {
+      await transport?.close();
+      return null;
+    }
+  }))).filter((c): c is HostConnection => c !== null && !c.transport.closed);
+  if (connected.length === 1) return connected[0];
+  await Promise.all(connected.map(c => c.client.close().catch(() => {})));
+  if (!connected.length) throw new HostConnectionError('host_unavailable', browserId
+    ? `Browser ${browserId} is not connected. Open that profile and enable the extension.`
+    : 'No browser host is connected. Open Chrome and enable the extension.');
+  throw new HostConnectionError('browser_selection_required', `Multiple browser hosts are connected. Set browserId in ~/.opencli-mcp/config.json or OPENCLI_MCP_BROWSER to one of: ${[...new Set(connected.map(c => c.state.browserId))].join(', ')}`);
 }

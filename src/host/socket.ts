@@ -1,5 +1,8 @@
 /** Standard MCP stream framing over local IPC, shared by both ends of the connection. */
 import net from 'node:net';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import { StdioServerTransport } from '@modelcontextprotocol/server/stdio';
 
 export class SocketTransport extends StdioServerTransport {
@@ -8,6 +11,8 @@ export class SocketTransport extends StdioServerTransport {
     super(socket, socket);
     socket.once('close', () => { void this.close(); });
   }
+
+  get closed(): boolean { return this.socket.destroyed; }
 
   override close(): Promise<void> {
     // The SDK stream transport does not own its streams; this IPC transport does.
@@ -30,4 +35,15 @@ export async function connectSocket(endpoint: string, timeoutMs = 1500): Promise
   // Cover the gap before Client.connect installs its error handlers.
   socket.on('error', () => {});
   return new SocketTransport(socket);
+}
+
+/** Only remove our socket and its now-empty directory, never arbitrary directory contents. */
+export function removeIpcEndpoint(endpoint: string): void {
+  if (process.platform === 'win32') return;
+  const dir = path.dirname(endpoint);
+  if (path.basename(endpoint) !== 'host.sock' || path.dirname(dir) !== path.resolve(os.tmpdir()) || !/^opencli-ipc-[\w-]+$/.test(path.basename(dir))) return;
+  fs.rmSync(endpoint, { force: true });
+  try { fs.rmdirSync(dir); } catch (error) {
+    if (!['ENOENT', 'ENOTEMPTY'].includes((error as NodeJS.ErrnoException).code ?? '')) throw error;
+  }
 }

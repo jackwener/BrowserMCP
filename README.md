@@ -126,7 +126,7 @@ Site commands execute directly without additional approval prompts. The read/wri
 
 | Guide | Contents |
 |---|---|
-| [Installation and configuration](docs/setup.md) | Source installs, browser profiles, remote clients, settings, troubleshooting |
+| [Installation and configuration](docs/setup.md) | Source installs, browser profiles, local connections, settings, troubleshooting |
 | [中文指南](docs/guide.zh-CN.md) | Chinese project overview and detailed usage |
 | [Site commands](docs/sites.md) | Discovering, enabling, and running adapters |
 | [JavaScript guide](docs/js-tool.md) | Persistent sessions and the object API |

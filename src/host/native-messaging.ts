@@ -45,7 +45,7 @@ export interface NativeChannelEvents {
 export class NativeChannel extends EventEmitter<NativeChannelEvents> {
   private readonly decoder = new FrameDecoder();
   private closed = false;
-  constructor(private readonly input: Readable, private readonly output: Writable) {
+  constructor(input: Readable, private readonly output: Writable) {
     super();
     this.decoder.onBadFrame = (err, preview) => this.emit('error', new Error(`bad native frame: ${err.message} (${preview})`));
     input.on('data', (chunk: Buffer) => {

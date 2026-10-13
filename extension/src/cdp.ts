@@ -547,7 +547,6 @@ export async function waitForDownload(tabId: number, afterSequence: number, time
  */
 interface OopifSession { sessionId: string; targetId: string; url: string; parentSessionId?: string }
 const oopifByTab = new Map<number, Map<string, OopifSession>>(); // tabId → targetId(frameId) → session
-const oopifWaiters = new Map<string, Set<() => void>>();          // `${tabId}:${frameId}` → resolvers waiting for attach
 
 export function oopifSessions(tabId: number): OopifSession[] { return [...(oopifByTab.get(tabId)?.values() ?? [])]; }
 
@@ -555,7 +554,6 @@ function noteOopif(tabId: number, info: { targetId: string; type: string; url: s
   if (info.type !== 'iframe') return;
   if (!oopifByTab.has(tabId)) oopifByTab.set(tabId, new Map());
   oopifByTab.get(tabId)!.set(info.targetId, { sessionId, targetId: info.targetId, url: info.url, parentSessionId });
-  for (const w of oopifWaiters.get(`${tabId}:${info.targetId}`) ?? []) w();
   // the child may host further OOPIFs: auto-attach from its session too (Page must be enabled for frame trees)
   void sendDebuggerCommand({ tabId, sessionId } as chrome.debugger.Debuggee, 'Target.setAutoAttach', { autoAttach: true, waitForDebuggerOnStart: false, flatten: true }, 3_000).catch(() => {});
   void sendDebuggerCommand({ tabId, sessionId } as chrome.debugger.Debuggee, 'Page.enable', undefined, 3_000).catch(() => {});
@@ -588,26 +586,6 @@ async function frameDebuggee(tabId: number, frameId: string, aggressiveRetry = f
   catch (e) { const msg = e instanceof Error ? e.message : String(e); if (!/already attached/i.test(msg)) throw Object.assign(new Error(`frame ${frameId} has no attachable target: ${msg}`), { code: 'frame_unreachable' }); }
   directTargets.set(key, frameId);
   return { targetId: frameId } as chrome.debugger.Debuggee;
-}
-
-async function ensureFrameSession(tabId: number, frameId: string, aggressiveRetry = false, waitMs = 1_500): Promise<OopifSession> {
-  await ensureAttached(tabId, aggressiveRetry);
-  const found = oopifByTab.get(tabId)?.get(frameId);
-  if (found) return found;
-  await armOopifAutoAttach(tabId);
-  const again = oopifByTab.get(tabId)?.get(frameId);
-  if (again) return again;
-  // the frame may be attaching right now (navigation in flight): wait briefly for its attachedToTarget
-  const key = `${tabId}:${frameId}`;
-  await new Promise<void>((resolve) => {
-    const w = () => { oopifWaiters.get(key)?.delete(w); resolve(); };
-    if (!oopifWaiters.has(key)) oopifWaiters.set(key, new Set());
-    oopifWaiters.get(key)!.add(w);
-    setTimeout(w, waitMs);
-  });
-  const late = oopifByTab.get(tabId)?.get(frameId);
-  if (late) return late;
-  throw Object.assign(new Error(`frame ${frameId} has no out-of-process target`), { code: 'frame_unreachable' });
 }
 
 /** True when the frame renders in its own process (has an auto-attached iframe session); false for in-process frames. */

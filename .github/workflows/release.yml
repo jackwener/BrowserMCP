@@ -70,7 +70,7 @@ jobs:
           npm pack --silent
           test -f "opencli-mcp-${RELEASE_VERSION}.tgz"
       - name: Package manual Chrome extension
-        run: node scripts/pack-manual-extension.mjs
+        run: node scripts/pack-extension.mjs manual
       - name: Check installed package
         run: |
           npm install --prefix "$RUNNER_TEMP/package-smoke" --ignore-scripts --no-audit --no-fund "./opencli-mcp-${RELEASE_VERSION}.tgz"

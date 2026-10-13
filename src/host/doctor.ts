@@ -5,8 +5,9 @@ import { execFileSync } from 'node:child_process';
 import { inspectLaunch, LAUNCHER_PATH, type LaunchHealth } from './launch.js';
 import { NATIVE_HOST_NAME } from '../protocol.js';
 import { nativeHostDirs, runningProfileDirs } from './registration.js';
+import type { DoctorReport } from '../runtime/runtime.js';
 import { EXTENSION_ID, EXTENSION_STORE_URL } from './extension.js';
-import { hostHealth, discoverHost, readHostStates, RUN_DIR, type HostState, type HostHealth } from './state.js';
+import { connectHost, HostConnectionError, readHostStates, RUN_DIR, type HostState } from './state.js';
 
 export interface DoctorResult {
   ok: boolean;
@@ -37,9 +38,23 @@ export async function doctor(): Promise<DoctorResult> {
   });
   const hosts = readHostStates();
   let state: HostState | null = null;
-  let discoveryError: string | undefined;
-  try { state = await discoverHost(); } catch (error) { discoveryError = (error as Error).message; }
-  const health: HostHealth = state ? await hostHealth(state) : { ok: false, error: discoveryError };
+  let error: string | undefined;
+  let selectionRequired = false;
+  let report: DoctorReport | undefined;
+  try {
+    const connection = await connectHost(undefined, hosts);
+    state = connection.state;
+    try {
+      const result = await connection.client.callTool({ name: 'doctor', arguments: {} }, { timeout: 1500 });
+      const text = result.content.find(item => item.type === 'text');
+      if (!text || text.type !== 'text' || result.isError) throw new Error('Invalid host status');
+      report = JSON.parse(text.text) as DoctorReport;
+    } finally { await connection.client.close(); }
+  } catch (err) {
+    error = (err as Error).message;
+    selectionRequired = err instanceof HostConnectionError && err.code === 'browser_selection_required';
+  }
+  const health = { ok: Boolean(report), backend: report?.backend, extensionConnected: report?.extension.connected, protocolWarning: report?.extension.protocolWarning, error };
   let chromeRunning: boolean | null = null;
   if (process.platform !== 'win32') {
     try { const out = execFileSync('pgrep', ['-fl', 'Google Chrome|Chromium|Microsoft Edge|Brave Browser'], { encoding: 'utf8', stdio: 'pipe' }); chromeRunning = out.trim().length > 0; } catch { chromeRunning = false; }
@@ -49,7 +64,8 @@ export async function doctor(): Promise<DoctorResult> {
   if (!registered) advice.push('Run `opencli-mcp setup` to register or repair the browser connection.');
   for (const d of running) if (!manifests.find((m) => m.browser === `profile:${d}`)?.present) advice.push(`Chrome is running with --user-data-dir=${d} but that profile has no host manifest: run \`opencli-mcp setup\` (it writes to running profiles automatically) and reload the extension there.`);
   if (!launch.ready) advice.push(...launch.errors, 'Run `opencli-mcp setup` from a working Node installation to repair startup. If the package is missing, reinstall opencli-mcp first.');
-  if (launch.ready && !health.ok) advice.push(`Host not reachable (${health.error ?? 'unknown'}). Open Chrome and install or enable the extension: ${EXTENSION_STORE_URL}. It reconnects automatically; if it stays disconnected, disable and re-enable it in chrome://extensions.`);
+  if (selectionRequired) advice.push(error!);
+  else if (launch.ready && !health.ok) advice.push(`Host not reachable (${health.error ?? 'unknown'}). Open Chrome and install or enable the extension: ${EXTENSION_STORE_URL}. It reconnects automatically; if it stays disconnected, disable and re-enable it in chrome://extensions.`);
   else if (health.ok && !health.extensionConnected) advice.push('Host is running but the browser is not connected. Enable the extension in Chrome; if it stays disconnected, disable and re-enable it in chrome://extensions.');
   else if (health.protocolWarning) advice.push(`Warning: ${health.protocolWarning}`);
   if (chromeRunning === false) advice.push('No Chromium-based browser process found; start Chrome.');
@@ -59,7 +75,7 @@ export async function doctor(): Promise<DoctorResult> {
     launch,
     extension: { id: EXTENSION_ID, storeUrl: EXTENSION_STORE_URL },
     manifests,
-    host: { registryDirectory: RUN_DIR, running: health.ok, browserId: state?.browserId, endpoint: state?.endpoint, instances: hosts, backend: health.backend, extensionConnected: health.extensionConnected, protocolWarning: health.protocolWarning, error: health.error },
+    host: { registryDirectory: RUN_DIR, running: health.ok || selectionRequired, browserId: state?.browserId, endpoint: state?.endpoint, instances: hosts, backend: health.backend, extensionConnected: health.extensionConnected, protocolWarning: health.protocolWarning, error: health.error },
     chromeRunning,
     advice,
   };
