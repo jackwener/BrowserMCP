@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.0.30 — 2026-10-14
+
+- Replace the local HTTP bridge with MCP over Unix domain sockets / Windows named pipes; remove port, token, and remote MCP configuration.
+- Reuse initialized host connections, keep each client session isolated, and reconnect to the same browser profile. Report session loss explicitly and never replay interrupted operations.
+- Distinguish browser selection from connection failures and reclaim stale IPC endpoints after host crashes.
+- Preserve explicitly organized tab groups through session cleanup.
+- Remove unused dependencies and frame-session code; consolidate extension packaging.
+
+Upgrade note: this release requires extension 0.0.22 alongside npm package 0.0.30. Update both, then reload the extension and restart your MCP client to switch from the old HTTP launcher to local IPC. Existing MCP stdio command configuration stays the same. Windows named pipes have not been verified on a Windows machine.
+
 ## 0.0.29 — 2026-10-09
 
 - chore: prepare extension 0.0.21 release
