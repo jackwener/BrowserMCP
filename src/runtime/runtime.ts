@@ -2,6 +2,7 @@
  * Runtime — the resident kernel: site registry, per-MCP-session state, and page backends.
  * Lives inside the Chrome-spawned host. The stdio launcher proxies to this runtime.
  */
+import type { ObserveResult } from '../api/tab.js';
 import { EventEmitter } from 'node:events';
 import type { ExtensionBridge } from '../host/bridge.js';
 import type { BrowserEvent } from '../protocol.js';
@@ -41,6 +42,8 @@ export interface SessionState {
   capabilities: Set<string>;
   js?: JsSession;
   observationSeq: number;
+  /** Most recent immutable observation per tab; replaced on fresh capture, cleared on release. */
+  observations: Map<string, ObserveResult>;
   lastObserve: Map<string, { id: string; text: string }>;
   /** Network entries seen per tab, with monotonically increasing sequence numbers for cursor-based reads. */
   netLog: Map<string, { seq: number; entries: Array<Record<string, unknown> & { seq: number }>; seen: Set<string>; bodyChars: number }>;
@@ -111,7 +114,7 @@ export class Runtime extends EventEmitter<RuntimeEvents> implements PageProvider
   session(id: string): SessionState {
     let s = this.sessions.get(id);
     if (!s) {
-      s = { id, createdAt: Date.now(), pages: new Map(), tabLocks: new Map(), enabledSites: new Map(), capabilities: new Set(), observationSeq: 0, lastObserve: new Map(), netLog: new Map(), finalized: false };
+      s = { id, createdAt: Date.now(), pages: new Map(), tabLocks: new Map(), enabledSites: new Map(), capabilities: new Set(), observationSeq: 0, observations: new Map(), lastObserve: new Map(), netLog: new Map(), finalized: false };
       this.sessions.set(id, s);
     }
     return s;
@@ -136,7 +139,7 @@ export class Runtime extends EventEmitter<RuntimeEvents> implements PageProvider
     s.pages.set(pageId, page);
     return page;
   }
-  forgetPage(sessionId: string, pageId: string): void { const s = this.sessions.get(sessionId); s?.pages.delete(pageId); s?.tabLocks.delete(pageId); if (s) for (const key of s.lastObserve.keys()) if (key.startsWith(`${pageId}:`)) s.lastObserve.delete(key); }
+  forgetPage(sessionId: string, pageId: string): void { const s = this.sessions.get(sessionId); s?.observations.delete(pageId); s?.pages.delete(pageId); s?.tabLocks.delete(pageId); if (s) for (const key of s.lastObserve.keys()) if (key.startsWith(`${pageId}:`)) s.lastObserve.delete(key); }
 
   /** Bind each adapter call to the site's current live tab; the extension owns that selection. */
   async getAdapterPage(site: string): Promise<RuntimePage> {

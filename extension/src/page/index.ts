@@ -11,8 +11,6 @@ import {
   type ReadTextArgs, type ReadTextResult, type DomClickArgs, type DomClickResult, type DomSnapshot, type ObserveFrameArgs, type FrameObservation, type ElementDetails,
 } from '../../../src/shared/page-contract.js';
 import { ARIA_REF_LINE } from '../../../src/shared/element-ref.js';
-import { collapseAria, subtreeByRef } from '../../../src/shared/aria-collapse.js';
-export { collapseAria, subtreeByRef };
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 type Injected = any;
@@ -523,11 +521,25 @@ function intersectsViewport(el: Element): boolean {
   for (const r of el.getClientRects()) if (r.width > 0 && r.height > 0 && r.right > 0 && r.bottom > 0 && r.left < vw && r.top < vh) return true;
   return false;
 }
+function observationRoot(args: AriaArgs): Element | Document {
+  if (args.ref) return requireRef(args.ref);
+  if (!args.selector) return document;
+  let matches = query(args.selector);
+  if (!matches.length && args.fallback) matches = query(args.fallback);
+  if (!matches.length) throw pageError('not_found', `No element matches ${args.selector}`, 'Observe the page or find the container again.');
+  if (matches.length > 1) {
+    const visible = matches.filter(el => is(el, 'visible'));
+    if (visible.length !== 1) throw pageError('selector_ambiguous', `${matches.length} elements match ${args.selector}`, 'Use a more specific locator.');
+    matches = visible;
+  }
+  return matches[0];
+}
+
 export function aria(args: AriaArgs = {}): string {
-  if (args.ref) requireRef(args.ref);
+  const root = observationRoot(args);
   const i = injected();
   annotatedRefs = [];
-  const raw: string = i.ariaSnapshot(document.body || document.documentElement, { mode: 'ai' });
+  const raw: string = i.ariaSnapshot(root === document ? document.body || document.documentElement : root, { mode: 'ai' });
   resetRefsIfEngineChanged();
   // Resolve native refs through the same engine that emitted them, synchronously within this capture.
   const elements = new Map<string, Element>();
@@ -563,7 +575,7 @@ export function aria(args: AriaArgs = {}): string {
   annotatedRefs = [...elements.values()].map(stableRefOf);
   // AX snapshots omit hidden file controls. Include them as addressable upload targets.
   const inAx = new Set(elements.values());
-  const missingFiles = [...document.querySelectorAll<HTMLInputElement>('input[type=file]')].filter((el) => !inAx.has(el));
+  const missingFiles = [...(root instanceof HTMLInputElement && root.type === 'file' ? [root] : []), ...root.querySelectorAll<HTMLInputElement>('input[type=file]')].filter((el) => !inAx.has(el));
   for (const input of missingFiles.slice(0, 20)) {
     const label = input.labels?.[0]?.textContent?.trim() || input.getAttribute('aria-label') || input.name || 'file upload';
     const hidden = !is(input, 'visible') || !intersectsViewport(input);
@@ -572,15 +584,8 @@ export function aria(args: AriaArgs = {}): string {
   if (missingFiles.length > 20) out.push(`- ${missingFiles.length - 20} more file inputs omitted`);
   // the plugin always ends its state with the focused element; ours names the focused ref so the next action can target it
   const active = document.activeElement;
-  const focusRef = active && active !== document.body ? ariaRefOf(active) : null;
-  let text = out.join('\n') + (focusRef ? `\nFocused: [ref=${focusRef}]` : '');
-  if (args.ref) {
-    const sub = subtreeByRef(text, args.ref);
-    if (sub == null) return `No node [ref=${args.ref}] in this snapshot. Observe again without ref.`;
-    text = sub;
-  }
-  // The host collapses the copy it returns. A caller that passes budget (tests) collapses here.
-  return typeof args.budget === 'number' ? collapseAria(text, args.budget).text : text;
+  const focusRef = active && active !== document.body && root.contains(active) ? ariaRefOf(active) : null;
+  return out.join('\n') + (focusRef ? `\nFocused: [ref=${focusRef}]` : '');
 }
 
 /** Read live properties, not initial HTML value/checked attributes. */
@@ -611,8 +616,7 @@ function isControl(el: Element): boolean {
 
 /** Independent DOM evidence, including open shadow roots; shares stable refs with ARIA and actions. */
 export function visibleDom(args: ObserveFrameArgs = {}): DomSnapshot {
-  const root = args.ref ? query(`aria-ref=${args.ref}`)[0] : document;
-  if (!root) throw new Error(`stale_ref: ${args.ref}; observe again without ref`);
+  const root = observationRoot(args);
   const elements = [...(root instanceof Element ? [root] : []), ...query('css=*', root)]
     .filter(el => isControl(el) && is(el, 'visible') && (args.viewport === false || intersectsViewport(el)));
   const start = Math.max(0, Math.floor(args.start ?? 0));
@@ -629,7 +633,7 @@ export function visibleDom(args: ObserveFrameArgs = {}): DomSnapshot {
 /** Capture one document and describe its frame owners without entering or scrolling them. */
 export function observeFrame(args: ObserveFrameArgs = {}): FrameObservation {
   const content = args.format === 'dom' ? { dom: visibleDom(args) } : { state: aria(args) };
-  const root = args.ref ? query(`aria-ref=${args.ref}`)[0] : document;
+  const root = observationRoot(args);
   const children = root ? [...(root instanceof Element && /^(IFRAME|FRAME)$/.test(root.tagName) ? [root] : []), ...query('css=iframe,frame', root)]
     .filter(el => el.getAttribute('aria-hidden') !== 'true' && is(el, 'visible') && (!args.viewport || intersectsViewport(el)))
     .map(el => ({ ref: ariaRefOf(el)!, id: el.id, name: el.getAttribute('name') ?? '', src: el.getAttribute('src') ?? '' })) : [];

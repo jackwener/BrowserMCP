@@ -126,8 +126,8 @@ interface ActionOutcome {
   download?: { afterSequence: number; started: Array<{ seq: number; guid?: string; url: string; suggestedFilename: string }> }; method?: 'dom';
 }
 
-interface ObserveOptions {
-  mode?: 'state' | 'screenshot' | 'both'; format?: 'aria' | 'dom'; frame?: FrameStep | FrameStep[]; since?: string; viewport?: boolean; ref?: string; start?: number;
+interface ObserveOptions { cursor?: string;
+  mode?: 'state' | 'screenshot' | 'both'; format?: 'aria' | 'dom'; frame?: FrameStep | FrameStep[]; since?: string; viewport?: boolean; ref?: string; target?: Target; start?: number;
   limit?: number; includeFrames?: boolean; annotate?: boolean;
   fullPage?: boolean;
 }
@@ -193,11 +193,11 @@ interface DownloadWaitResult {
 interface EventStream { read(options?: StreamReadOptions): Promise<StreamBatch>; close(): Promise<void>;
 }
 
-interface ObservedContent { state?: string; dom?: DomSnapshot; warnings?: string[]; diff?: boolean; changed?: { added: number; removed: number; changed?: number } }
+interface ObservedContent { metadataTruncated?: boolean; stateContinued?: boolean; stateContinues?: boolean; state?: string; dom?: DomSnapshot; warnings?: string[]; diff?: boolean; changed?: { added: number; removed: number; changed?: number } }
 
 interface ObservedFrame extends ObservedContent { frame: FrameStep[]; owner: FrameOwner; unavailable?: string }
 
-interface ObserveResult extends ObservedContent {
+interface ObserveResult extends ObservedContent { complete?: boolean; nextCursor?: string;
   url: string | null; title: string | null; snapshotId?: string; image?: ImageValue; frames?: ObservedFrame[]; framesComplete?: boolean;
 }
 

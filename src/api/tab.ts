@@ -9,7 +9,8 @@ import { ActionError } from './errors.js';
 import { checkActInput, checkExpect } from './action-input.js';
 import { ariaDiff } from './diff.js';
 import { networkDetail, networkSummary } from './network.js';
-import { ARIA_BUDGET, collapseAria } from '../shared/aria-collapse.js';
+import { compactAria } from '../shared/aria-tree.js';
+import { observationPage } from './observation.js';
 import { targetToSelector, fallbackSelector, frameSteps } from '../shared/engine.js';
 import type { FindResult, QueryFindResult, ElementAtResult, Expectation, CheckResult, ReadTextResult, FrameObservation, FrameOwner, DomSnapshot, ElementDetails, ResolveFail } from '../shared/page-contract.js';
 import type { DialogInfo, DownloadWaitResult, FrameStep } from '../protocol.js';
@@ -44,6 +45,8 @@ export interface ActionOutcome {
 }
 
 export interface ObserveOptions {
+  /** Continue the previous immutable capture. Pass cursor alone; a fresh observation replaces it. */
+  cursor?: string;
   mode?: 'state' | 'screenshot' | 'both';
   /** ARIA overview (default) or independent visible controls and live DOM attributes. */
   format?: 'aria' | 'dom';
@@ -55,6 +58,8 @@ export interface ObserveOptions {
   viewport?: boolean;
   /** Open a branch in the selected frame. */
   ref?: string;
+  /** Observe a known container using the same locator contract as read/act, without first obtaining a ref. */
+  target?: Target;
   /** DOM pagination within the selected frame. The live page can change between calls. */
   start?: number;
   limit?: number;
@@ -64,9 +69,13 @@ export interface ObserveOptions {
   annotate?: boolean;
   fullPage?: boolean;
 }
-export interface ObservedContent { state?: string; dom?: DomSnapshot; warnings?: string[]; diff?: boolean; changed?: { added: number; removed: number; changed?: number } }
+export interface ObservedContent { /** Long URL/title/frame metadata was abbreviated; page evidence uses cursor pagination. */ metadataTruncated?: boolean; /** A single oversized text line can span pages. Concatenate these fragments before interpreting it. */ stateContinued?: boolean; stateContinues?: boolean; state?: string; dom?: DomSnapshot; warnings?: string[]; diff?: boolean; changed?: { added: number; removed: number; changed?: number } }
 export interface ObservedFrame extends ObservedContent { frame: FrameStep[]; owner: FrameOwner; unavailable?: string }
 export interface ObserveResult extends ObservedContent {
+  /** Whether this is the final output page, not a claim that all dynamic page content was captured. */
+  complete?: boolean;
+  /** Continue this captured state with observe({cursor: nextCursor}). */
+  nextCursor?: string;
   url: string | null; title: string | null; snapshotId?: string; image?: ImageValue;
   /** Refs are local to each frame. Copy this path into observe.frame or target.frame. */
   frames?: ObservedFrame[];
@@ -156,16 +165,26 @@ export class Tab {
   async observe(opts: ObserveOptions = {}): Promise<ObserveResult> {
     const mode = opts.mode ?? 'state';
     return this.use(async (page) => {
+      if (opts.cursor !== undefined) {
+        if (Object.keys(opts).some(key => key !== 'cursor')) throw new ActionError('invalid_argument', 'Pass cursor alone when continuing an observation.', 'Use tab.observe({cursor}) or start a fresh observation with other options.');
+        const previous = this.ctx.state.observations.get(this.id);
+        if (!previous) throw new ActionError('stale_observation', 'No captured observation remains for this tab.', 'Call tab.observe() for a fresh snapshot.');
+        return observationPage(previous, opts.cursor);
+      }
       const out: ObserveResult = { ...await this.info(page) };
       if (mode === 'state' || mode === 'both') {
         const snapshotId = `${++this.ctx.state.observationSeq}`;
         out.snapshotId = snapshotId;
-        const base = frameSteps(opts.frame);
-        const viewport = opts.ref ? false : opts.viewport ?? (opts.format === 'dom');
+        if (opts.target && opts.ref) throw new ActionError('invalid_target', 'Use either target or ref to scope an observation.', 'Pass one locator.');
+        if (opts.target?.frame && opts.frame) throw new ActionError('invalid_target', 'Frame was specified twice.', 'Put frame in target.frame or observe.frame.');
+        const selector = opts.target ? targetToSelector(opts.target) : null;
+        if (opts.target && !selector) throw new ActionError('invalid_target', 'Observation scope needs a ref or locator.', 'Use find({x,y}) first for a screenshot coordinate.');
+        const base = frameSteps(opts.target?.frame ?? opts.frame);
+        const viewport = opts.ref || opts.target ? false : opts.viewport ?? (opts.format === 'dom');
         const render = (capture: FrameObservation, frame: FrameStep[], ref?: string): ObservedContent => {
           if (capture.dom) return { dom: capture.dom };
-          let text = capture.state ?? '';
-          const key = `${this.id}:${JSON.stringify(frame)}:${viewport ? 'vp' : 'all'}:${ref ?? ''}`;
+          let text = compactAria(capture.state ?? '');
+          const key = `${this.id}:${JSON.stringify(frame)}:${viewport ? 'vp' : 'all'}:${ref ?? (frame.length === base.length ? selector ?? '' : '')}`;
           const prev = this.ctx.state.lastObserve.get(key);
           this.ctx.state.lastObserve.set(key, { id: snapshotId, text });
           const content: ObservedContent = { ...(capture.warnings && { warnings: capture.warnings }) };
@@ -179,19 +198,19 @@ export class Tab {
               text = (d.text || 'There has been no change since the last observe.') + (focus ? `\n${focus}` : '');
             }
           }
-          content.state = collapseAria(text, ARIA_BUDGET).text;
+          content.state = text;
           return content;
         };
         const capture = (frame: FrameStep[], ref?: string, root = false) => page.pageCall('observeFrame', {
           format: opts.format ?? 'aria', viewport, ...(ref && { ref }),
-          ...(root && { start: opts.start, limit: opts.limit }),
+          ...(root && { start: opts.start, limit: opts.limit, ...(selector && { selector, fallback: fallbackSelector(opts.target!) }) }),
         }, 5000, frame) as Promise<FrameObservation>;
         const root = await capture(base, opts.ref, true);
         Object.assign(out, render(root, base, opts.ref));
         if (root.warnings?.length) out.framesComplete = false;
         if (opts.includeFrames !== false && root.children.length) {
           out.frames = [];
-          out.framesComplete = true;
+          out.framesComplete = !root.warnings?.length;
           let captured = 0;
           const visit = async (parent: FrameStep[], owners: FrameOwner[], depth: number): Promise<void> => {
             for (const owner of owners) {
@@ -207,13 +226,19 @@ export class Tab {
                   await visit(frame, child.children, depth + 1);
                 } catch (error) { result.unavailable = String((error as Error).message ?? error); }
               }
-              if (result.unavailable) out.framesComplete = false;
+              if (result.unavailable || result.warnings?.length) out.framesComplete = false;
             }
           };
           await visit(base, root.children, 0);
         }
       }
-      if (mode === 'screenshot' || mode === 'both') out.image = await this.screenshotOn(page, { annotate: opts.annotate, fullPage: opts.fullPage });
+      if (mode === 'state' || mode === 'both') {
+        this.ctx.state.observations.set(this.id, out);
+        const result = observationPage(out);
+        if (mode === 'both') result.image = await this.screenshotOn(page, { annotate: opts.annotate, fullPage: opts.fullPage });
+        return result;
+      }
+      out.image = await this.screenshotOn(page, { annotate: opts.annotate, fullPage: opts.fullPage });
       return out;
     });
   }

@@ -50,12 +50,12 @@ export interface FindResult { matches_n: number; visible_n: number; selector: st
 export interface QueryFindResult { matches_n: number; entries: Array<FindEntry & { path: string[]; interactiveAncestorRef: string | null }> }
 
 export interface AriaArgs {
+  selector?: string;
+  fallback?: string | null;
   /** only the subtree of elements intersecting the viewport */
   viewport?: boolean;
-  /** open one branch of a previous snapshot (opaque ref). Ignores viewport so an off-screen collapsed branch can be read. */
+  /** open one branch of a previous snapshot (opaque ref). Ignores viewport so an off-screen branch can be read. */
   ref?: string;
-  /** character budget before branches with a ref collapse. The host uses the default; tests pass a small one. */
-  budget?: number;
 }
 
 /** Compact DOM evidence. Truncated fields can be read exactly with tab.read({target:{ref}}). */

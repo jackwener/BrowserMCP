@@ -170,6 +170,12 @@ try {
   assert((await tab.find({ query: 'shadow-live' })).entries.length);
   assert((await tab.read({ maxChars: 20000 })).text.includes('Shadow article content'));
   console.log('Passed: independent DOM evidence, live state, shadow content, pagination, full exact read and DOM query.');
+  const scoped = await tab.observe({target:{selector:'#shadow'}});
+  assert(scoped.state.includes('Shadow action') && !scoped.state.includes('Main action'));
+  assert(scoped.frames.every(frame => frame.owner.id === 'shadow-frame'));
+  assert((await tab.observe({target:{frame:child.frame, role:'button', name:'Frame action'}})).state.includes('Frame action'));
+  await assert.rejects(tab.observe({target:{selector:'button'}}), error => error.code === 'selector_ambiguous');
+
 
   const field = await tab.find({ frame: child.frame, label: 'Cost center' });
   assert.equal((await tab.read({ target: { frame: child.frame, ref: field.entries[0].ref } })).attrs.value, 'live-value');
@@ -336,6 +342,36 @@ try {
   assert(!events.some(e => e.id === 'blurred' && e.type === 'keydown'), 'No key after focus loss');
   console.log('Passed: browser text insertion, clear/append, formatting/rejection/reset, native controls, rich text, shadow inputs, and focus failure.');
   console.log('Passed: observe → find → exact read → real click/fill → observe, including OOPIF/nested/shadow controls and scoped diffs.');
+  await page.evaluate(() => {
+    document.body.innerHTML = '<section id="large" aria-label="Results">' + Array.from({length:600}, (_, i) => `<button>Result ${i}</button>`).join('') + '<iframe id="paged-frame" src="/nested"></iframe></section>';
+  });
+  await page.frameLocator('#paged-frame').getByRole('button').waitFor();
+  const firstPage = await js('await tab.observe({target:{selector:"#large"}})');
+  assert(firstPage.ok && firstPage.value.nextCursor && !firstPage.truncated, JSON.stringify(firstPage).slice(0, 300));
+  const oldCursor = firstPage.value.nextCursor;
+  let current = firstPage.value, collected = current.state, frameText = '', pages = 1;
+  // Pagination is stable even if the live DOM changes in the meantime.
+  await page.evaluate(() => document.querySelector('#large button').textContent = 'Changed after capture');
+  while (current.nextCursor) {
+    const response = await js(`await tab.observe({cursor:${JSON.stringify(current.nextCursor)}})`);
+    assert(response.ok && !response.truncated);
+    assert(JSON.stringify(response).length <= 12000);
+    current = response.value;
+    collected += current.state ?? '';
+    frameText += (current.frames ?? []).map(frame => frame.state ?? '').join('');
+    assert(++pages < 30, 'Every cursor must make progress');
+  }
+  assert(current.complete && pages > 1);
+  assert(frameText.includes('Nested action'), 'Child evidence shares the same cursor and output budget');
+  assert.equal((collected.match(/- button /g) ?? []).length, 600);
+  assert(collected.includes('Result 599') && !collected.includes('Changed after capture'));
+  const rootRef = (await tab.find({selector:'#large'})).entries[0].ref;
+  const expanded = await tab.observe({ref:rootRef});
+  assert(expanded.state.includes('Changed after capture'), 'Ref expansion must expose children of a large branch');
+  assert(expanded.nextCursor, 'A large branch remains readable through continuation');
+  assert.equal((await js(`await tab.observe({cursor:${JSON.stringify(oldCursor)}})`)).error.code, 'stale_observation');
+  console.log('Passed: scoped snapshots, large-branch expansion, bounded MCP output and immutable cursor pagination.');
+
 } finally {
   await client?.close();
   await mcp?.close();

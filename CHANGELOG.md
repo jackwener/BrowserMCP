@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- Page observations across the main document and child frames under one output budget, with explicit cursors over an immutable capture. Remove recursive branch folding that could hide the same branch on every expansion.
+- Scope observations directly with existing locators or refs, and remove inert ARIA wrappers while preserving names, states, refs and explanatory text.
+- Describe observation continuation in the MCP tool itself; distinguish output pagination, frame capture coverage, long-text fragments and abbreviated metadata.
+
 ## 0.0.30 — 2026-10-14
 
 - Replace the local HTTP bridge with MCP over Unix domain sockets / Windows named pipes; remove port, token, and remote MCP configuration.
