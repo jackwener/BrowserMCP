@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.0.33 — 2026-10-20
+
+- refactor: standardize BrowserMCP runtime names and simplify configuration
+- feat: simplify browser targets, verification and continuations for agents
+
 ## Unreleased
 
 - Reuse observed refs directly across frames for observe, find, read, act, and expect; keep document identity without a second ref system.
