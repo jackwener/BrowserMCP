@@ -19,11 +19,11 @@ These findings describe this bundle, not every ChatGPT deployment. The readable 
 
 The useful principle is recoverable summarization: the overview establishes context; a specific target must have a clear path to exact evidence and then to action. No snapshot can expose virtual rows that have not been rendered or recover canvas business semantics from an absent DOM representation.
 
-## OpenCLI design
+## BrowserMCP design
 
 Keep the existing REPL and MCP entrypoints. Add options to the existing Tab methods:
 
-- `observe()` remains an ARIA overview. Child observations carry an explicit frame path and owner metadata. Frame-local refs remain frame-local; do not invent a second global node-id system.
+- `observe()` remains an ARIA overview. Child observations carry an explicit frame path and owner metadata. Refs retain their existing document namespace. The session remembers namespace-to-frame routes so a returned ref is directly usable across observe/find/read/act/expect; no second element-id system is needed.
 - `observe({format:'dom'})` independently discovers visible controls, useful attributes and live form state, including open shadow roots. Its refs use the same stable identity map as ARIA, find and act. Paginate the live list with `start/nextStart`; clipped entry fields have `truncated:true`.
 - `read({target})` returns full current text, name and selected attributes/live properties for one strictly resolved target. This is the detail path, not another overview. Document `read()` retains its bounded scan and continuation semantics, with a selectable frame.
 - `find({query})` searches DOM evidence independently of the ARIA tree. Exact find/read/action resolution uses the same locator compiler and frame routing.
@@ -41,3 +41,11 @@ Runtime instructions and the REPL quickstart explain the observation choices. Th
 `npm run build && npm run smoke:observation` launches a temporary Chromium profile and a test extension using the production engine, chrome.debugger transport, frame routing and action implementation. The host uses the actual Tab API and ExtensionPage. Only Native Messaging delivery is substituted with a service-worker call, so the test does not touch an installed extension or native-host registration.
 
 The fixture covers long labels/URLs, custom controls, live form values, open shadow roots, same-origin/cross-origin/nested/shadow iframe owners, non-scrolling observation, exact reads, DOM pagination and query, scoped diffs, and observation-derived refs used for real click/fill. Set `OPENCLI_TEST_CHROMIUM` to an installed Chromium executable if needed. Canvas interpretation, closed shadow roots and exhaustive virtual-grid extraction are outside this change.
+
+## AX refinement
+
+The session routes observed refs automatically; explicit frame paths remain available for semantic locators, document reads, Main World evaluation and WebMCP. `expect` uses the same target compiler and frame routing as actions, with strict resolution and current value/checked/selected/enabled evidence. It never treats an ambiguous target as successful merely because one match satisfies a condition.
+
+Observation and document reading return copyable `next` arguments. A DOM capture separately exposes `dom.next` for the next live control batch; this is deliberately distinct from continuing the immutable output capture. Popup entries can be passed directly to `browser.tabs.get`, and action download objects to `tab.download`.
+
+Page-tool discovery runs once per fresh observation of its root frame, not on cursor continuation. Only changed catalogs emit bounded summaries; full schemas remain explicit lookups. This is a small read-time discovery path, not a subscription service or a background polling loop.

@@ -23,7 +23,7 @@ BrowserMCP 是一个连接到真实 Chrome 的 MCP browser service。Chrome exte
 - `tab.observe` 给出可访问性快照和 opaque Element ref；`tab.read` 读取长文档的线性文本。
 - `tab.act` 等待目标可操作、定位、执行真实输入并等待页面稳定。所有 API 方法都用 `await`；变量、function 和 class 跨调用保留。
 - `tab.expect` 轮询你要确认的结果。页面变化后重新 observe，不要沿用旧引用。
-- 如果 `tab.act` 返回 `openedTabs`，可直接使用其中的 `tab`；若为 `pending:true`，稍后用数字 `tabId` 在 `browser.tabs.list()` 中找到它。下载时把 `download.afterSequence` 传给 `tab.download`，确认文件是否完成。
+- 如果 `tab.act` 返回 `openedTabs`，将其中的条目直接传给 `browser.tabs.get()`，包括 pending 的条目。下载时把 `result.download` 直接传给 `tab.download`，确认文件是否完成。
 
 完成后调用 `session_finalize`。没有保留的 agent tab 会关闭；已接管的 user tab 会释放。需要把新 tab 留给用户时标记为 `deliverable`，需要供后续回合继续接管时标记为 `handoff`。也可用 `tab.release` 保留单个 tab，或用 `tab.close` 明确关闭。详见 [tab 生命周期](tab-lifecycle.md)。
 

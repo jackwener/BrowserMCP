@@ -7,7 +7,7 @@
 import {
   ENGINE_GLOBAL, PAGE_GLOBAL,
   type ResolveArgs, type ResolveOutcome, type ResolveFail, type Candidate, type FindArgs, type FindResult, type FindEntry, type QueryFindResult, type UploadTarget,
-  type AriaArgs, type PointInfo, type FrameProbeResult, type SettleArgs, type SelectResult, type ElementAtResult, type Box, type Expectation, type CheckResult,
+  type AriaArgs, type PointInfo, type FrameProbeResult, type SettleArgs, type SelectResult, type ElementAtResult, type Box, type CheckArgs, type CheckResult,
   type ReadTextArgs, type ReadTextResult, type DomClickArgs, type DomClickResult, type DomSnapshot, type ObserveFrameArgs, type FrameObservation, type ElementDetails,
 } from '../../../src/shared/page-contract.js';
 import { ARIA_REF_LINE } from '../../../src/shared/element-ref.js';
@@ -728,22 +728,57 @@ export function annotate(): number {
 export function unannotate(): void { document.getElementById(ANNOTATE_ID)?.remove(); }
 
 /** Evaluate an expectation once (the host polls until it holds or times out). */
-export function check(args: Expectation): CheckResult {
+export function check(args: CheckArgs): CheckResult {
   const failed: string[] = [];
-  const bodyText = (document.body?.innerText ?? document.body?.textContent ?? '').replace(/\s+/g, ' ');
-  if (args.text !== undefined && !bodyText.includes(args.text)) failed.push(`text "${args.text}" not on the page`);
-  if (args.notText !== undefined && bodyText.includes(args.notText)) failed.push(`text "${args.notText}" still on the page`);
+  const actual: Record<string, unknown> = {};
+  let element: Element | undefined;
+  if (args.selector !== undefined) {
+    let matches = query(args.selector);
+    if (!matches.length && args.fallback) matches = query(args.fallback);
+    if (matches.length > 1) {
+      const visible = matches.filter(el => is(el, 'visible'));
+      if (visible.length !== 1) throw Object.assign(new Error(`${matches.length} elements match; use a scoped target or an observed ref.`), { code: 'selector_ambiguous' });
+      matches = visible;
+    }
+    element = matches[0];
+    actual.visible = !!element && is(element, 'visible');
+    const visibilityOnly = ['text', 'notText', 'value', 'checked', 'selected', 'enabled'].every(key => args[key as keyof CheckArgs] === undefined);
+    if (args.visible !== undefined || visibilityOnly) {
+      if (actual.visible !== (args.visible ?? true)) failed.push(`visible is ${actual.visible}, expected ${args.visible ?? true}`);
+    }
+    if (!element && !visibilityOnly) failed.push('target matches nothing');
+  }
+  if (args.selector === undefined || element) {
+    const root = element ?? document.body;
+    const content = element && isCredentialField(element) ? '<redacted>' : ((root as HTMLElement)?.innerText ?? root?.textContent ?? '').replace(/\s+/g, ' ');
+    if (args.text !== undefined || args.notText !== undefined) {
+      actual.text = content.slice(0, 1000);
+      if (args.text !== undefined && !content.includes(args.text)) failed.push(`text does not include "${args.text}"`);
+      if (args.notText !== undefined && content.includes(args.notText)) failed.push(`text still includes "${args.notText}"`);
+    }
+    if (element) {
+      if (args.value !== undefined) {
+        const value = element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement || element instanceof HTMLSelectElement
+          ? element.value : (element as HTMLElement).isContentEditable ? element.textContent ?? '' : undefined;
+        actual.value = isCredentialField(element) ? '<redacted>' : value ?? null;
+        if (value !== args.value) failed.push('value does not match');
+      }
+      for (const key of ['checked', 'enabled'] as const) {
+        if (args[key] === undefined) continue;
+        const state = stateOf(element, key);
+        actual[key] = state.received.startsWith('error:') ? null : state.matches;
+        if (actual[key] !== args[key]) failed.push(`${key} is ${actual[key]}, expected ${args[key]}`);
+      }
+      if (args.selected !== undefined) {
+        actual.selected = element instanceof HTMLSelectElement ? [...element.selectedOptions].map(option => option.value) : null;
+        const values = actual.selected as string[] | null;
+        if (!values || values.length !== args.selected.length || !values.every(value => args.selected!.includes(value))) failed.push('selected values do not match');
+      }
+    }
+  }
   if (args.url !== undefined && !location.href.includes(args.url)) failed.push(`url ${location.href} does not include "${args.url}"`);
   if (args.title !== undefined && !document.title.includes(args.title)) failed.push(`title "${document.title}" does not include "${args.title}"`);
-  const locator = args.selector ?? (args.ref ? `aria-ref=${args.ref}` : undefined);
-  if (locator !== undefined) {
-    const els = query(locator);
-    const wantVisible = args.visible !== false;
-    if (!els.length) { if (wantVisible) failed.push(`${locator} matches nothing`); }
-    else if (wantVisible && !els.some((e) => is(e, 'visible'))) failed.push(`${locator} matches but none is visible`);
-    else if (!wantVisible && els.some((e) => is(e, 'visible'))) failed.push(`${locator} is still visible`);
-  }
-  return { ok: failed.length === 0, failed, url: location.href, title: document.title };
+  return { ok: failed.length === 0, failed, url: location.href, title: document.title, actual };
 }
 
 export const api = { check, resolve, resolveUpload, fileSelectionCount, pointInfo, focus, readValue, fill, isChecked, select, caretToEnd, actionTarget, clearActionTarget, settle, frameProbe, frameElement, clearFrameProbe, aria, observeFrame, visibleDom, readElement, find, findByQuery, elementAt, annotate, unannotate, armClickProbe, readClickProbe, domClick, readText };

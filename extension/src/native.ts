@@ -51,7 +51,7 @@ export class NativeHost {
       this.scheduleReconnect();
     });
     this.status = 'connected';
-    const features: BrowserFeature[] = ['chrome-api', 'streams', 'extension-logs', 'page-evaluate', 'frames', 'dialogs', 'console', 'downloads', 'visibility', 'webmcp'];
+    const features: BrowserFeature[] = ['chrome-api', 'streams', 'extension-logs', 'page-evaluate', 'frame-evaluate', 'frames', 'dialogs', 'console', 'downloads', 'visibility', 'webmcp'];
     if (chrome.debugger) features.push('cdp', 'viewport', 'network');
     // A profile keeps its identity across host and service-worker restarts.
     void chrome.storage.local.get('opencliBrowserId').then(async stored => {

@@ -1,6 +1,7 @@
 /** Object-model action validation shared by REPL sessions and adapters. */
 import { ActionError } from './errors.js';
 import { z } from 'zod';
+import type { Expectation } from '../shared/page-contract.js';
 import type { ActAction, Target } from './tab.js';
 
 export interface RawTarget {
@@ -43,7 +44,7 @@ const actionShape = z.object({
   files: z.array(z.string().min(1)).optional(), direction: z.enum(['up', 'down', 'left', 'right']).optional(), amount: z.number().optional(),
   timeoutMs: z.number().int().nonnegative().optional(), settleMs: z.number().int().min(0).max(10_000).optional(), method: z.enum(['cdp', 'dom']).optional(),
 }).strict();
-const expectationShape = z.object({ text: z.string().optional(), notText: z.string().optional(), url: z.string().optional(), title: z.string().optional(), selector: z.string().optional(), ref: z.union([z.string(), z.number().int()]).optional(), visible: z.boolean().optional() }).strict();
+const expectationShape = z.object({ target: targetShape.optional(), text: z.string().min(1).optional(), notText: z.string().min(1).optional(), url: z.string().min(1).optional(), title: z.string().min(1).optional(), visible: z.boolean().optional(), value: z.string().optional(), checked: z.boolean().optional(), selected: z.array(z.string()).optional(), enabled: z.boolean().optional() }).strict();
 
 function validate(shape: z.ZodType, value: unknown): void {
   const result = shape.safeParse(value);
@@ -160,15 +161,16 @@ export function checkActInput(input: ActToolInput): { target?: Target; to?: Targ
   return { target, to, ...(input.method && { method: input.method }) };
 }
 
-const EXPECT_KEYS = ['text', 'notText', 'url', 'title', 'selector', 'ref'] as const;
-
-export function checkExpect(what: { text?: string; notText?: string; url?: string; title?: string; selector?: string; ref?: string | number; visible?: boolean }): void {
+/** Validate the public contract before sending a compiled expectation to the page. */
+export function checkExpect(what: Expectation): void {
   validate(expectationShape, what);
-  const has = EXPECT_KEYS.some((k) => what[k] !== undefined && what[k] !== '');
-  if (!has) {
-    throw new ActionError('invalid_args', 'tab.expect needs at least one of text, notText, url, title, selector, ref.', 'An empty expect succeeds without looking at the page.', { details: { expected: { oneOf: [...EXPECT_KEYS] } } });
-  }
-  if (what.visible !== undefined && !what.selector && !what.ref) {
-    throw new ActionError('invalid_args', 'visible requires selector or ref.', 'visible does not apply to text, url, or title checks.', { details: { expected: { visible: 'boolean', with: 'selector or ref' } } });
+  const conditions = ['text', 'notText', 'url', 'title', 'visible', 'value', 'checked', 'selected', 'enabled'] as const;
+  if (!what.target && !conditions.some(key => what[key] !== undefined)) throw new ActionError('invalid_args', 'expect needs a target or a condition.', 'Use a target to wait for visibility, or text/url/title for the document.');
+  if (what.target) {
+    const target = pickTarget(what.target, 'click', 'target');
+    if (!target || 'x' in target) throw new ActionError('invalid_args', 'expect needs an element target, not a point.', 'Use find({x,y}) to obtain an element target.');
+    if (what.url !== undefined || what.title !== undefined) throw new ActionError('invalid_args', 'Use separate expectations for an element and page URL/title.');
+  } else if (['visible', 'value', 'checked', 'selected', 'enabled'].some(key => what[key as keyof Expectation] !== undefined)) {
+    throw new ActionError('invalid_args', 'Control conditions require target.', 'Pass the same target used by read or act.');
   }
 }

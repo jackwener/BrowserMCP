@@ -23,7 +23,7 @@ export interface RuntimePage {
   waitForDownload(afterSequence: number, timeoutMs?: number): Promise<DownloadWaitResult>;
   /** Child frames in document order; crossOrigin marks frames whose origin differs from the top document (data:/sandboxed count as cross-origin). */
   frames(): Promise<Array<{ index: number; frameId: string; url: string; name: string; crossOrigin?: boolean; oopif?: boolean }>>;
-  evaluateInFrame(js: string, frameIndex: number, timeoutMs?: number): Promise<unknown>;
+  evaluateInFrame(js: string, frame: import('../protocol.js').FrameStep | import('../protocol.js').FrameStep[], timeoutMs?: number): Promise<unknown>;
   getCurrentUrl(): Promise<string | null>;
   evaluateWithArgs(js: string, args: Record<string, unknown>): Promise<unknown>;
   /** browsermcp extras */

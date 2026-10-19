@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+- Reuse observed refs directly across frames for observe, find, read, act, and expect; keep document identity without a second ref system.
+- Verify scoped targets with value, checked, selected, enabled, visibility, and text conditions, returning actual evidence on failure.
+- Return copyable continuation arguments; accept popup entries and download results directly in follow-up calls.
+- Announce changed page-tool catalogs during observation, with bounded summaries and on-demand schemas.
+- Simplify runtime instructions and correct explicit nth behavior. Extension 0.0.25 adds scoped verification and Main World frame routing; reload the extension after upgrading.
+
 ## 0.0.32 — 2026-10-20
 
 - Rename the project, npm package, and CLI to browsermcp; rename the Chrome extension to BrowserMCP Connector (0.0.24).

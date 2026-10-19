@@ -35,7 +35,7 @@ class Browser {
   tabs: {
     new(url?: string): Promise<Tab>;
     list(): Promise<Array<{ id?: string; tabId: number; pending?: true; url?: string; title?: string; active: boolean; selected: boolean; origin: "agent" | "user"; state: "active" | "handoff"; }>>;
-    get(id: string): Promise<Tab>;
+    get(tab: string | { tab?: string; tabId: number; }, opts?: { timeoutMs?: number; }): Promise<Tab>;
     selected(): Promise<Tab | undefined>;
     finalize(opts?: { keep?: Array<{ tab: string | Tab; status: "handoff" | "deliverable"; }>; }): Promise<{ closed: Array<string>; kept: Array<string>; failed: Array<{ page: string; reason: string; }>; }>;
   };
@@ -63,18 +63,18 @@ class Tab {
   reload(): Promise<void>;
   close(): Promise<void>; // Close this tab, whether it was opened or claimed by this session.
   release(): Promise<void>; // Keep this tab open and give up this session's control of it.
-  observe(opts?: ObserveOptions): Promise<ObserveResult>; // ARIA overview by default; format:'dom' reveals visible controls and live attributes. Child-frame refs must be used with their returned frame path.
+  observe(opts?: ObserveOptions): Promise<ObserveResult>; // ARIA overview by default; format:'dom' reveals visible controls and live attributes. Observed refs automatically route to their frame.
   screenshot(opts?: { fullPage?: boolean; annotate?: boolean; format?: "png" | "jpeg"; quality?: number; }): Promise<ImageValue>;
   find(target: (Target & { limit?: number; }) | { query: string; limit?: number; frame?: FrameStep | Array<FrameStep>; }): Promise<FindResult | ElementAtResult | QueryFindResult>;
-  read(opts: ReadElementOptions): Promise<ElementDetails>; // With target: exact current element text, attributes and live values, without scrolling. Otherwise: bounded document text scan (including open shadow roots), restores scroll; readId/nextStart continue the same capture. A growing feed returns reason `unbounded`; the scan stops rather than chasing an endless bottom.
-  read(opts?: ReadOptions): Promise<ReadTextResult>; // With target: exact current element text, attributes and live values, without scrolling. Otherwise: bounded document text scan (including open shadow roots), restores scroll; readId/nextStart continue the same capture. A growing feed returns reason `unbounded`; the scan stops rather than chasing an endless bottom.
+  read(opts: ReadElementOptions): Promise<ElementDetails>; // With target: exact current element text, attributes and live values, without scrolling. Otherwise: bounded document text scan (including open shadow roots), restores scroll; pass result.next to continue. A growing feed returns reason `unbounded`; the scan stops rather than chasing an endless bottom.
+  read(opts?: ReadOptions): Promise<DocumentReadResult>; // With target: exact current element text, attributes and live values, without scrolling. Otherwise: bounded document text scan (including open shadow roots), restores scroll; pass result.next to continue. A growing feed returns reason `unbounded`; the scan stops rather than chasing an endless bottom.
   act(opts: ActOptions): Promise<ActionOutcome>; // wait + act in one call at the runtime edge: locate → wait actionable → hit-test → real input → settle. `method:'dom'` skips the mouse event.
   webmcp: { // WebMCP: tools the page itself registers via navigator.modelContext (page-provided tool source).
-    list(): Promise<Array<{ name: string; description?: string; inputSchema?: unknown; }>>;
-    call(name: string, input?: Record<string, unknown>): Promise<unknown>;
+    list(options?: { name?: string; frame?: FrameStep | Array<FrameStep>; }): Promise<Array<PageTool>>; // List names/descriptions, or fetch one full schema by name. Scoped to the requested frame.
+    call(name: string, input?: Record<string, unknown>, options?: { frame?: FrameStep | Array<FrameStep>; }): Promise<unknown>;
   };
   expect(what: Expectation, opts?: { timeoutMs?: number; }): Promise<CheckResult>; // Assert what the page must show now (polled up to timeoutMs).
-  evaluate(script: string | ((arg: any) => any), opts?: { arg?: unknown; frame?: number; timeoutMs?: number; }): Promise<unknown>; // Main World page code; functions receive only opts.arg, never host closures. Dispatched scripts are never replayed.
+  evaluate(script: string | ((arg: any) => any), opts?: { arg?: unknown; frame?: FrameStep | Array<FrameStep>; timeoutMs?: number; }): Promise<unknown>; // Main World page code; functions receive only opts.arg, never host closures. Dispatched scripts are never replayed.
   cdp: { // Native CDP on this Tab's shared debugger attachment. Parameters are not rewritten.
     send(method: string, params?: Record<string, unknown>, target?: { frameId: string; }): Promise<unknown>;
     watch(event: string, options?: StreamOptions): Promise<EventStream>;
@@ -98,7 +98,7 @@ class Tab {
   cookie(name: string, opts?: { domain?: string; }): Promise<string | undefined>; // Read one cookie's value at run time — useful for per-request tokens an adapter needs (csrf/ct0/ csrftoken/XSRF-TOKEN). Defaults to the current page's host. Returns undefined when the cookie is absent.
   fetchJson(url: string, opts?: Record<string, unknown>): Promise<unknown>; // Fetch JSON through the page (its cookies and origin) after verifying the endpoint.
   frames(): Promise<Array<{ index: number; frameId: string; url: string; name: string; crossOrigin?: boolean; oopif?: boolean; }>>;
-  download(afterSequence: number, timeoutMs?: number): Promise<DownloadWaitResult>; // Wait for the page download begun after a tab.act cursor, then check Chrome's file state.
+  download(download: { tab: string; afterSequence: number; started: Array<{ seq: number; guid?: string; url: string; suggestedFilename: string; }>; }, timeoutMs?: number): Promise<DownloadWaitResult>; // Wait for the page download begun after a tab.act cursor, then check Chrome's file state.
 }
 
 type Target = ({ frame?: FrameStep | FrameStep[]; within?: string }) & (
@@ -123,7 +123,7 @@ interface ActionOutcome {
   ref?: string; filled?: boolean; verified?: boolean; actual?: string;
   checked?: boolean; changed?: boolean; selected?: string[]; files?: number;
   openedTabs?: Array<{ tab?: string; tabId: number; url?: string; title?: string; pending?: true }>;
-  download?: { afterSequence: number; started: Array<{ seq: number; guid?: string; url: string; suggestedFilename: string }> }; method?: 'dom';
+  download?: { tab: string; afterSequence: number; started: Array<{ seq: number; guid?: string; url: string; suggestedFilename: string }> }; method?: 'dom';
 }
 
 interface ObserveOptions { cursor?: string;
@@ -156,9 +156,9 @@ interface ElementAtResult { matches_n: number; entries: FindEntry[] }
 
 interface ReadTextResult { readId: string; text: string; complete: boolean; reason?: 'budget' | 'scan_limit' | 'unbounded' | 'stale'; chars: number; start: number; nextStart?: number }
 
-interface Expectation { text?: string; notText?: string; selector?: string; ref?: string; url?: string; title?: string; visible?: boolean }
+interface Expectation { target?: Target; text?: string; notText?: string; url?: string; title?: string; visible?: boolean; value?: string; checked?: boolean; selected?: string[]; enabled?: boolean }
 
-interface CheckResult { ok: boolean; failed: string[]; url: string; title: string }
+interface CheckResult { ok: boolean; failed: string[]; url: string; title: string; actual?: Record<string, unknown> }
 
 interface DialogInfo { type: 'alert' | 'confirm' | 'prompt' | 'beforeunload'; message: string; defaultPrompt?: string; url?: string; openedAt: number }
 
@@ -190,6 +190,10 @@ interface DownloadWaitResult {
   elapsedMs: number;
 }
 
+interface PageTool { name: string; description?: string; inputSchema?: unknown }
+
+interface PageToolsUpdate { status: 'ready' | 'unavailable'; frame: FrameStep[]; tools: Array<{ name: string; description?: string }>; truncated?: boolean }
+
 interface EventStream { read(options?: StreamReadOptions): Promise<StreamBatch>; close(): Promise<void>;
 }
 
@@ -197,15 +201,17 @@ interface ObservedContent { metadataTruncated?: boolean; stateContinued?: boolea
 
 interface ObservedFrame extends ObservedContent { frame: FrameStep[]; owner: FrameOwner; unavailable?: string }
 
-interface ObserveResult extends ObservedContent { complete?: boolean; nextCursor?: string;
+interface ObserveResult extends ObservedContent { complete?: boolean; webmcp?: PageToolsUpdate; nextCursor?: string; next?: { cursor: string };
   url: string | null; title: string | null; snapshotId?: string; image?: ImageValue; frames?: ObservedFrame[]; framesComplete?: boolean;
 }
+
+interface DocumentReadResult extends ReadTextResult { next?: ReadOptions }
 
 interface ReadElementOptions { target: Target }
 
 interface DomEntry { ref: string; tag: string; text: string; attrs: Record<string, string>; truncated: boolean }
 
-interface DomSnapshot { entries: DomEntry[]; total: number; start: number; nextStart?: number; scope: 'viewport' | 'document' }
+interface DomSnapshot { entries: DomEntry[]; total: number; start: number; nextStart?: number; scope: 'viewport' | 'document'; next?: { format: 'dom'; frame?: FrameStep[]; target?: Target; start: number; limit?: number; viewport: boolean; includeFrames: false } }
 
 interface FrameOwner { ref: string; id: string; name: string; src: string }
 

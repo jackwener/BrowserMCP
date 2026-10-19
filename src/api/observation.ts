@@ -49,7 +49,7 @@ export function observationPage(capture: ObserveResult, cursor?: string): Observ
       return {
         ...out, ...(section === 0 ? content : { frames: [...(out.frames ?? []), content as ObservedFrame] }),
         complete: nextSection === sections.length,
-        ...(nextSection < sections.length ? { nextCursor: `${capture.snapshotId}:${nextSection}:${nextOffset}` } : { nextCursor: undefined }),
+        ...(nextSection < sections.length ? { nextCursor: `${capture.snapshotId}:${nextSection}:${nextOffset}`, next: { cursor: `${capture.snapshotId}:${nextSection}:${nextOffset}` } } : { nextCursor: undefined, next: undefined }),
       };
     };
     const fits = (end: number) => JSON.stringify(place(candidate(end), end)).length <= OBSERVATION_BUDGET;
@@ -71,6 +71,7 @@ export function observationPage(capture: ObserveResult, cursor?: string): Observ
       if (end === offset || !fits(end)) {
         if (!progressed) throw new ActionError('observation_metadata_too_large', 'One observation entry or its metadata exceeds the output budget.', 'Observe a narrower ref or read the element with tab.read({target:{ref}}).');
         out.nextCursor = `${capture.snapshotId}:${section}:${offset}`;
+        out.next = { cursor: out.nextCursor };
         return out;
       }
     }

@@ -55,7 +55,20 @@ export class Browser {
       const tabs = await page.tabs() as Array<{ tabId: number; page?: string; pending?: true; url?: string; title?: string; active: boolean; selected: boolean; origin: 'agent' | 'user'; state: 'active' | 'handoff' }>;
       return tabs.map((t) => ({ ...(t.page && { id: t.page }), tabId: t.tabId, ...(!t.page && { pending: true as const }), url: t.url, title: t.title, active: t.active, selected: t.selected, origin: t.origin, state: t.state }));
     },
-    get: async (id: string): Promise<Tab> => new Tab(id, this.ctx),
+    get: async (tab: string | { tab?: string; tabId: number }, opts: { timeoutMs?: number } = {}): Promise<Tab> => {
+      if (opts.timeoutMs !== undefined && (!Number.isFinite(opts.timeoutMs) || opts.timeoutMs < 0)) throw new ActionError('invalid_args', 'timeoutMs must be a finite non-negative number.');
+      if (typeof tab === 'string') return new Tab(tab, this.ctx);
+      if (tab.tab) return new Tab(tab.tab, this.ctx);
+      if (!Number.isSafeInteger(tab.tabId)) throw new ActionError('invalid_args', 'Pass a session tab id or an openedTabs entry.');
+      const deadline = Date.now() + (opts.timeoutMs ?? 5000);
+      do {
+        const found = (await this.tabs.list()).find(item => item.tabId === tab.tabId);
+        if (found?.id) return new Tab(found.id, this.ctx);
+        if (Date.now() >= deadline) break;
+        await new Promise(resolve => setTimeout(resolve, 100));
+      } while (true);
+      throw new ActionError('tab_not_ready', 'The opened tab has not joined this session.', 'Inspect browser.tabs.list(); the popup may have closed or failed to attach.');
+    },
     selected: async (): Promise<Tab | undefined> => {
       const tabs = (await this.tabs.list()).filter((tab) => tab.state === 'active' && tab.id);
       const current = tabs.find((tab) => tab.selected) ?? tabs.find((tab) => tab.active) ?? tabs[0];

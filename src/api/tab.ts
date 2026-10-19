@@ -1,3 +1,4 @@
+import { pageTools, pageToolsUpdate, type PageTool, type PageToolsUpdate } from './webmcp.js';
 import { watch } from './streams.js';
 import type { StreamOptions, StreamReadOptions } from '../protocol.js';
 /**
@@ -7,20 +8,17 @@ import type { StreamOptions, StreamReadOptions } from '../protocol.js';
 import type { RuntimePage } from '../backends/page-types.js';
 import { ActionError } from './errors.js';
 import { checkActInput, checkExpect } from './action-input.js';
+import { ARIA_REF_LINE } from '../shared/element-ref.js';
 import { ariaDiff } from './diff.js';
 import { networkDetail, networkSummary } from './network.js';
 import { compactAria } from '../shared/aria-tree.js';
 import { observationPage } from './observation.js';
 import { targetToSelector, fallbackSelector, frameSteps } from '../shared/engine.js';
-import type { FindResult, QueryFindResult, ElementAtResult, Expectation, CheckResult, ReadTextResult, FrameObservation, FrameOwner, DomSnapshot, ElementDetails, ResolveFail } from '../shared/page-contract.js';
+import type { Target, FindResult, QueryFindResult, ElementAtResult, Expectation, CheckResult, ReadTextResult, FrameObservation, FrameOwner, DomSnapshot, ElementDetails, ResolveFail } from '../shared/page-contract.js';
 import type { DialogInfo, DownloadWaitResult, FrameStep } from '../protocol.js';
 import type { SessionContext } from './context.js';
 
-export type Target = ({ frame?: FrameStep | FrameStep[]; /** container (css/selector/ref) to resolve inside */ within?: string }) & (
-  | { ref: number | string }
-  | { selector: string; nth?: number }
-  | { role?: string; name?: string; label?: string; text?: string; testid?: string; nth?: number }
-  | { x: number; y: number });
+export type { Target } from '../shared/page-contract.js';
 
 export type ActAction = 'click' | 'dblclick' | 'hover' | 'focus' | 'fill' | 'type' | 'press' | 'select' | 'check' | 'uncheck' | 'upload' | 'drag' | 'scroll' | 'back' | 'forward' | 'reload';
 
@@ -39,7 +37,7 @@ export interface ActionOutcome {
   filled?: boolean; verified?: boolean; actual?: string;
   checked?: boolean; changed?: boolean; selected?: string[]; files?: number;
   openedTabs?: Array<{ tab?: string; tabId: number; url?: string; title?: string; pending?: true }>;
-  download?: { afterSequence: number; started: Array<{ seq: number; guid?: string; url: string; suggestedFilename: string }> };
+  download?: { tab: string; afterSequence: number; started: Array<{ seq: number; guid?: string; url: string; suggestedFilename: string }> };
   /** Present when the action used DOM activation or a native control setter. */
   method?: 'dom';
 }
@@ -74,15 +72,20 @@ export interface ObservedFrame extends ObservedContent { frame: FrameStep[]; own
 export interface ObserveResult extends ObservedContent {
   /** Whether this is the final output page, not a claim that all dynamic page content was captured. */
   complete?: boolean;
+  /** Page-provided tool catalog changes in the observed root frame; schemas are fetched explicitly. */
+  webmcp?: PageToolsUpdate;
   /** Continue this captured state with observe({cursor: nextCursor}). */
   nextCursor?: string;
+  /** Pass directly to tab.observe(result.next) to continue this capture. */
+  next?: { cursor: string };
   url: string | null; title: string | null; snapshotId?: string; image?: ImageValue;
-  /** Refs are local to each frame. Copy this path into observe.frame or target.frame. */
+  /** Child frames and explicit routes for semantic locators or document reads; refs route automatically. */
   frames?: ObservedFrame[];
   /** False if a discovered frame could not be captured or the bounded traversal stopped. */
   framesComplete?: boolean;
 }
 export interface ReadOptions { /** stop after this many characters. Default 60000. */ maxChars?: number; /** character offset returned as nextStart by a previous read */ start?: number; /** capture id returned by that same read */ readId?: string; frame?: FrameStep | FrameStep[] }
+export interface DocumentReadResult extends ReadTextResult { /** Pass directly to tab.read(result.next). */ next?: ReadOptions }
 export interface ReadElementOptions { /** Exact current text, attributes and form values for one locator. No scrolling or preview clipping. */ target: Target }
 
 export interface ImageValue { __image: true; mimeType: string; base64: string }
@@ -110,6 +113,28 @@ export class Tab {
       const page = this.bound ?? await this.ctx.rt.pageFor(this.ctx.sessionId, this.id);
       return await fn(page);
     } finally { release(); }
+  }
+
+  /** Reuse the document namespace already present in refs; no second element-id system. */
+  private rememberRefs(refs: string[], frame: FrameStep[] = []): void {
+    let routes = this.ctx.state.refFrames.get(this.id);
+    if (!routes) this.ctx.state.refFrames.set(this.id, routes = new Map());
+    for (const ref of refs) {
+      const scope = /^e([a-f0-9]{16})_/.exec(ref)?.[1];
+      if (!scope || routes.has(scope)) continue;
+      // A newer document at this exact route replaces its old routing entry.
+      for (const [key, path] of routes) if (JSON.stringify(path) === JSON.stringify(frame)) routes.delete(key);
+      routes.set(scope, frame);
+    }
+  }
+
+  private routeTarget(target: Target): Target {
+    if (target.frame !== undefined) return target;
+    const identity = 'ref' in target ? target.ref : target.within;
+    const scope = /^e([a-f0-9]{16})_/.exec(String(identity ?? ''))?.[1];
+    const frame = scope && this.ctx.state.refFrames.get(this.id)?.get(scope);
+    if (scope && !frame) throw new ActionError('stale_ref', 'This ref has no observed document in this tab.', 'Observe or find the target again; use its returned ref.');
+    return frame?.length ? { ...target, frame } : target;
   }
 
   async goto(url: string, opts: { waitUntil?: 'load' | 'none'; settleMs?: number } = {}): Promise<{ url: string | null; title: string | null }> {
@@ -161,8 +186,11 @@ export class Tab {
   /** Keep this tab open and give up this session's control of it. */
   async release(): Promise<void> { await this.use((p) => p.releaseTab(this.id)); this.closed = true; this.ctx.rt.forgetPage(this.ctx.sessionId, this.id); }
 
-  /** ARIA overview by default; format:'dom' reveals visible controls and live attributes. Child-frame refs must be used with their returned frame path. */
+  /** ARIA overview by default; format:'dom' reveals visible controls and live attributes. Observed refs automatically route to their frame. */
   async observe(opts: ObserveOptions = {}): Promise<ObserveResult> {
+    if (opts.ref && opts.target) throw new ActionError('invalid_target', 'Use target or ref, not both.');
+    if (opts.ref) { opts = { ...opts, target: { ref: opts.ref, ...(opts.frame !== undefined && { frame: opts.frame }) } }; delete opts.ref; delete opts.frame; }
+    if (opts.target) opts = { ...opts, target: this.routeTarget(opts.target) };
     const mode = opts.mode ?? 'state';
     return this.use(async (page) => {
       if (opts.cursor !== undefined) {
@@ -182,7 +210,8 @@ export class Tab {
         const base = frameSteps(opts.target?.frame ?? opts.frame);
         const viewport = opts.ref || opts.target ? false : opts.viewport ?? (opts.format === 'dom');
         const render = (capture: FrameObservation, frame: FrameStep[], ref?: string): ObservedContent => {
-          if (capture.dom) return { dom: capture.dom };
+          this.rememberRefs(capture.dom ? capture.dom.entries.map(entry => entry.ref) : (capture.state ?? '').split('\n').flatMap(line => { const match = ARIA_REF_LINE.exec(line); return match ? [match[2]] : []; }), frame);
+          if (capture.dom) return { dom: { ...capture.dom, ...(capture.dom.nextStart !== undefined && { next: { format: 'dom' as const, ...(frame.length === base.length && opts.target ? {target:opts.target} : {frame}), start:capture.dom.nextStart, limit:opts.limit, viewport:!!viewport, includeFrames:false as const } }) } };
           let text = compactAria(capture.state ?? '');
           const key = `${this.id}:${JSON.stringify(frame)}:${viewport ? 'vp' : 'all'}:${ref ?? (frame.length === base.length ? selector ?? '' : '')}`;
           const prev = this.ctx.state.lastObserve.get(key);
@@ -233,6 +262,10 @@ export class Tab {
         }
       }
       if (mode === 'state' || mode === 'both') {
+        if (this.ctx.rt.hasFeature('webmcp')) {
+          const frame = frameSteps(opts.target?.frame ?? opts.frame);
+          out.webmcp = await pageToolsUpdate(page, this.ctx.state.webmcpCatalogs, `${this.id}:${JSON.stringify(frame)}`, frame);
+        }
         this.ctx.state.observations.set(this.id, out);
         const result = observationPage(out);
         if (mode === 'both') result.image = await this.screenshotOn(page, { annotate: opts.annotate, fullPage: opts.fullPage });
@@ -256,44 +289,50 @@ export class Tab {
   }
 
   async find(target: (Target & { limit?: number }) | { query: string; limit?: number; frame?: FrameStep | FrameStep[] }): Promise<FindResult | ElementAtResult | QueryFindResult> {
+    if (!('query' in target)) target = this.routeTarget(target);
     return this.use(async (page) => {
-      if ('query' in target) return await page.pageCall('findByQuery', { query: target.query, limit: target.limit ?? 20 }, undefined, target.frame) as QueryFindResult;
+      const remember = <T extends FindResult | ElementAtResult | QueryFindResult>(result: T): T => { this.rememberRefs(result.entries.flatMap(entry => entry.ref ? [entry.ref] : []), frameSteps(target.frame)); return result; };
+      if ('query' in target) return remember(await page.pageCall('findByQuery', { query: target.query, limit: target.limit ?? 20 }, undefined, target.frame) as QueryFindResult);
       // a viewport point (screenshot coordinates) → the element there and its ancestors, as locators
-      if ('x' in target) return await page.pageCall('elementAt', { x: target.x, y: target.y }, undefined, target.frame) as ElementAtResult;
+      if ('x' in target) return remember(await page.pageCall('elementAt', { x: target.x, y: target.y }, undefined, target.frame) as ElementAtResult);
       // same engine and the same compiled selector as act: what find lists is exactly what act would resolve
       const spec = target as Record<string, unknown>;
       const selector = targetToSelector(spec);
       if (!selector) throw new ActionError('invalid_target', 'find needs a selector, an observed ref, a semantic locator (role/name/label/text/testid), or a point {x,y}', 'Pass one of: {ref} from observe, {selector}, {role,name}, {label}, {text}, {testid}, or {x,y}.');
-      return await page.pageCall('find', { selector, fallback: fallbackSelector(spec), limit: target.limit ?? 20 }, undefined, target.frame) as FindResult;
+      return remember(await page.pageCall('find', { selector, fallback: fallbackSelector(spec), limit: target.limit ?? 20 }, undefined, target.frame) as FindResult);
     });
   }
 
   /**
    * With target: exact current element text, attributes and live values, without scrolling.
-   * Otherwise: bounded document text scan (including open shadow roots), restores scroll; readId/nextStart continue the same capture.
+   * Otherwise: bounded document text scan (including open shadow roots), restores scroll; pass result.next to continue.
    * A growing feed returns reason `unbounded`; the scan stops rather than chasing an endless bottom.
    */
   async read(opts: ReadElementOptions): Promise<ElementDetails>;
-  async read(opts?: ReadOptions): Promise<ReadTextResult>;
-  async read(opts: ReadOptions | ReadElementOptions = {}): Promise<ReadTextResult | ElementDetails> {
+  async read(opts?: ReadOptions): Promise<DocumentReadResult>;
+  async read(opts: ReadOptions | ReadElementOptions = {}): Promise<DocumentReadResult | ElementDetails> {
+    if ('target' in opts) opts = { ...opts, target: this.routeTarget(opts.target) };
     return this.use(async (page) => {
       if ('target' in opts) {
         const selector = targetToSelector(opts.target);
         if (!selector) throw new ActionError('invalid_target', 'Exact read needs a ref or locator.', 'Use find({x,y}) first for a screenshot coordinate.');
         const result = await page.pageCall('readElement', { selector, fallback: fallbackSelector(opts.target), limit: 1 }, undefined, opts.target.frame) as ElementDetails | ResolveFail;
         if ('error' in result) throw new ActionError(result.error.code, result.error.message, result.error.hint);
+        this.rememberRefs([result.ref], frameSteps(opts.target.frame));
         return result;
       }
       if (opts.start !== undefined && !opts.readId) throw new ActionError('invalid_args', 'Continuing a read requires both readId and start.', 'Copy readId and nextStart from the previous tab.read result.');
       const r = await page.pageCall('readText', opts, undefined, opts.frame) as ReadTextResult;
       if (r.reason === 'stale') throw new ActionError('stale_read', 'This page no longer has that text capture.', 'Call tab.read without readId to start a new capture.');
-      return r;
+      return { ...r, ...(r.nextStart !== undefined && { next: { ...opts, readId: r.readId, start: r.nextStart } }) };
     });
   }
 
   /** wait + act in one call at the runtime edge: locate → wait actionable → hit-test → real input → settle. `method:'dom'` skips the mouse event. */
   async act(opts: ActOptions): Promise<ActionOutcome> {
     opts = { ...opts, ...checkActInput(opts) };
+    if (opts.target) opts.target = this.routeTarget(opts.target);
+    if (opts.to) opts.to = this.routeTarget(opts.to);
     const { action } = opts;
     return this.use(async (page) => {
       try {
@@ -314,6 +353,7 @@ export class Tab {
         if (!opts.target) throw new ActionError('missing_target', `action "${action}" needs a target`, 'Pass a target: a {ref} from observe, or a selector/role+name/label/text/testid.');
         const r = await page.act({ kind: action, target: opts.target as Record<string, unknown>, value: opts.value, files: opts.files, to: opts.to as Record<string, unknown> | undefined, direction: opts.direction, amount: opts.amount, timeoutMs: opts.timeoutMs, settleMs: opts.settleMs ?? 600, cursor: this.ctx.rt.cursorEnabled, ...(opts.method ? { method: opts.method } : {}) });
         if (capture) await this.harvest(page);
+        if (r.ref) this.rememberRefs([r.ref], frameSteps(opts.target.frame));
         const delivery = action === 'fill' || action === 'type' ? (r.verified ? 'applied' : 'dispatched') : r.method === 'dom' || ['check', 'uncheck', 'select', 'upload', 'focus'].includes(action) ? 'applied' : action === 'click' || action === 'dblclick' ? 'received' : 'dispatched';
         const controlVerified = r.verified === true || (action === 'check' && r.checked === true) || (action === 'uncheck' && r.checked === false) || (action === 'select' && Array.isArray(r.selected) && r.selected.length > 0);
         // Return the outcome and the fields needed to choose the next action.
@@ -330,7 +370,7 @@ export class Tab {
           ...(r.selected !== undefined ? { selected: r.selected } : {}),
           ...(r.files !== undefined ? { files: r.files } : {}),
           ...(r.openedTabs?.length ? { openedTabs: r.openedTabs.map(({ page, tabId, url, title, pending }) => ({ ...(page && { tab: page }), tabId, url, title, ...(pending && { pending }) })) } : {}),
-          ...(r.download ? { download: r.download } : {}),
+          ...(r.download ? { download: { ...r.download, tab: this.id } } : {}),
           ...(['click', 'fill', 'select'].includes(action) && r.method === 'dom' ? { method: 'dom' as const } : {}),
         };
       } catch (err) {
@@ -343,18 +383,31 @@ export class Tab {
 
   /** WebMCP: tools the page itself registers via navigator.modelContext (page-provided tool source). */
   readonly webmcp = {
-    list: async (): Promise<Array<{ name: string; description?: string; inputSchema?: unknown }>> => this.use(async (p) => {
-      const r = await p.evaluate(`(async () => { const mc = navigator.modelContext || document.modelContext; if (!mc || typeof mc.getTools !== 'function') return []; const tools = await mc.getTools(); return (tools || []).map(t => ({ name: t.name, description: t.description, inputSchema: t.inputSchema })); })()`);
-      return Array.isArray(r) ? r as Array<{ name: string; description?: string; inputSchema?: unknown }> : [];
+    /** List names/descriptions, or fetch one full schema by name. Scoped to the requested frame. */
+    list: async (options: { name?: string; frame?: FrameStep | FrameStep[] } = {}): Promise<PageTool[]> => this.use(async page => {
+      const tools = await pageTools(page, frameSteps(options.frame));
+      return options.name !== undefined ? tools.filter(tool => tool.name === options.name) : tools.map(({name, description}) => ({name, description}));
     }),
-    call: async (name: string, input: Record<string, unknown> = {}): Promise<unknown> => this.use(async (p) => {
-      return p.evaluateWithArgs(`(async () => { const mc = navigator.modelContext || document.modelContext; if (!mc) throw new Error('page exposes no modelContext'); if (typeof mc.executeTool === 'function') return await mc.executeTool(name, input); const tools = await mc.getTools(); const t = (tools || []).find(x => x.name === name); if (!t || typeof t.execute !== 'function') throw new Error('unknown page tool ' + name); return await t.execute(input); })()`, { name, input });
+    call: async (name: string, input: Record<string, unknown> = {}, options: { frame?: FrameStep | FrameStep[] } = {}): Promise<unknown> => this.use(async page => {
+      const script = `(async () => {
+        const name = ${JSON.stringify(name)}, input = ${JSON.stringify(input)};
+        const mc = navigator.modelContext || document.modelContext;
+        if (typeof mc?.executeTool === 'function') return mc.executeTool(name, input);
+        if (typeof navigator.modelContextTesting?.executeTool === 'function') return navigator.modelContextTesting.executeTool(name, JSON.stringify(input));
+        const tools = await mc?.getTools?.();
+        const tool = tools?.find(t => t.name === name);
+        if (typeof tool?.execute !== 'function') throw new Error('Page tool is unavailable; refresh webmcp.list.');
+        return tool.execute(input);
+      })()`;
+      return options.frame !== undefined ? page.evaluateInFrame(script, options.frame) : page.evaluate(script);
     }),
   };
 
   /** Assert what the page must show now (polled up to timeoutMs). */
   async expect(what: Expectation, opts: { timeoutMs?: number } = {}): Promise<CheckResult> {
+    if (opts.timeoutMs !== undefined && (!Number.isFinite(opts.timeoutMs) || opts.timeoutMs < 0)) throw new ActionError('invalid_args', 'timeoutMs must be a finite non-negative number.');
     checkExpect(what);
+    if (what.target) what = { ...what, target: this.routeTarget(what.target) };
     return this.use(async (page) => {
       try { return await page.expect(what, opts); }
       catch (err) { const e = err as { code?: string; message?: string; hint?: string; extra?: Record<string, unknown> }; throw new ActionError(e.code ?? 'expectation_failed', e.message ?? String(err), e.hint, e.extra); }
@@ -362,7 +415,7 @@ export class Tab {
   }
 
   /** Main World page code; functions receive only opts.arg, never host closures. Dispatched scripts are never replayed. */
-  async evaluate(script: string | ((arg: any) => any), opts: { arg?: unknown; frame?: number; timeoutMs?: number } = {}): Promise<unknown> {
+  async evaluate(script: string | ((arg: any) => any), opts: { arg?: unknown; frame?: FrameStep | FrameStep[]; timeoutMs?: number } = {}): Promise<unknown> {
     if (opts.timeoutMs !== undefined && (!Number.isFinite(opts.timeoutMs) || opts.timeoutMs < 1 || opts.timeoutMs > 300_000)) throw new ActionError('invalid_args', 'timeoutMs must be from 1 to 300000');
     const source = typeof script === 'function' ? script.toString() : (script as unknown as { $function?: string })?.$function;
     const expression = source ? `(${source})(${JSON.stringify(opts.arg) ?? 'undefined'})` : script as string;
@@ -437,5 +490,8 @@ export class Tab {
   async fetchJson(url: string, opts: Record<string, unknown> = {}): Promise<unknown> { return this.use((p) => p.fetchJson(url, opts as never)); }
   async frames(): Promise<Array<{ index: number; frameId: string; url: string; name: string; crossOrigin?: boolean; oopif?: boolean }>> { return this.use((p) => p.frames()); }
   /** Wait for the page download begun after a tab.act cursor, then check Chrome's file state. */
-  async download(afterSequence: number, timeoutMs = 30_000): Promise<DownloadWaitResult> { return this.use((p) => p.waitForDownload(afterSequence, timeoutMs)); }
+  async download(download: NonNullable<ActionOutcome['download']>, timeoutMs = 30_000): Promise<DownloadWaitResult> {
+    if (!download || download.tab !== this.id || !Number.isSafeInteger(download.afterSequence) || download.afterSequence < 0) throw new ActionError('invalid_args', 'Pass the download object returned by an action on this tab.', 'Use await tab.download(result.download).');
+    return this.use((p) => p.waitForDownload(download.afterSequence, timeoutMs));
+  }
 }

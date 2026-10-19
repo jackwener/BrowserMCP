@@ -1,3 +1,5 @@
+import type { FrameStep } from '../protocol.js';
+
 /**
  * Contract between the host-side engine (src/shared/engine.ts) and the page-side module
  * (extension/src/page/index.ts) that runs inside the extension's isolated world next to Playwright's
@@ -60,7 +62,7 @@ export interface AriaArgs {
 
 /** Compact DOM evidence. Truncated fields can be read exactly with tab.read({target:{ref}}). */
 export interface DomEntry { ref: string; tag: string; text: string; attrs: Record<string, string>; truncated: boolean }
-export interface DomSnapshot { entries: DomEntry[]; total: number; start: number; nextStart?: number; scope: 'viewport' | 'document' }
+export interface DomSnapshot { entries: DomEntry[]; total: number; start: number; nextStart?: number; scope: 'viewport' | 'document'; /** Continue the live control list with tab.observe(dom.next). */ next?: { format: 'dom'; frame?: FrameStep[]; target?: Target; start: number; limit?: number; viewport: boolean; includeFrames: false } }
 export interface ObserveFrameArgs extends AriaArgs { format?: 'aria' | 'dom'; start?: number; limit?: number }
 export interface FrameOwner { ref: string; id: string; name: string; src: string }
 export interface FrameObservation { state?: string; dom?: DomSnapshot; children: FrameOwner[]; warnings?: string[] }
@@ -87,5 +89,14 @@ export interface SelectResult { selected?: string[]; error?: string; available?:
 export interface ElementAtResult { matches_n: number; entries: FindEntry[] }
 
 /** What a flow expects of the page at a step; every field given must hold. */
-export interface Expectation { text?: string; notText?: string; selector?: string; ref?: string; url?: string; title?: string; visible?: boolean }
-export interface CheckResult { ok: boolean; failed: string[]; url: string; title: string }
+export type Target = ({ frame?: FrameStep | FrameStep[]; /** container (css/selector/ref) to resolve inside */ within?: string }) & (
+  | { ref: number | string }
+  | { selector: string; nth?: number }
+  | { role?: string; name?: string; label?: string; text?: string; testid?: string; nth?: number }
+  | { x: number; y: number });
+
+
+export interface Expectation { target?: Target; text?: string; notText?: string; url?: string; title?: string; visible?: boolean; value?: string; checked?: boolean; selected?: string[]; enabled?: boolean }
+/** Compiled once by the host; evaluated in the target document. */
+export interface CheckArgs extends Omit<Expectation, 'target'> { selector?: string; fallback?: string | null }
+export interface CheckResult { ok: boolean; failed: string[]; url: string; title: string; actual?: Record<string, unknown> }

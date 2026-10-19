@@ -19,7 +19,7 @@ Copy its numeric `tabId` into `await browser.user.claimTab({tabId: ...})`. Store
 
 After reading the observation, call `await tab.act({action:'click', target:{ref: '...'}})` using a returned ref, then `await tab.observe()` or `await tab.expect({text:'...'})` with the expected result. `await tab.read()` reads document text. Batch determined steps; return at new decision points.
 
-When ARIA lacks detail, `await tab.observe({format:'dom'})` returns visible controls with live attributes and the same actionable refs. `await tab.read({target:{ref:'...'}})` reads full text/attributes without scrolling. DOM previews flag `truncated`; use `dom.nextStart` as `start` to continue a live list in the same frame. Child observations are in `frames`; copy each child's `frame` path alongside its local ref into `target.frame` for `find/read/act`, or pass `frame` to `observe`. A screenshot remains the evidence for canvas, layout and colors.
+When ARIA lacks detail, `await tab.observe({format:'dom'})` returns visible controls with live attributes and the same actionable refs. `await tab.read({target:{ref:'...'}})` reads full text/attributes without scrolling. DOM previews flag `truncated`; pass `dom.next` directly to `tab.observe` to continue the live control list. Child refs automatically retain their observed frame route. Explicit semantic queries and whole-document reads accept the returned `frame` path. A screenshot remains the evidence for canvas, layout and colors.
 
 The last expression is returned. `nodeRepl.write(value)` adds output; `await tab.screenshot()` returns an image. Keep large results in variables and return summaries; truncation is explicit. API handles print only their public identity. `Tab.id` is a property; methods are awaited.
 
@@ -29,6 +29,8 @@ let shot = await tab.screenshot({format: 'jpeg', quality: 80});
 shot;
 ```
 
-Refs are opaque Element identities shared by ARIA, DOM and find. Copy them unchanged with the observed frame path. They remain valid while the same Element lives in that document; after replacement or navigation, `stale_ref` means observe again. A semantic locator can find a replacement Element; an old ref does not.
+Refs are opaque Element identities shared by ARIA, DOM and find. Copy them unchanged; routing to their observed frame is automatic. They remain valid while the same Element lives in that document; after replacement or navigation, `stale_ref` means observe again. A semantic locator can find a replacement Element; an old ref does not.
 
 Finish with `session_finalize`. Use `doctor` for connection/execution status and `js_reset` to stop JavaScript, clear bindings and close explicit subscriptions; tabs stay open. Read `repl-session` for Node declaration semantics, errors, timeout/reset and images. Request `api-reference` with `member:"Tab.act"`, `"Tab.network"`, `"Browser"` or another class/member for exact signatures; omit member for the full reference.
+
+Reuse the same target for verification: `await tab.expect({target, value:"42"})`. Continue captured output with `tab.observe(result.next)` or `tab.read(result.next)`. Pass an `openedTabs` entry directly to `browser.tabs.get`, and the returned download object to `tab.download(result.download)`.

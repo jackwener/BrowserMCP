@@ -5,6 +5,7 @@ import { wrapForEval, waitForDomStableJs, networkRequestsJs } from './browser-he
 import type { RuntimePage } from './page-types.js';
 import type { Command, ActSpec, ActResult, DialogInfo, StreamReadOptions, StreamBatch, CloseUserTabsResult, DownloadWaitResult, FrameStep } from '../protocol.js';
 import { pageCallJs, unwrapPageResult, ActError, PAGE_GLOBAL, frameSteps } from '../shared/engine.js';
+import { targetToSelector, fallbackSelector } from '../shared/engine.js';
 import type { Expectation, CheckResult } from '../shared/page-contract.js';
 
 export interface ExtensionPageOptions {
@@ -98,9 +99,9 @@ class ExtensionPage implements ExtensionRuntimePage {
   async evaluate<T = unknown>(input: string, opts: { timeoutMs?: number } = {}): Promise<T> {
     return this.evaluateCommand(input, opts) as Promise<T>;
   }
-  private async evaluateCommand(input: string, opts: { timeoutMs?: number; frameIndex?: number }): Promise<unknown> {
+  private async evaluateCommand(input: string, opts: { timeoutMs?: number; frame?: FrameStep | FrameStep[] }): Promise<unknown> {
     const code = wrapForEval(input);
-    try { return (await this.send('exec', { code, timeoutMs: opts.timeoutMs, frameIndex: opts.frameIndex })).data; }
+    try { return (await this.send('exec', { code, timeoutMs: opts.timeoutMs, frame: opts.frame })).data; }
     catch (error) {
       const e = error as { code?: string; message?: string };
       if (isNavigationError(error) || ['timeout', 'cdp_timeout', 'extension_disconnected', 'detached_mid_command', 'frame_unreachable'].includes(e.code ?? '')) {
@@ -183,7 +184,10 @@ class ExtensionPage implements ExtensionRuntimePage {
   async networkRequests(includeStatic = false): Promise<unknown[]> { const r = await this.evaluate(networkRequestsJs(includeStatic)); return Array.isArray(r) ? r : []; }
   async waitForDownload(afterSequence: number, timeoutMs = 30_000): Promise<DownloadWaitResult> { return (await this.send('wait-download', { afterSequence, timeoutMs })).data as DownloadWaitResult; }
   async frames(): Promise<Array<{ index: number; frameId: string; url: string; name: string }>> { const r = await this.send('frames'); return Array.isArray(r.data) ? r.data as Array<{ index: number; frameId: string; url: string; name: string }> : []; }
-  async evaluateInFrame(js: string, frameIndex: number, timeoutMs?: number): Promise<unknown> { return this.evaluateCommand(js, { frameIndex, timeoutMs }); }
+  async evaluateInFrame(js: string, frame: FrameStep | FrameStep[], timeoutMs?: number): Promise<unknown> {
+    if (!this.bridge.extensionFeatures.includes('frame-evaluate')) throw new ActError('capability_unavailable', 'The connected extension does not support frame-routed page evaluation.', 'Update/reload the extension. Main-document evaluation remains available.');
+    return this.evaluateCommand(js, { frame, timeoutMs });
+  }
   async cdp(method: string, params?: Record<string, unknown>, target?: { frameId: string }): Promise<unknown> { return (await this.send('cdp', { cdpMethod: method, cdpParams: params, cdpTarget: target })).data; }
 
   // ── browsermcp extras ──
@@ -258,15 +262,25 @@ class ExtensionPage implements ExtensionRuntimePage {
   /** Accessibility snapshot text for browser sessions and adapters. */
   async aria(opts: { viewport?: boolean } = {}): Promise<string> { return String(await this.pageCall('aria', { viewport: Boolean(opts.viewport) })); }
   async expect(what: Expectation, opts: { timeoutMs?: number } = {}): Promise<CheckResult> {
+    const { target, ...conditions } = what;
+    const selector = target ? targetToSelector(target) : undefined;
+    if (target && !selector) throw new ActError('invalid_target', 'Expectation needs an observed ref or semantic locator.');
+    const args = { ...conditions, ...(target && { selector, fallback: fallbackSelector(target) }) };
     const deadline = Date.now() + (opts.timeoutMs ?? 5000);
     let last: CheckResult | null = null;
     for (;;) {
-      try { last = await this.pageCall('check', what, 3000) as CheckResult; if (last.ok) return last; } catch { /* navigation in flight: retry */ }
+      try { last = await this.pageCall('check', args, 3000, target?.frame) as CheckResult;
+        if (!last.actual) throw new ActError('capability_unavailable', 'The connected extension does not provide target verification evidence.', 'Update/reload the extension before using expect.');
+        if (last.ok) return last; } catch (error) {
+        const code = (error as { code?: string }).code;
+        if (code === 'capability_unavailable' || code === 'stale_ref' || code === 'selector_ambiguous' || code === 'invalid_selector') throw error;
+        // A document can disappear while navigation is in flight.
+      }
       if (Date.now() >= deadline) break;
       await new Promise((r) => setTimeout(r, 150));
     }
-    const state = await this.aria({ viewport: true }).catch(() => '');
-    throw new ActError('expectation_failed', last ? last.failed.join('; ') : 'page not reachable', 'Observe the page; the flow may need a different step or a wait.', { expect: what as Record<string, unknown>, failed: last?.failed ?? [], url: last?.url, title: last?.title, state: state.slice(0, 4000) });
+    const state = await this.pageCall('aria', { viewport: true }, 3000, target?.frame).catch(() => '');
+    throw new ActError('expectation_failed', last ? last.failed.join('; ') : 'page not reachable', 'Observe the page; the flow may need a different step or a wait.', { expect: what as Record<string, unknown>, failed: last?.failed ?? [], url: last?.url, title: last?.title, actual: last?.actual, state: String(state).slice(0, 4000) });
   }
   async getVisibility(): Promise<boolean> { const r = await this.bridge.send('visibility', { ...this.sessionOpts() }); return Boolean((r.data as { visible?: boolean } | undefined)?.visible); }
 }

@@ -181,11 +181,9 @@ async function handleExec(cmd: Command, s: Session): Promise<Result> {
     return pageScoped(cmd.id, tabId, await evaluateInWorld(tabId, route?.frameId ?? null, cmd.code, aggressive, commandTimeoutMs(cmd)));
   }
   const { result, error } = await sessions.withChildTabs(tabId, async () => {
-    if (cmd.frameIndex != null) {
-      const frames = await executor.listFrames(tabId);
-      const f = frames[cmd.frameIndex];
-      if (!f) throw new SessionError('frame_not_found', `Frame index ${cmd.frameIndex} out of range (${frames.length})`);
-      return evaluateMain(tabId, f.frameId, cmd.code!, aggressive, commandTimeoutMs(cmd));
+    if (cmd.frame !== undefined) {
+      const route = await routeFrames(tabId, frameSteps(cmd.frame), false);
+      return evaluateMain(tabId, route?.frameId ?? null, cmd.code!, aggressive, commandTimeoutMs(cmd));
     }
     return executor.evaluate(tabId, cmd.code!, aggressive, commandTimeoutMs(cmd));
   });

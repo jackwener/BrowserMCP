@@ -72,8 +72,7 @@ export interface Command {
   timeoutMs?: number;
   cdpMethod?: string;
   cdpParams?: Record<string, unknown>;
-  frameIndex?: number;
-  /** Engine-world page calls use the same frame path as actions. */
+  /** Engine and Main World calls use the same frame path as actions. */
   frame?: FrameStep | FrameStep[];
   deadlineAt?: number;
   /** session-name */
@@ -202,7 +201,7 @@ export type BrowserEvent =
 export type HostToExt = { type: 'command'; command: Command } | { type: 'ready'; version: string };
 /** Advisory contract revision; individual capabilities and command results decide what works. */
 export const PROTOCOL_REVISION = 3;
-export type BrowserFeature = 'chrome-api' | 'streams' | 'extension-logs' | 'page-evaluate' | 'cdp' | 'network' | 'frames' | 'dialogs' | 'console' | 'downloads' | 'viewport' | 'visibility' | 'webmcp';
+export type BrowserFeature = 'chrome-api' | 'streams' | 'extension-logs' | 'page-evaluate' | 'frame-evaluate' | 'cdp' | 'network' | 'frames' | 'dialogs' | 'console' | 'downloads' | 'viewport' | 'visibility' | 'webmcp';
 export type ExtToHost =
   | { type: 'hello'; browserId: string; extensionVersion: string; protocolRevision?: number; features?: BrowserFeature[] }
   | { type: 'result'; result: Result }

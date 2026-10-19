@@ -52,10 +52,10 @@ try {
     globalThis.runCommand = async ({action, params, tabId}) => {
       if (action === 'act') return {data: await performAct(tabId, params.act, {aggressive:false})};
       if (action !== 'exec') throw new Error('Unexpected command: ' + action);
-      const route = params.world === 'engine' ? await routeFrames(tabId, frameSteps(params.frame), false) : null;
+      const route = await routeFrames(tabId, frameSteps(params.frame), false);
       const data = params.world === 'engine'
         ? await evaluateInWorld(tabId, route?.frameId ?? null, params.code, false, params.timeoutMs)
-        : await evaluateMain(tabId, null, params.code, false, params.timeoutMs);
+        : await evaluateMain(tabId, route?.frameId ?? null, params.code, false, params.timeoutMs);
       return {data};
     };
   ` }, bundle: true, format: 'esm', platform: 'browser', target: 'chrome120', outfile: join(directory, 'worker.js') });
@@ -69,7 +69,7 @@ try {
   await page.goto(`http://127.0.0.1:${port}/`);
   await page.waitForFunction(() => document.querySelector('#shadow')?.shadowRoot?.querySelector('button'));
   const tabId = await worker.evaluate(async url => (await chrome.tabs.query({})).find(tab => tab.url === url).id, page.url());
-  const bridge = { send: async (action, params) => {
+  const bridge = { extensionFeatures: ['frame-evaluate'], send: async (action, params) => {
     // Like the native bridge, preserve structured errors across the worker transport.
     const result = await worker.evaluate(async command => {
       try { return await globalThis.runCommand(command); }
@@ -165,7 +165,7 @@ try {
   assert.equal((await tab.read({target:{within:shadowContainer.ref, ref:shadow.ref}})).attrs.value, 'shadow-live');
   const paged = await tab.observe({ format: 'dom', limit: 1, includeFrames: false });
   assert.equal(paged.dom.nextStart, 1);
-  assert.equal((await tab.observe({ format: 'dom', start: paged.dom.nextStart, limit: 1, includeFrames: false })).dom.start, 1);
+  assert.equal((await tab.observe(paged.dom.next)).dom.start, 1);
   assert((await tab.find({ query: 'Internal workflow' })).entries.some(entry => entry.ref === custom.ref));
   assert((await tab.find({ query: 'shadow-live' })).entries.length);
   assert((await tab.read({ maxChars: 20000 })).text.includes('Shadow article content'));
@@ -178,12 +178,20 @@ try {
 
 
   const field = await tab.find({ frame: child.frame, label: 'Cost center' });
-  assert.equal((await tab.read({ target: { frame: child.frame, ref: field.entries[0].ref } })).attrs.value, 'live-value');
+  assert.equal((await tab.read({ target: { ref: field.entries[0].ref } })).attrs.value, 'live-value');
   const buttonRef = child.state.match(/button "Frame action"[^\n]*\[ref=([^\]]+)\]/)[1];
-  await tab.act({ action: 'click', target: { frame: child.frame, ref: buttonRef }, settleMs: 0 });
+  await tab.act({ action: 'click', target: { ref: buttonRef }, settleMs: 0 });
   assert((await tab.observe({ frame: child.frame })).state.includes('Frame done'));
-  await tab.act({ action: 'fill', target: { frame: child.frame, ref: field.entries[0].ref }, value: 'edited', settleMs: 0 });
-  assert.equal((await tab.read({ target: { frame: child.frame, ref: field.entries[0].ref } })).attrs.value, 'edited');
+  await tab.act({ action: 'fill', target: { ref: field.entries[0].ref }, value: 'edited', settleMs: 0 });
+  assert.equal((await tab.read({ target: { ref: field.entries[0].ref } })).attrs.value, 'edited');
+  const amount = { ref: field.entries[0].ref };
+  await tab.expect({target:amount, value:'edited', enabled:true});
+  await tab.expect({target:{frame:child.frame, label:'Cost center'}, value:'edited'});
+  await tab.expect({target:{selector:'#flag'}, checked:true});
+  await assert.rejects(tab.expect({target:amount, value:'wrong'}, {timeoutMs:0}), error => error.code === 'expectation_failed' && error.data?.actual?.value === 'edited');
+  await assert.rejects(tab.expect({target:{selector:'button'}}), error => error.code === 'selector_ambiguous');
+  console.log('Passed: observed iframe refs reused directly across read/act/expect; strict scoped verification and actual state.');
+
   await tab.act({ action: 'click', target: { frame: nested.frame, role: 'button', name: 'Nested action' }, settleMs: 0 });
   assert((await tab.observe({ frame: nested.frame })).state.includes('Nested done'));
   const shadowButton = dom.dom.entries.find(entry => entry.text === 'Shadow action');
@@ -205,6 +213,17 @@ try {
   assert((await tab.read()).text.includes('Shadow report complete'), 'Read must scroll shadow-root lazy content');
   assert.equal(await page.evaluate(() => document.querySelector('#shadow').shadowRoot.querySelector('#shadow-scroll').scrollTop), 0, 'Read restores the shadow scrollport');
   console.log('Passed: shadow-root lazy document scan and scroll restoration.');
+  const {pageToolsUpdate} = await import('../dist/src/api/webmcp.js');
+  await page.evaluate(() => Object.defineProperty(navigator, 'modelContext', {configurable:true, value:{ getTools:() => [{name:'fixtureLookup',description:'Look up a fixture',inputSchema:{type:'object'}}] }}));
+  const catalog = new Map();
+  assert.equal((await pageToolsUpdate(transport,catalog,'main',[])).tools[0].name,'fixtureLookup');
+  assert.equal(await pageToolsUpdate(transport,catalog,'main',[]),undefined);
+  assert.equal((await tab.webmcp.list())[0].inputSchema,undefined);
+  assert.deepEqual((await tab.webmcp.list({name:'fixtureLookup'}))[0].inputSchema,{type:'object'});
+  await page.evaluate(() => { navigator.modelContext.getTools = () => []; });
+  assert.deepEqual((await pageToolsUpdate(transport,catalog,'main',[])).tools,[]);
+  console.log('Passed: page tool discovery emits changes only and defers full schemas.');
+
   await page.evaluate(() => {
     const el = document.createElement('button'); el.id = 'quoted';
     el.textContent = 'Quoted: name [ref=e999999] and \"text\"'; document.body.append(el);
@@ -218,7 +237,7 @@ try {
   await page.evaluate(() => document.body.prepend(document.createElement('button')));
   assert.equal((await tab.find({selector:'#custom'})).entries[0].ref, original);
   assert.equal((await tab.read({target:{ref:original}})).attrs.id, 'custom');
-  await assert.rejects(tab.act({action:'click', target:{ref:buttonRef}, settleMs:0}), e => e.code === 'stale_ref');
+  assert.equal((await tab.read({target:{ref:buttonRef}})).text, 'Frame done', 'Observed child refs retain their frame route across other observations');
   const annotation = await transport.pageCall('annotate');
   assert(annotation > 0);
   await transport.pageCall('unannotate');
