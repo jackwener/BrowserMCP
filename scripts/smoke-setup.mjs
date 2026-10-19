@@ -167,8 +167,14 @@ try {
   const launcherEnv = { ...env, OPENCLI_SETUP_TEST_NODE: '', NODE_OPTIONS: `--import=${JSON.stringify(preload)}` };
   host = spawn(manifest.path, ['chrome-extension://' + storeId + '/'], { env: launcherEnv, stdio: ['pipe', 'pipe', 'pipe'] });
   host.stderr.on('data', (chunk) => { stderr += chunk; });
-  host.stdout.resume();
-  const { encodeFrame } = await import('../dist/src/host/native-messaging.js');
+  const { encodeFrame, FrameDecoder } = await import('../dist/src/host/native-messaging.js');
+  let answerPing = true;
+  const decoder = new FrameDecoder();
+  host.stdout.on('data', chunk => {
+    for (const message of decoder.push(chunk)) if (message.type === 'command' && message.command.action === 'ping' && answerPing) {
+      host.stdin.write(encodeFrame({ type: 'result', result: { id: message.command.id, ok: true, data: { pong: true } } }));
+    }
+  });
   const { PROTOCOL_REVISION } = await import('../dist/src/protocol.js');
   host.stdin.write(encodeFrame({ type: 'hello', browserId: 'setup-browser', extensionVersion: 'test', protocolRevision: PROTOCOL_REVISION + 1, features: [] }));
   const hasHostState = () => fs.existsSync(path.join(stateDir, 'run')) && fs.readdirSync(path.join(stateDir, 'run')).some(f => /^[\da-f-]{36}\.json$/.test(f));
@@ -297,6 +303,16 @@ try {
   assert(help.includes('setup'));
   assert(!/^\s+install\s/m.test(help));
   await cli(['install'], 2);
+  // Keep stdio open but stop answering: the actual host must reclaim itself without a PID killer.
+  answerPing = false;
+  const exited = once(host, 'exit');
+  let watchdog;
+  try {
+    await Promise.race([exited, new Promise((_, reject) => { watchdog = setTimeout(() => reject(new Error('Unresponsive host did not retire')), 55000); })]);
+  } finally { clearTimeout(watchdog); }
+  assert.equal(host.exitCode, 0, stderr);
+  assert(!hasHostState(), 'Host must remove its discovery record');
+  console.log('PASS lifecycle: live process with unresponsive extension retires and clears its registry');
   console.log('setup smoke passed');
 } catch (error) {
   if (stderr) process.stderr.write(`Native host stderr:\n${stderr}`);

@@ -38,7 +38,7 @@ describe('stdio launcher when Chrome starts later', () => {
 
     const rt = new Runtime();
     await rt.init();
-    const host = await startIpcServer(rt, { version: 'test' });
+    const host = await startIpcServer(rt, { version: 'test', probe: async () => ({ browserId: 'late-browser', extensionResponsive: true }) });
     let activeHost = host;
     cleanup.push(async () => { await activeHost.close(); await rt.shutdown(); });
     const run = path.join(home, '.opencli-mcp', 'run');
@@ -48,7 +48,7 @@ describe('stdio launcher when Chrome starts later', () => {
       fs.writeFileSync(file, JSON.stringify({ pid: process.pid, browserId, instanceId: instance.instanceId, endpoint: instance.endpoint, version: 'test' }));
       return file;
     };
-    const other = await startIpcServer(rt, { version: 'other' });
+    const other = await startIpcServer(rt, { version: 'other', probe: async () => ({ browserId: 'other-browser', extensionResponsive: true }) });
     cleanup.push(() => other.close());
     const firstFile = publish(host);
     const otherFile = publish(other, 'other-browser');
@@ -93,7 +93,7 @@ describe('stdio launcher when Chrome starts later', () => {
     publish(other, 'other-browser');
     const wrongProfile = await client.callTool({ name: 'doctor', arguments: {} });
     expect(wrongProfile.content).toMatchObject([{ type: 'text', text: expect.stringContaining('host_unavailable') }]);
-    activeHost = await startIpcServer(rt, { version: 'restarted' });
+    activeHost = await startIpcServer(rt, { version: 'restarted', probe: async () => ({ browserId: 'late-browser', extensionResponsive: true }) });
     publish(activeHost);
     // Discovery may reconnect but must not consume the session-loss notice.
     await client.listTools();

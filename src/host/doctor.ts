@@ -7,7 +7,7 @@ import { NATIVE_HOST_NAME } from '../protocol.js';
 import { nativeHostDirs, runningProfileDirs } from './registration.js';
 import type { DoctorReport } from '../runtime/runtime.js';
 import { EXTENSION_ID, EXTENSION_STORE_URL } from './extension.js';
-import { connectHost, HostConnectionError, readHostStates, RUN_DIR, type HostState } from './state.js';
+import { connectHost, HostConnectionError, readHostStates, RUN_DIR, type HostDiagnostic, type HostState } from './state.js';
 
 export interface DoctorResult {
   ok: boolean;
@@ -15,7 +15,7 @@ export interface DoctorResult {
   launch: LaunchHealth;
   extension: { id: string; storeUrl: string };
   manifests: Array<{ browser: string; file: string; present: boolean; launcherExists: boolean; launcherMatches: boolean; authorized: boolean }>;
-  host: { registryDirectory: string; running: boolean; browserId?: string; endpoint?: string; instances: HostState[]; backend?: string; extensionConnected?: boolean; protocolWarning?: string | null; error?: string };
+  host: { registryDirectory: string; running: boolean; browserId?: string; endpoint?: string; instances: HostState[]; probes: HostDiagnostic[]; backend?: string; extensionConnected?: boolean; protocolWarning?: string | null; error?: string };
   chromeRunning: boolean | null;
   advice: string[];
 }
@@ -37,12 +37,13 @@ export async function doctor(): Promise<DoctorResult> {
     return { browser, file, present: fs.existsSync(file), launcherExists, launcherMatches, authorized };
   });
   const hosts = readHostStates();
+  const probes: HostDiagnostic[] = [];
   let state: HostState | null = null;
   let error: string | undefined;
   let selectionRequired = false;
   let report: DoctorReport | undefined;
   try {
-    const connection = await connectHost(undefined, hosts);
+    const connection = await connectHost(undefined, hosts, probes);
     state = connection.state;
     try {
       const result = await connection.client.callTool({ name: 'doctor', arguments: {} }, { timeout: 1500 });
@@ -75,7 +76,7 @@ export async function doctor(): Promise<DoctorResult> {
     launch,
     extension: { id: EXTENSION_ID, storeUrl: EXTENSION_STORE_URL },
     manifests,
-    host: { registryDirectory: RUN_DIR, running: health.ok || selectionRequired, browserId: state?.browserId, endpoint: state?.endpoint, instances: hosts, backend: health.backend, extensionConnected: health.extensionConnected, protocolWarning: health.protocolWarning, error: health.error },
+    host: { registryDirectory: RUN_DIR, running: health.ok || selectionRequired, browserId: state?.browserId, endpoint: state?.endpoint, instances: hosts, probes, backend: health.backend, extensionConnected: health.extensionConnected, protocolWarning: health.protocolWarning, error: health.error },
     chromeRunning,
     advice,
   };

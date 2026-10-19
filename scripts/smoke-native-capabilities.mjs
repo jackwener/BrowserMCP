@@ -13,7 +13,7 @@ import { ExtensionBridge } from '../dist/src/host/bridge.js';
 import { NativeChannel, FrameDecoder, encodeFrame } from '../dist/src/host/native-messaging.js';
 import { Runtime } from '../dist/src/runtime/runtime.js';
 import { startIpcServer } from '../dist/src/host/ipc.js';
-import { connectSocket } from '../dist/src/host/socket.js';
+import { connectSocket, probeSocket, attachSocket } from '../dist/src/host/socket.js';
 import { PROTOCOL_REVISION } from '../dist/src/protocol.js';
 import { timeline, searchUrl } from '../tests/fixtures/twitter-search.mjs';
 
@@ -69,9 +69,11 @@ try {
   incoming.write(encodeFrame({ type: 'hello', browserId: 'native-smoke-browser', extensionVersion: 'smoke', protocolRevision: PROTOCOL_REVISION,
     features: ['chrome-api', 'streams', 'extension-logs', 'page-evaluate', 'cdp', 'console', 'frames', 'network', 'dialogs'] }));
   const runtime = new Runtime({ bridge });
-  session = await startIpcServer(runtime, { version: 'native-smoke' });
+  session = await startIpcServer(runtime, { version: 'native-smoke', probe: async () => ({ browserId: bridge.browserId, extensionResponsive: await bridge.probe() }) });
   const ct = await connectSocket(session.endpoint);
   client = new Client({ name: 'native-smoke', version: '1' }, { capabilities: {} });
+  await probeSocket(ct);
+  attachSocket(ct);
   await client.connect(ct);
   const call = async (name, args = {}, failure = false) => {
     const r = await client.callTool({ name, arguments: args });

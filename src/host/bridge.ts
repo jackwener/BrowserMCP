@@ -80,6 +80,16 @@ export class ExtensionBridge extends EventEmitter<BridgeEvents> {
     if (msg.type === 'event') this.emit('event', msg.event);
   }
 
+  private probePending: Promise<boolean> | null = null;
+  /** A fresh extension round trip; concurrent discovery and lifecycle checks share it. */
+  probe(): Promise<boolean> {
+    if (!this.connected) return Promise.resolve(false);
+    if (!this.probePending) this.probePending = this.send('ping', {}, { timeoutMs: 2000 })
+      .then(result => (result.data as { pong?: boolean })?.pong === true, () => false)
+      .finally(() => { this.probePending = null; });
+    return this.probePending;
+  }
+
   /** Send a command; resolves with `data`, throws BrowserCommandError on `ok:false`. */
   async send(action: Action, params: Omit<Command, 'id' | 'action'> = {}, opts: { timeoutMs?: number } = {}): Promise<{ data: unknown; page?: string }> {
     const timeoutMs = opts.timeoutMs ?? (params.timeoutMs ?? 60_000) + 5_000;

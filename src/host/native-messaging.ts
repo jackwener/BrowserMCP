@@ -55,7 +55,9 @@ export class NativeChannel extends EventEmitter<NativeChannelEvents> {
     });
     input.on('end', () => this.close());
     input.on('close', () => this.close());
-    input.on('error', (err) => this.emit('error', err));
+    const failed = (err: Error) => { this.close(); this.emit('error', err); };
+    input.on('error', failed);
+    output.on('error', failed);
   }
   send(message: unknown): void {
     if (this.closed) throw new Error('native channel closed');

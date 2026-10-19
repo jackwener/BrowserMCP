@@ -1,6 +1,12 @@
 # Changelog
 
-## Unreleased
+## 0.0.31 — 2026-10-20
+
+- Probe browser health before creating MCP sessions. Automatically choose a responsive host when multiple instances share one browserId; preserve already connected sessions.
+- Diagnose each host independently and retire hosts whose extension stops responding. Bound shutdown and handle native pipe errors.
+- Move extension ping outside page/session initialization. Ship extension 0.0.23.
+
+Upgrade note: reload the extension after upgrading npm to restart the native host with the new IPC handshake, then restart the MCP client.
 
 - Page observations across the main document and child frames under one output budget, with explicit cursors over an immutable capture. Remove recursive branch folding that could hide the same branch on every expansion.
 - Scope observations directly with existing locators or refs, and remove inert ARIA wrappers while preserving names, states, refs and explanatory text.

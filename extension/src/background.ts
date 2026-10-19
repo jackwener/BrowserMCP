@@ -61,6 +61,7 @@ function errorResult(id: string, err: unknown): Result {
 /** Every child frame of the tab (in document order), flagged cross-origin when its origin differs from the top document's. Opaque origins (data:, sandboxed) count as cross-origin. */
 // ── router ──
 async function handleCommand(cmd: Command): Promise<Result> {
+  if (cmd.action === 'ping') return { id: cmd.id, ok: true, data: { pong: true, version: chrome.runtime.getManifest().version } };
   await sessions.ready();
   const s = sessionFor(cmd);
   await sessions.touch(s);
@@ -77,7 +78,6 @@ async function handleCommand(cmd: Command): Promise<Result> {
       case 'stream-close': closeStream(s.key, cmd.streamId ?? ''); return { id: cmd.id, ok: true, data: null };
       case 'streams-reset': closeSessionStreams(s.key); return { id: cmd.id, ok: true, data: null };
       case 'extension-logs': return { id: cmd.id, ok: true, data: extensionLogs.read(cmd.streamRead) };
-      case 'ping': return { id: cmd.id, ok: true, data: { pong: true, version: chrome.runtime.getManifest().version } };
       case 'exec': return await handleExec(cmd, s);
       case 'act': {
         if (!cmd.act) return { id: cmd.id, ok: false, error: 'Missing act spec', errorCode: 'invalid_target' };

@@ -227,3 +227,13 @@ An enabled MCP client entry does not establish the browser connection. The two c
    ```
 
    The default value must point to the existing Chrome manifest reported by doctor. Doctor checks the runtime and program entry, launcher consistency, manifest file, authorized extension origin, and live connection; it does **not** currently verify the Windows registry value. A missing or stale registry value needs setup again under the Windows account running Chrome.
+
+### Duplicate hosts and recovery
+
+A `browserId` identifies a browser profile; an `instanceId` identifies one host process. Discovery probes the extension round trip without opening an Agent session. For duplicate hosts of one browser, new clients choose the newest responsive instance automatically; existing sessions stay on their current host. Different available browser IDs still require browser selection.
+
+`doctor --json` includes per-instance `probes`: readiness, selection and connection failures. Unselected hosts are not killed. Hosts retire after three consecutive failed extension checks (15-second intervals, 2-second ping timeout); shutdown is bounded to 5 seconds. Registry age and parent PID changes are not health signals.
+
+After a host disconnects, the launcher reconnects to the same browser. `session_restarted` means the current call was not executed and REPL bindings must be recreated. `command_outcome_unknown` means a dispatched call may have taken effect: inspect browser state before retrying. Discovery never replays mutations.
+
+The local IPC handshake changed: after upgrading the npm package, reload the extension to restart the native host, then restart the MCP client. The extension and host version numbers need not match.

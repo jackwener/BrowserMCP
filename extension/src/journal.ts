@@ -84,7 +84,7 @@ export async function executeWithJournal(
   execute: (cmd: Command) => Promise<Result>,
 ): Promise<Result> {
   const id = cmd.id;
-  if (!id) return execute(cmd);
+  if (!id || cmd.action === 'ping') return execute(cmd);
 
   const running = inFlight.get(id);
   if (running) return running;

@@ -35,7 +35,7 @@ jobs:
           node-version: ${{ matrix.node }}
       - run: npm ci --ignore-scripts
       - run: npm run build
-      - run: npx vitest run tests/repl.test.ts
+      - run: npx vitest run tests/repl.test.ts tests/ipc-session.test.ts
       - run: npm run smoke:setup
 
   release:
