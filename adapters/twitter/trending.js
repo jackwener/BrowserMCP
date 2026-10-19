@@ -1,4 +1,4 @@
-import { defineAdapter, errors } from 'browsermcp/adapter-sdk';
+import { defineAdapter, errors } from '@jackwener/browsermcp/adapter-sdk';
 
 export default defineAdapter({
   description: 'X trending topics. Returns rank, topic, and category.',

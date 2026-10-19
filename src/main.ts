@@ -16,7 +16,7 @@ import { parseArgs } from 'node:util';
 const here = path.dirname(fileURLToPath(import.meta.url));
 function findVersion(): string {
   let dir = here;
-  for (let i = 0; i < 6; i++) { const pkg = path.join(dir, 'package.json'); try { const j = JSON.parse(fs.readFileSync(pkg, 'utf8')) as { name?: string; version?: string }; if (j.name === 'browsermcp' && j.version) return j.version; } catch { /* walk */ } dir = path.dirname(dir); }
+  for (let i = 0; i < 6; i++) { const pkg = path.join(dir, 'package.json'); try { const j = JSON.parse(fs.readFileSync(pkg, 'utf8')) as { name?: string; version?: string }; if (j.name === '@jackwener/browsermcp' && j.version) return j.version; } catch { /* walk */ } dir = path.dirname(dir); }
   return '0.0.0';
 }
 const VERSION = findVersion();

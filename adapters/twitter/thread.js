@@ -1,4 +1,4 @@
-import { defineAdapter, errors } from 'browsermcp/adapter-sdk';
+import { defineAdapter, errors } from '@jackwener/browsermcp/adapter-sdk';
 import { ensureOnX, gql, extractTweet, tweetIdFrom, apiError, applyTopByEngagement } from './_shared.js';
 
 const QUERY_ID = 'nBS-WpgA6ZG0CyNHD517JQ';

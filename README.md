@@ -4,7 +4,7 @@
 
 BrowserMCP lets MCP clients observe and operate your Chrome tabs through a local extension and host. Optional site adapters package verified workflows as reusable tools.
 
-[![npm](https://img.shields.io/npm/v/browsermcp)](https://www.npmjs.com/package/browsermcp)
+[![npm](https://img.shields.io/npm/v/@jackwener/browsermcp)](https://www.npmjs.com/package/@jackwener/browsermcp)
 [![Chrome Web Store](https://img.shields.io/badge/Chrome_Web_Store-Install_extension-4285F4?logo=googlechrome&logoColor=white)](https://chromewebstore.google.com/detail/opencli-mcp/lnaoghmfcdnbhgcihkakfobckmfhllkg)
 [![Node.js](https://img.shields.io/badge/Node.js-%3E%3D22-339933)](package.json)
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
@@ -20,6 +20,8 @@ BrowserMCP lets MCP clients observe and operate your Chrome tabs through a local
 
 Works with MCP clients including Claude Code, Codex, OpenCode, Cursor, Claude Desktop, DeepSeek Harness (`dsh`), and Pi (with `pi-mcp-adapter`). Agents use a persistent JavaScript REPL for browser work and structured site tools for verified workflows.
 
+The npm package is `@jackwener/browsermcp`; the command is `browsermcp`.
+
 ## Quick start
 
 You need **Node.js 22 or newer**, **Google Chrome**, and an **MCP client**. The local host also supports Chromium-based browsers such as Edge and Brave; see [installation details](docs/setup.md).
@@ -33,8 +35,8 @@ For an extension version ahead of the Web Store, download the **manual-install z
 ### 2. Install the npm package and set up the connection
 
 ```bash
-npm install -g browsermcp
-BrowserMCP setup
+npm install -g @jackwener/browsermcp
+browsermcp setup
 ```
 
 Keep Chrome open. `setup` connects the extension to the local program, asks which MCP clients to configure, registers only your selection, and checks the browser connection. If you have not installed the extension yet, it opens the Chrome Web Store for you.
@@ -46,7 +48,7 @@ For **OpenCode**, run `browsermcp setup --clients opencode`. It adds a global MC
 For **DeepSeek Harness (`dsh`)**, run `browsermcp setup --clients none`, then add the same npm package to your dsh profile:
 
 ```bash
-dsh plugin --profile web add browsermcp
+dsh plugin --profile web add @jackwener/browsermcp
 ```
 
 Restart `dsh web`. The package's dsh bundle uses dsh's MCP client to connect to the browser service. See the [dsh setup details](docs/setup.md#deepseek-harness-dsh).
@@ -65,9 +67,9 @@ Connection issues? See [troubleshooting](docs/setup.md#troubleshooting).
 
 ## Upgrading from opencli-mcp
 
-Install `browsermcp` and rerun `browsermcp setup`, selecting the MCP clients you want to update. Setup replaces their old `opencli-mcp` entry with `browsermcp`. For manually configured clients, update the entry yourself. The extension is now named **BrowserMCP Connector** and keeps its existing Web Store ID.
+Install `@jackwener/browsermcp` and rerun `browsermcp setup`, selecting the MCP clients you want to update. Setup replaces their old `opencli-mcp` entry with `browsermcp`. For manually configured clients, update the entry yourself. The extension is now named **BrowserMCP Connector** and keeps its existing Web Store ID.
 
-Existing data in `~/.opencli-mcp`, the stable launcher, and the Native Messaging host identity are retained for compatibility. Existing adapters can still import `opencli-mcp/adapter-sdk`; new adapters use `browsermcp/adapter-sdk`. `BROWSERMCP_BROWSER` and `BROWSERMCP_BIN` take precedence over their legacy `OPENCLI_MCP_*` equivalents.
+Existing data in `~/.opencli-mcp`, the stable launcher, and the Native Messaging host identity are retained for compatibility. Existing adapters can still import `opencli-mcp/adapter-sdk`; new adapters use `@jackwener/browsermcp/adapter-sdk`. `BROWSERMCP_BROWSER` and `BROWSERMCP_BIN` take precedence over their legacy `OPENCLI_MCP_*` equivalents.
 
 ## Usage
 

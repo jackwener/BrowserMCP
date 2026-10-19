@@ -1,4 +1,4 @@
-import { defineAdapter, errors } from 'browsermcp/adapter-sdk';
+import { defineAdapter, errors } from '@jackwener/browsermcp/adapter-sdk';
 import { safeFacebookUrl } from './_shared.js';
 
 const OPERATION = 'EventCometHomeDiscoverContentRefetchQuery';

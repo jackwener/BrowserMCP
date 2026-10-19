@@ -13,7 +13,7 @@ export function projectRoot(): string {
   let dir = path.dirname(fileURLToPath(import.meta.url));
   for (let i = 0; i < 6; i++) {
     const pkg = path.join(dir, 'package.json');
-    try { if ((JSON.parse(fs.readFileSync(pkg, 'utf8')) as { name?: string }).name === 'browsermcp') return dir; } catch { /* keep walking */ }
+    try { if ((JSON.parse(fs.readFileSync(pkg, 'utf8')) as { name?: string }).name === '@jackwener/browsermcp') return dir; } catch { /* keep walking */ }
     dir = path.dirname(dir);
   }
   throw new Error('browsermcp project root not found');

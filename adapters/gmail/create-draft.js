@@ -1,4 +1,4 @@
-import { defineAdapter } from 'browsermcp/adapter-sdk';
+import { defineAdapter } from '@jackwener/browsermcp/adapter-sdk';
 import { composeArgs, gmailCreateDraft } from './send.js';
 
 export default defineAdapter({

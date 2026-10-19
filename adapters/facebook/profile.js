@@ -1,4 +1,4 @@
-import { defineAdapter, errors } from 'browsermcp/adapter-sdk';
+import { defineAdapter, errors } from '@jackwener/browsermcp/adapter-sdk';
 import { facebookGraphql } from './_graphql.js';
 import { parseProfileSearch, safeFacebookUrl, searchProfilesApi } from './_shared.js';
 

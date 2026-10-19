@@ -1,4 +1,4 @@
-import { defineAdapter, errors } from 'browsermcp/adapter-sdk';
+import { defineAdapter, errors } from '@jackwener/browsermcp/adapter-sdk';
 import { ensureOnReddit, toPostId, redditPost } from './_shared.js';
 
 const EXPAND_ROUNDS_MIN = 1;

@@ -1,4 +1,4 @@
-import { errors } from 'browsermcp/adapter-sdk';
+import { errors } from '@jackwener/browsermcp/adapter-sdk';
 
 export const ORIGIN = 'https://www.linkedin.com';
 export const compact = (value) => String(value ?? '').replace(/[\u00a0\u202f\s]+/g, ' ').trim();

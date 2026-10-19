@@ -1,5 +1,5 @@
 // Shared helpers for the X/Twitter adapters. Files starting with `_` are not commands.
-import { errors } from 'browsermcp/adapter-sdk';
+import { errors } from '@jackwener/browsermcp/adapter-sdk';
 import fs from 'node:fs';
 import path from 'node:path';
 

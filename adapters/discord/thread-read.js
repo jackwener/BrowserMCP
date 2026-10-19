@@ -1,4 +1,4 @@
-import { defineAdapter, errors } from 'browsermcp/adapter-sdk';
+import { defineAdapter, errors } from '@jackwener/browsermcp/adapter-sdk';
 import { count, discordClient, discordRoute, messageRow } from './_shared.js';
 
 export default defineAdapter({

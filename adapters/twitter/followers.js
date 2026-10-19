@@ -1,4 +1,4 @@
-import { defineAdapter, errors } from 'browsermcp/adapter-sdk';
+import { defineAdapter, errors } from '@jackwener/browsermcp/adapter-sdk';
 import { ensureOnX, resolveLoggedInUser, normalizeScreenName } from './_shared.js';
 
 const EXTRACT = `(() => {

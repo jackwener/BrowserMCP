@@ -6,7 +6,7 @@
 - Migrate selected MCP client registrations while retaining the extension ID, native host identity, local data, and legacy adapter SDK imports.
 - Move the repository to jackwener/browsermcp and update setup, documentation, and release artifacts.
 
-Upgrade: npm install -g browsermcp, then browsermcp setup. Reload the extension and reconnect your MCP client.
+Upgrade: npm install -g @jackwener/browsermcp, then browsermcp setup. Reload the extension and reconnect your MCP client.
 
 ## 0.0.31 — 2026-10-20
 

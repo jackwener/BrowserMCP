@@ -1,4 +1,4 @@
-import { errors } from 'browsermcp/adapter-sdk';
+import { errors } from '@jackwener/browsermcp/adapter-sdk';
 import { compact, linkedinApi } from './_shared.js';
 
 const QUERY_ID = 'voyagerIdentityDashProfileComponents.8903e7f7b15f1c12a050c55d48ca2835';

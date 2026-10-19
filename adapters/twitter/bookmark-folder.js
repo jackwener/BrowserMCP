@@ -1,4 +1,4 @@
-import { defineAdapter, errors } from 'browsermcp/adapter-sdk';
+import { defineAdapter, errors } from '@jackwener/browsermcp/adapter-sdk';
 import { ensureOnX, gql, walkTimeline, apiError, applyTopByEngagement } from './_shared.js';
 
 const QUERY_ID = '13H7EUATwethsj_jZ6QQAQ';

@@ -10,7 +10,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { defineAdapter, type AdapterDescriptor } from 'browsermcp/adapter-sdk';
+import { defineAdapter, type AdapterDescriptor } from '@jackwener/browsermcp/adapter-sdk';
 import { argSpec, validateArgDefinitions, type Arg, type ArgView } from './schema.js';
 
 export type SourceKind = 'builtin' | 'user';

@@ -1,4 +1,4 @@
-import { defineAdapter } from 'browsermcp/adapter-sdk';
+import { defineAdapter } from '@jackwener/browsermcp/adapter-sdk';
 import { ensureOnBili, biliApiSigned, stripHtml } from './_shared.js';
 
 export default defineAdapter({

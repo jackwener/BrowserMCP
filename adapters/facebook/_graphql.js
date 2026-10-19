@@ -1,4 +1,4 @@
-import { errors } from 'browsermcp/adapter-sdk';
+import { errors } from '@jackwener/browsermcp/adapter-sdk';
 
 export async function facebookGraphql(tab, pageUrl, operation, variables, { allowPartial = false, docId } = {}) {
   if (!/^https:\/\/www\.facebook\.com\/[\w/?=&%.-]*$/.test(pageUrl) || !/^[A-Za-z0-9_]+$/.test(operation)) {

@@ -1,4 +1,4 @@
-import { defineAdapter, errors } from 'browsermcp/adapter-sdk';
+import { defineAdapter, errors } from '@jackwener/browsermcp/adapter-sdk';
 import { ensureOnReddit } from './_shared.js';
 
 const SUBREDDIT_NAME_RE = /^[A-Za-z][A-Za-z0-9_]{2,20}$/;

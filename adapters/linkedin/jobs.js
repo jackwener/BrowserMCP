@@ -1,4 +1,4 @@
-import { defineAdapter, errors } from 'browsermcp/adapter-sdk';
+import { defineAdapter, errors } from '@jackwener/browsermcp/adapter-sdk';
 import { compact, ensureLinkedIn, integer, linkedinApi, requireElements } from './_shared.js';
 
 const EXPERIENCE = { internship: '1', entry: '2', associate: '3', mid: '4', senior: '4', director: '5', executive: '6' };

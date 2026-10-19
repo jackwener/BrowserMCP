@@ -1,4 +1,4 @@
-import { errors } from 'browsermcp/adapter-sdk';
+import { errors } from '@jackwener/browsermcp/adapter-sdk';
 import { compact, linkedinApi, requireElements } from './_shared.js';
 
 export function profileIdentity(value) {

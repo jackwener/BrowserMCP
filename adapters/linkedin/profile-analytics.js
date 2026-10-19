@@ -1,4 +1,4 @@
-import { defineAdapter, errors } from 'browsermcp/adapter-sdk';
+import { defineAdapter, errors } from '@jackwener/browsermcp/adapter-sdk';
 import { ensureLinkedIn, linkedinApi } from './_shared.js';
 import { linkedinProfile, profileIdentity } from './_profile.js';
 

@@ -1,4 +1,4 @@
-import { errors } from 'browsermcp/adapter-sdk';
+import { errors } from '@jackwener/browsermcp/adapter-sdk';
 import { parseProfileSearch, searchProfilesApi } from './_shared.js';
 import { friendsTemplate } from './friends.js';
 

@@ -1,4 +1,4 @@
-import { defineAdapter, errors } from 'browsermcp/adapter-sdk';
+import { defineAdapter, errors } from '@jackwener/browsermcp/adapter-sdk';
 import { compact, ensureLinkedIn, linkedinApi } from './_shared.js';
 
 export function jobId(value) {

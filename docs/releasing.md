@@ -4,7 +4,7 @@ The npm package and Chrome extension have separate versions. Each npm release al
 
 ## One-time npm setup
 
-In the [browsermcp npm package settings](https://www.npmjs.com/package/browsermcp), add a **Trusted Publisher** for GitHub Actions:
+In the [browsermcp npm package settings](https://www.npmjs.com/package/@jackwener/browsermcp), add a **Trusted Publisher** for GitHub Actions:
 
 - GitHub owner: `jackwener`
 - Repository: `browsermcp`
@@ -13,7 +13,7 @@ In the [browsermcp npm package settings](https://www.npmjs.com/package/browsermc
 
 The workflow uses GitHub OIDC to publish to npm. It does not need an `NPM_TOKEN` secret. GitHub Actions must be enabled for this repository.
 
-The rename creates a new npm package, `browsermcp`. Before the first release, establish ownership and configure its Trusted Publisher; the old package's publisher configuration does not carry over. Upload **BrowserMCP Connector** as an update to the existing Web Store item, preserving its extension ID and incrementing the extension version.
+The rename creates a new npm package, `@jackwener/browsermcp`. Before the first release, establish ownership and configure its Trusted Publisher; the old package's publisher configuration does not carry over. Upload **BrowserMCP Connector** as an update to the existing Web Store item, preserving its extension ID and incrementing the extension version.
 
 ## Each release
 

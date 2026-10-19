@@ -1,4 +1,4 @@
-import { defineAdapter, errors } from 'browsermcp/adapter-sdk';
+import { defineAdapter, errors } from '@jackwener/browsermcp/adapter-sdk';
 import { compact, csrf, ensureLinkedIn, linkedinApi } from './_shared.js';
 
 const PROFILE_DECORATION = '(entityUrn,objectUrn,firstName,lastName,fullName,headline,degree,inmailRestriction,memberBadges,defaultPosition)';

@@ -1,4 +1,4 @@
-import { errors } from 'browsermcp/adapter-sdk';
+import { errors } from '@jackwener/browsermcp/adapter-sdk';
 import { facebookGraphql } from './_graphql.js';
 
 const HOME = 'https://www.facebook.com/';

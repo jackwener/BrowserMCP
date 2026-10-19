@@ -4,7 +4,7 @@ For the recommended npm + Chrome Web Store installation, follow the [README quic
 
 ## What setup does
 
-`npm install -g browsermcp` installs the software. `browsermcp setup` configures the two connections it needs:
+`npm install -g @jackwener/browsermcp` installs the software. `browsermcp setup` configures the two connections it needs:
 
 1. **Chrome → local program:** writes the Native Messaging registration so Chrome can start the program when the extension connects.
 2. **MCP client → local program:** asks you to select `claude`, `codex`, `opencode`, `pi`, or a combination when their CLIs are on your PATH. Only selected clients are configured; their `browsermcp` entry is set to the managed launcher. Other server entries are unchanged. Pi requires `pi-mcp-adapter`. Choose `manual` (the default) for a ready-to-copy configuration using absolute paths, or `none` to configure only the browser connection.
@@ -53,10 +53,10 @@ After installing the Chrome extension and `browsermcp` globally, connect the bro
 
 ```bash
 browsermcp setup --clients none
-dsh plugin --profile web add browsermcp
+dsh plugin --profile web add @jackwener/browsermcp
 ```
 
-Restart `dsh web`. The main package's bundle inserts one `@deepseek-ai/dsh-mcp-client` entry using the launcher created by setup, so dsh discovers the same MCP tools without depending on npm's `PATH`. Set `BROWSERMCP_BIN` only if you need a different executable. To remove the dsh registration, run `dsh plugin --profile web remove browsermcp`. Replace `web` with your active dsh profile when needed.
+Restart `dsh web`. The main package's bundle inserts one `@deepseek-ai/dsh-mcp-client` entry using the launcher created by setup, so dsh discovers the same MCP tools without depending on npm's `PATH`. Set `BROWSERMCP_BIN` only if you need a different executable. To remove the dsh registration, run `dsh plugin --profile web remove @jackwener/browsermcp`. Replace `web` with your active dsh profile when needed.
 
 ## Pi
 
@@ -123,7 +123,7 @@ Keep the extracted directory in place while using the extension. For an update, 
 Download a package from [GitHub Releases](https://github.com/jackwener/browsermcp/releases), then run:
 
 ```bash
-npm install -g ./browsermcp-<version>.tgz
+npm install -g ./jackwener-browsermcp-<version>.tgz
 browsermcp setup
 ```
 
@@ -132,7 +132,7 @@ Install the Chrome extension from the Web Store or use the manual-install zip ab
 ## Updating
 
 ```bash
-npm install -g browsermcp@latest
+npm install -g @jackwener/browsermcp@latest
 browsermcp setup
 ```
 
@@ -201,7 +201,7 @@ Chrome may report:
 
 An enabled MCP client entry does not establish the browser connection. The two connections are separate: the MCP client launches the MCP transport, while Chrome locates and launches the Native Messaging host through its own registration. On Windows, setup writes the host manifest and launcher, and registers the manifest path under `HKCU\Software\Google\Chrome\NativeMessagingHosts\com.opencli.mcp` for the current Windows user. Run setup as the same user who runs Chrome; administrator access is not required.
 
-1. If using an old package, update it with `npm install -g browsermcp@latest`. After an update or a Node.js installation change, refresh the browser registration:
+1. If using an old package, update it with `npm install -g @jackwener/browsermcp@latest`. After an update or a Node.js installation change, refresh the browser registration:
 
    ```powershell
    browsermcp setup --clients none --no-open --wait 0

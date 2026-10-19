@@ -1,4 +1,4 @@
-import { defineAdapter } from 'browsermcp/adapter-sdk';
+import { defineAdapter } from '@jackwener/browsermcp/adapter-sdk';
 import { ensureOnBili, biliApi, resolveUid, stripHtml } from './_shared.js';
 
 const TYPE_MAP = {

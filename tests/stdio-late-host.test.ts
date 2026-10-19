@@ -29,7 +29,7 @@ describe('stdio launcher when Chrome starts later', () => {
     await client.connect(transport);
     cleanup.push(() => client.close());
 
-    expect(client.getInstructions()).toContain('browsermcp');
+    expect(client.getInstructions()).toContain('BrowserMCP');
     expect((await client.listTools()).tools.map((tool) => tool.name)).toContain('js');
     expect((await client.listResources()).resources.some((resource) => resource.uri.startsWith('opencli://docs/'))).toBe(true);
     const offline = await client.callTool({ name: 'js', arguments: { code: 'await browser.tabs.new("https://example.com")' } });

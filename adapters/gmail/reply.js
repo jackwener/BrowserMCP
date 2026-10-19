@@ -1,4 +1,4 @@
-import { defineAdapter, errors } from 'browsermcp/adapter-sdk';
+import { defineAdapter, errors } from '@jackwener/browsermcp/adapter-sdk';
 import { accountNumber, gmailFetchThread, syncThreadId } from './_shared.js';
 import { gmailCreateDraft, gmailSendDraft } from './send.js';
 

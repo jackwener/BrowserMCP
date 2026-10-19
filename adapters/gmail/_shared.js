@@ -1,4 +1,4 @@
-import { errors } from 'browsermcp/adapter-sdk';
+import { errors } from '@jackwener/browsermcp/adapter-sdk';
 
 const ORIGIN = 'https://mail.google.com';
 const REQUIRED_HEADERS = new Set(['content-type', 'x-framework-xsrf-token', 'x-gmail-btai', 'x-gmail-storage-request', 'x-google-btd']);

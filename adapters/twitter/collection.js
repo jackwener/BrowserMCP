@@ -1,4 +1,4 @@
-import { defineAdapter, errors } from 'browsermcp/adapter-sdk';
+import { defineAdapter, errors } from '@jackwener/browsermcp/adapter-sdk';
 import { ensureOnX, gql, resolveUserId, normalizeScreenName, extractMedia, apiError } from './_shared.js';
 
 const QUERY_ID = 'lrMzG9qPQHpqJdP3AbM-bQ';

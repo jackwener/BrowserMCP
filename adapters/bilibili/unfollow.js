@@ -1,4 +1,4 @@
-import { defineAdapter, errors } from 'browsermcp/adapter-sdk';
+import { defineAdapter, errors } from '@jackwener/browsermcp/adapter-sdk';
 import { ensureOnBili, biliPost, getSelfUid, resolveUid, parseSpaceMidUrl, fetchRelationAttribute, waitForRelation } from './_shared.js';
 
 async function resolveTargetMid(tab, raw) {

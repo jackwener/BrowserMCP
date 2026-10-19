@@ -1,5 +1,5 @@
 // Shared helpers for the Reddit adapters. Files starting with `_` are not commands.
-import { errors } from 'browsermcp/adapter-sdk';
+import { errors } from '@jackwener/browsermcp/adapter-sdk';
 
 /** Be on reddit.com so the same-origin .json fetches carry your session (personalized/over-18/subscribed content). */
 export async function ensureOnReddit(tab) {

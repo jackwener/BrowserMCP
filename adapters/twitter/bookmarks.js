@@ -1,4 +1,4 @@
-import { defineAdapter, errors } from 'browsermcp/adapter-sdk';
+import { defineAdapter, errors } from '@jackwener/browsermcp/adapter-sdk';
 import { ensureOnX, gql, walkTimeline } from './_shared.js';
 
 const QUERY_ID = 'Fy0QMy4q_aZCpkO0PnyLYw';

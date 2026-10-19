@@ -1,4 +1,4 @@
-import { defineAdapter, errors } from 'browsermcp/adapter-sdk';
+import { defineAdapter, errors } from '@jackwener/browsermcp/adapter-sdk';
 import { ensureOnX, authHeaders, apiError, applyTopByEngagement } from './_shared.js';
 
 const PATH = '/i/api/2/notifications/device_follow.json';

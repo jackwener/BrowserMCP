@@ -1,4 +1,4 @@
-import { errors } from 'browsermcp/adapter-sdk';
+import { errors } from '@jackwener/browsermcp/adapter-sdk';
 
 export const ORIGIN = 'https://discord.com';
 const API = `${ORIGIN}/api/v9`;

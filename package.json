@@ -1,5 +1,5 @@
 {
-  "name": "browsermcp",
+  "name": "@jackwener/browsermcp",
   "version": "0.0.32",
   "description": "Chrome-backed MCP browser service with optional site adapters.",
   "repository": {

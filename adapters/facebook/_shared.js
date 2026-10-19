@@ -1,4 +1,4 @@
-import { errors } from 'browsermcp/adapter-sdk';
+import { errors } from '@jackwener/browsermcp/adapter-sdk';
 
 const ORIGIN = 'https://www.facebook.com';
 const SEARCH_OPERATION = 'SearchCometResultsPaginatedResultsQuery';

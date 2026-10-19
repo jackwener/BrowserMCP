@@ -1,4 +1,4 @@
-import { defineAdapter, errors } from 'browsermcp/adapter-sdk';
+import { defineAdapter, errors } from '@jackwener/browsermcp/adapter-sdk';
 import { walkTimeline } from './_shared.js';
 
 const restart = () => errors.argument('Search cursor expired or does not match this search', 'Start without cursor. Continue with the same query and sort before navigating, refreshing, or starting another X search.');

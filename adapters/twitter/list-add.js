@@ -1,4 +1,4 @@
-import { defineAdapter, errors } from 'browsermcp/adapter-sdk';
+import { defineAdapter, errors } from '@jackwener/browsermcp/adapter-sdk';
 import { ensureOnX, gql, resolveUserId, normalizeScreenName, fetchManagedLists, apiError } from './_shared.js';
 
 const LIST_ADD_MEMBER_QUERY_ID = 'vWPi0CTMoPFsjsL6W4IynQ';
