@@ -26,8 +26,8 @@ export function createAgentApi(rt: Runtime, sessionId: string): AgentApi {
   const ctx: SessionContext = { rt, sessionId, state };
   // One user, one Chrome — there is no browser fleet to route among; getDefault is the single accessor.
   const getDefault = async (): Promise<Browser> => {
-    if (rt.backend() !== 'extension') throw new ActionError('browser_unavailable', 'No browser backend is connected', 'Run browsermcp doctor and keep Chrome with the extension running.');
-    return new Browser('chrome', 'extension', ctx);
+    if (!rt.browserAvailable()) throw new ActionError('browser_unavailable', 'No browser backend is connected', 'Inspect doctor and the host browser connection.');
+    return new Browser(rt.backend() === 'electron' ? 'embedded' : 'chrome', rt.backend() === 'electron' ? 'electron' : 'extension', ctx);
   };
 
   const siteBase = {
@@ -39,11 +39,11 @@ export function createAgentApi(rt: Runtime, sessionId: string): AgentApi {
       rt.emit('tools-changed', { site });
       const cmds = (await rt.registry.commands(site)).filter((c) => opts.write || c.access === 'read');
       const tools = cmds.map((c) => `${site}_${c.name}`.replace(/[^A-Za-z0-9_-]/g, '_'));
-      return { site, tools, commands: cmds.map((c) => ({ tool: `${site}_${c.name}`.replace(/[^A-Za-z0-9_-]/g, '_'), description: c.description, access: c.access, args: argSpec(c.args), result: c.result })), note: 'Adapter commands use your logged-in Chrome session in a background tab.' };
+      return { site, tools, commands: cmds.map((c) => ({ tool: `${site}_${c.name}`.replace(/[^A-Za-z0-9_-]/g, '_'), description: c.description, access: c.access, args: argSpec(c.args), result: c.result })), note: 'Adapter commands use the calling session’s browser context.' };
     },
     disable: async (site: string) => { const ok = state.enabledSites.delete(site); if (ok) rt.emit('tools-changed', { site }); return ok; },
     run: async (site: string, name: string, args: Record<string, unknown> = {}) => {
-      const r = await rt.runSite(site, name, args);
+      const r = await rt.runSite(site, name, args, { sessionId });
       if (!r.ok) throw new ActionError(r.error.code, r.error.message, r.error.hint, { site, command: name , ...(r.error.details && { details: r.error.details }) });
       return r.nextCursor ? { rows: r.rows, nextCursor: r.nextCursor } : (r.rows ?? r.value);
     },
@@ -62,7 +62,7 @@ export function createAgentApi(rt: Runtime, sessionId: string): AgentApi {
       browsers: { getDefault },
       // The single default browser, eagerly available (one user, one Chrome) so `browser.tabs/user/...` works in js
       // without a bootstrap line; ops throw browser_unavailable at call time when Chrome isn't connected.
-      browser: new Browser('chrome', 'extension', ctx),
+      browser: new Browser(rt.backend() === 'electron' ? 'embedded' : 'chrome', rt.backend() === 'electron' ? 'electron' : 'extension', ctx),
       documentation: { get: async (name: string) => readDocForContext(name, { backend: rt.backend(), capabilities: rt.features() }) },
     },
     sites,
@@ -70,10 +70,10 @@ export function createAgentApi(rt: Runtime, sessionId: string): AgentApi {
     tools: {
       // In js, an explicit function can be passed directly; its source is saved as the adapter.
       define: (def: ToolDefinition | (Omit<ToolDefinition, 'func'> & { func?: string | ((ctx: Record<string, unknown>) => unknown) })) => rt.defineTool({ ...def, func: typeof def.func === 'function' ? def.func.toString() : def.func } as ToolDefinition),
-      try: (draftId, args, expect) => rt.tryToolDraft(draftId, args, expect),
+      try: (draftId, args, expect) => rt.tryToolDraft(draftId, args, expect, sessionId),
       activate: (draftId) => rt.activateToolDraft(draftId),
       discard: async (draftId) => rt.discardToolDraft(draftId),
-      list: async () => listDefinedTools(),
+      list: async () => rt.listTools(),
       remove: (site: string, name: string) => rt.removeTool(site, name),
     },
     session: { id: sessionId },

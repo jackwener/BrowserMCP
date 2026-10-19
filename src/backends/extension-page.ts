@@ -1,5 +1,5 @@
 /** The page transport over the extension bridge; interactions use the shared act engine. */
-import type { ExtensionBridge } from '../host/bridge.js';
+import type { PageTransport } from './page-transport.js';
 import { BrowserCommandError } from '../host/bridge.js';
 import { wrapForEval, waitForDomStableJs, networkRequestsJs } from './browser-helpers.js';
 import type { RuntimePage } from './page-types.js';
@@ -8,29 +8,8 @@ import { pageCallJs, unwrapPageResult, ActError, PAGE_GLOBAL, frameSteps } from 
 import { targetToSelector, fallbackSelector } from '../shared/engine.js';
 import type { Expectation, CheckResult } from '../shared/page-contract.js';
 
-export interface ExtensionPageOptions {
-  session: string;
-  surface: 'browser' | 'adapter';
-  /** bind this page object to one tab identity for its whole life (per-Tab pages); omitted = session-scope page with no tab */
-  page?: string;
-}
-
-export interface UserTabInfo { tabId: number; title?: string; url?: string; windowId: number; active: boolean; groupId?: number; lastAccessed?: number }
-
-/** Extra methods available on extension-backed pages. */
-export interface ExtensionPageExtras {
-  nameSession(name: string): Promise<void>;
-  userTabs(options?: { query?: string; limit?: number }): Promise<UserTabInfo[]>;
-  claim(tab: { tabId?: number; active?: boolean; title?: string; url?: string; expectedUrl?: string; expectedTitle?: string }): Promise<{ page: string; tabId: number; url?: string; title?: string }>;
-  closeUserTabs(tabIds: number[]): Promise<CloseUserTabsResult>;
-  mark(page: string, mark: 'deliverable' | 'handoff' | null): Promise<void>;
-  finalize(keep: Array<{ page: string; status: 'deliverable' | 'handoff' }>): Promise<{ closed: string[]; kept: string[]; failed: Array<{ page: string; reason: string }> }>;
-  cursor(x: number, y: number, opts?: { waitForArrival?: boolean }): Promise<void>;
-  setVisibility(visible: boolean): Promise<void>;
-  getVisibility(): Promise<boolean>;
-}
-
-export type ExtensionRuntimePage = RuntimePage & ExtensionPageExtras;
+import type { PageOptions as ExtensionPageOptions, ManagedRuntimePage as ExtensionRuntimePage, UserTabInfo } from './managed-page.js';
+export type { PageOptions as ExtensionPageOptions, ManagedRuntimePage as ExtensionRuntimePage, UserTabInfo } from './managed-page.js';
 
 /** Only retry errors indicating the execution target changed during navigation. */
 function isNavigationError(err: unknown): boolean {
@@ -44,7 +23,7 @@ function isNavigationError(err: unknown): boolean {
 class ExtensionPage implements ExtensionRuntimePage {
   readonly session: string;
   readonly surface: 'browser' | 'adapter';
-  private readonly bridge: ExtensionBridge;
+  private readonly bridge: PageTransport;
   private readonly opts: ExtensionPageOptions;
   private _page: string | undefined;
   private _lastUrl: string | null = null;
@@ -52,7 +31,7 @@ class ExtensionPage implements ExtensionRuntimePage {
   private bound: boolean;
   private closed = false;
 
-  constructor(bridge: ExtensionBridge, opts: ExtensionPageOptions) {
+  constructor(bridge: PageTransport, opts: ExtensionPageOptions) {
     this.bridge = bridge;
     this.opts = opts;
     this.session = opts.session;
@@ -285,6 +264,6 @@ class ExtensionPage implements ExtensionRuntimePage {
   async getVisibility(): Promise<boolean> { const r = await this.bridge.send('visibility', { ...this.sessionOpts() }); return Boolean((r.data as { visible?: boolean } | undefined)?.visible); }
 }
 
-export async function createExtensionPage(bridge: ExtensionBridge, opts: ExtensionPageOptions): Promise<ExtensionRuntimePage> {
+export async function createExtensionPage(bridge: PageTransport, opts: ExtensionPageOptions): Promise<ExtensionRuntimePage> {
   return new ExtensionPage(bridge, opts);
 }

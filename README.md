@@ -143,6 +143,66 @@ Site commands execute directly without additional approval prompts. The read/wri
 | [Tab lifecycle](docs/tab-lifecycle.md) | Claiming tabs, grouping, and cleanup |
 | [Errors](docs/errors.md) | Error codes and recovery |
 
+## Embedded Electron applications
+
+Import `@jackwener/browsermcp/embedded` from Electron's main process. This entry does not run setup, register Native Messaging, discover Chrome, read global CLI configuration, or install an extension. The application supplies its writable directory, profile sessions, and page lifecycle callbacks. Adapters can still be created, verified, activated, updated, and removed through `tools`.
+
+```ts
+import { app, BrowserWindow, session } from 'electron';
+import path from 'node:path';
+import { createEmbeddedBrowser } from '@jackwener/browsermcp/embedded';
+
+await app.whenReady();
+const windows = new Map<number, BrowserWindow>();
+const profile = ({ profileId }) => session.fromPartition(`persist:${profileId}`);
+const browser = await createEmbeddedBrowser({
+  dataDir: path.join(app.getPath('userData'), 'browsermcp'),
+  execution: 'trusted-node',
+  browser: {
+    profile,
+    async createPage(scope) {
+      const window = new BrowserWindow({
+        webPreferences: {
+          session: profile(scope), contextIsolation: true,
+          sandbox: true, nodeIntegration: false,
+        },
+      });
+      const id = window.webContents.id;
+      windows.set(id, window);
+      window.once('closed', () => windows.delete(id));
+      return window.webContents;
+    },
+    async closePage(contents) { windows.get(contents.id)?.destroy(); },
+    async activatePage(contents) { windows.get(contents.id)?.show(); },
+  },
+});
+
+// Scope comes from the application, not from agent-provided MCP arguments.
+const connection = browser.createSession({ workspaceId: 'project-a', profileId: 'personal' });
+await connection.server.connect(transport); // Any host-provided MCP SDK transport.
+// On disconnect, cleanup is automatic. Explicit close and application shutdown:
+await connection.close();
+await browser.dispose();
+```
+
+The callbacks can manage `WebContentsView` instead of `BrowserWindow`; layout is entirely application-owned. Use `browser.registerPage(contents, scope)` to make an existing user page available for claiming. Register only intended browser content, not application settings or privileged UI. `unregisterPage(handle)` revokes access without closing the page. User pages are released during cleanup; unkept agent pages are closed. Profile IDs must map to the intended Electron `Session`, and the backend checks this identity when registering/creating pages.
+
+The current evaluator explicitly requires **trusted Node execution**. REPL and adapter modules can access Node capabilities; neither `vm`, a Worker, nor page registration is a sandbox against malicious host code. The REPL runs in a Worker; adapter modules execute in the runtime process. This main-process entry is for applications that trust the connected agent and loaded adapter code. Browser pages should retain `sandbox: true`, `contextIsolation: true`, and `nodeIntegration: false`.
+
+Storage is confined by configuration: generated adapters are in `<dataDir>/adapters`, inactive candidates in `<dataDir>/drafts`, and a small standalone adapter SDK in `<dataDir>/node_modules`. No implicit `~/.browsermcp` or `~/.opencli-mcp` source is loaded. Optional `sources` are explicit; generated adapters override them. Adapter code is shared within the service, while execution uses the caller's authorized profile and pages. No login credentials are copied between profiles.
+
+`browser.chrome.call/describe/watch` remain available. Electron implements `tabs.query/get/create/update/remove/reload` and `cookies.getAll/get/set/remove`, plus session-scoped `tabs.onCreated/onUpdated/onRemoved/onActivated` events. Call `describe` for method availability and differences. Only registered, accessible tabs are returned; `windowId` is `-1` because window organization belongs to the host. Unsupported methods/options return `capability_unavailable`. Page-scoped CDP is available through `tab.cdp.send`; browser-wide `Target.*` and `Browser.*` commands are rejected. This is an explicit compatibility surface, not an emulation of every extension API.
+
+Package the generated `dist`, `docs`, and `adapter-sdk` resources with the npm package. When using ASAR, unpack `**/js-*.mjs` so the REPL worker and evaluator remain loadable. Keep Electron as an application dependency; it is only a development dependency here. Call `dispose()` before quitting, await it, and handle cleanup failures; it is safe to retry. The SDK does not install process exit handlers or call `process.exit()`.
+
+Validation:
+
+```bash
+npm run build:embedded        # SDK and page resources; no extension build required
+npm run smoke:embedded        # real Electron + MCP, two profiles, adapter editing, cleanup
+npm run smoke:embedded:package # installed npm package inside app.asar
+```
+
 ## Development
 
 ```bash

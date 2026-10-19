@@ -71,7 +71,7 @@ it('runs discovery → observe → act → verify → cleanup through MCP and th
   rt.backend = () => 'extension';
   rt.getBrowserPage = async () => page;
   rt.pageFor = async () => page;
-  rt.isExtensionPage = (() => true) as unknown as typeof rt.isExtensionPage;
+  rt.isManagedPage = (() => true) as unknown as typeof rt.isManagedPage;
   const session = createMcpServer(rt, 'repl-e2e');
   const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
   const client = new Client({ name: 'repl-e2e', version: '1' }, { capabilities: {} });

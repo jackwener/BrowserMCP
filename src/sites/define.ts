@@ -5,7 +5,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { createRequire } from 'node:module';
-import { USER_ADAPTERS_DIR } from '../lib/sources.js';
 
 import type { Arg } from '@jackwener/browsermcp/adapter-sdk';
 import { validateArgDefinitions } from './schema.js';
@@ -37,26 +36,27 @@ export function validateDefinition(def: ToolDefinition): void {
 }
 
 /** Ensure the user source dir can resolve the SDK subpath of this browsermcp installation. */
-export function ensureUserSource(): string {
-  fs.mkdirSync(USER_ADAPTERS_DIR, { recursive: true });
-  const home = path.dirname(USER_ADAPTERS_DIR); // ~/.browsermcp
+export function ensureUserSource(userAdaptersDir: string): string {
+  fs.mkdirSync(userAdaptersDir, { recursive: true });
+  const home = path.dirname(userAdaptersDir); // ~/.browsermcp
   const nodeModules = path.join(home, 'node_modules');
   fs.mkdirSync(nodeModules, { recursive: true });
   const sdkDir = path.dirname(createRequire(import.meta.url).resolve('@jackwener/browsermcp/adapter-sdk'));
-  const packageDir = path.dirname(sdkDir);
   const link = path.join(nodeModules, '@jackwener/browsermcp');
   fs.mkdirSync(path.dirname(link), { recursive: true });
   const existing = fs.lstatSync(link, { throwIfNoEntry: false });
-  let current: string | null = null;
-  try { current = fs.realpathSync(link); } catch { /* a dangling link needs replacement */ }
-  if (current !== fs.realpathSync(packageDir)) {
-    if (existing && !existing.isSymbolicLink()) throw new Error(`${link} exists and is not a symlink`);
-    if (existing) fs.unlinkSync(link);
-    fs.symlinkSync(packageDir, link, 'dir');
+  // A self-contained SDK copy also works when the application resources live inside app.asar.
+  if (existing?.isSymbolicLink()) fs.unlinkSync(link);
+  fs.mkdirSync(path.join(link, 'adapter-sdk'), { recursive: true });
+  for (const name of ['index.js', 'index.d.ts']) {
+    const source = fs.readFileSync(path.join(sdkDir, name));
+    const target = path.join(link, 'adapter-sdk', name);
+    if (!fs.existsSync(target) || !fs.readFileSync(target).equals(source)) fs.writeFileSync(target, source);
   }
+  fs.writeFileSync(path.join(link, 'package.json'), JSON.stringify({ name: '@jackwener/browsermcp', private: true, type: 'module', exports: { './adapter-sdk': './adapter-sdk/index.js' } }));
   const pkg = path.join(home, 'package.json');
   if (!fs.existsSync(pkg)) fs.writeFileSync(pkg, JSON.stringify({ name: 'browsermcp-user-adapters', private: true, type: 'module' }, null, 2));
-  return USER_ADAPTERS_DIR;
+  return userAdaptersDir;
 }
 
 export function renderAdapterModule(def: ToolDefinition): string {
@@ -76,18 +76,19 @@ export function renderAdapterModule(def: ToolDefinition): string {
   ].filter((l): l is string => l !== null).join('\n');
 }
 
-export function deleteTool(site: string, name: string): boolean {
-  const file = path.join(USER_ADAPTERS_DIR, site, `${name}.js`);
+export function deleteTool(site: string, name: string, userAdaptersDir: string): boolean {
+  if (!NAME_RE.test(site) || !NAME_RE.test(name)) throw Object.assign(new Error('Invalid adapter identity'), { code: 'invalid_definition' });
+  const file = path.join(userAdaptersDir, site, `${name}.js`);
   if (!fs.existsSync(file)) return false;
   fs.rmSync(file);
   return true;
 }
 
-export function listDefinedTools(): Array<{ site: string; name: string; file: string }> {
-  if (!fs.existsSync(USER_ADAPTERS_DIR)) return [];
+export function listDefinedTools(userAdaptersDir: string): Array<{ site: string; name: string; file: string }> {
+  if (!fs.existsSync(userAdaptersDir)) return [];
   const out: Array<{ site: string; name: string; file: string }> = [];
-  for (const site of fs.readdirSync(USER_ADAPTERS_DIR)) {
-    const d = path.join(USER_ADAPTERS_DIR, site);
+  for (const site of fs.readdirSync(userAdaptersDir)) {
+    const d = path.join(userAdaptersDir, site);
     try { if (!fs.statSync(d).isDirectory()) continue; } catch { continue; }
     for (const f of fs.readdirSync(d)) if (f.endsWith('.js') && !f.startsWith('_')) out.push({ site, name: f.replace(/\.js$/, ''), file: path.join(d, f) });
   }

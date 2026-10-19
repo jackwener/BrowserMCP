@@ -21,9 +21,9 @@ interface AgentApi {
 }
 
 class Browser {
-  id: "chrome";
-  type: "extension";
-  chrome: { // Native Chrome APIs in the extension service worker. Positional JSON arguments, native return values.
+  id: string;
+  type: "extension" | "electron";
+  chrome: { // Chrome APIs through the connected backend. Electron supports an explicit compatibility subset.
     call(method: string, args?: Array<unknown>): Promise<unknown>;
     describe(member: string): Promise<unknown>;
     watch(event: string, options?: StreamOptions): Promise<EventStream>;
