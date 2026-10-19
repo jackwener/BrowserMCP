@@ -9,7 +9,7 @@ Built-in adapters cover Twitter/X (`twitter`), Bilibili (`bilibili`), and Reddit
 - Commands are also callable in `js` as `await sites.<site>.<command>({...args})`.
 - Adapters use the same `tab` object API as interactive exploration and run in a background tab of the connected Chrome profile. Each command binds to the site's current live background tab when it starts; a closed tab is replaced on the next command. Opening an interactive agent tab does not change the adapter's tab.
 - Results contain `rows` (optionally `nextCursor`) or a `value`. Failures contain `error.code`, `error.message`, and optional `error.hint` / details; inspect the returned error to recover.
-- `tools.define` creates an inactive draft. `tools.try` executes it with real arguments and checks an explicit result assertion. `tools.activate` publishes a passing draft under `~/.opencli-mcp/adapters/<site>/<command>.js`; only then does it appear in search and `site_run`. User adapters override built-ins with the same site and command. A typed tool appears after `sites.enable(site)` in `js` (`write:true` for write commands).
+- `tools.define` creates an inactive draft. `tools.try` executes it with real arguments and checks an explicit result assertion. `tools.activate` publishes a passing draft under `~/.browsermcp/adapters/<site>/<command>.js`; only then does it appear in search and `site_run`. User adapters override built-ins with the same site and command. A typed tool appears after `sites.enable(site)` in `js` (`write:true` for write commands).
 
 For authoring, call `docs_get` with `name: "define-tools"`.
 

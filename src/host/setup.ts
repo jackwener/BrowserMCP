@@ -83,9 +83,6 @@ function registerClients(c: StdioCommand, selected: string[]): ClientRegistratio
     try {
       if (exists) execFileSync(bin, ['mcp', 'remove', ...client.scope, 'browsermcp'], options);
       execFileSync(bin, ['mcp', 'add', ...client.scope, 'browsermcp', '--', c.command, ...c.args], options);
-      let legacyExists = false;
-      try { execFileSync(bin, ['mcp', 'get', 'opencli-mcp'], options); legacyExists = true; } catch { /* No legacy registration. */ }
-      if (legacyExists) execFileSync(bin, ['mcp', 'remove', ...client.scope, 'opencli-mcp'], options);
       results.push({ name: client.name, status: 'registered' });
     } catch { results.push({ name: client.name, status: 'failed' }); }
   }

@@ -54,9 +54,9 @@ export class NativeHost {
     const features: BrowserFeature[] = ['chrome-api', 'streams', 'extension-logs', 'page-evaluate', 'frame-evaluate', 'frames', 'dialogs', 'console', 'downloads', 'visibility', 'webmcp'];
     if (chrome.debugger) features.push('cdp', 'viewport', 'network');
     // A profile keeps its identity across host and service-worker restarts.
-    void chrome.storage.local.get('opencliBrowserId').then(async stored => {
-      const browserId = typeof stored.opencliBrowserId === 'string' ? stored.opencliBrowserId : crypto.randomUUID();
-      if (browserId !== stored.opencliBrowserId) await chrome.storage.local.set({ opencliBrowserId: browserId });
+    void chrome.storage.local.get('browsermcpBrowserId').then(async stored => {
+      const browserId = typeof stored.browsermcpBrowserId === 'string' ? stored.browsermcpBrowserId : crypto.randomUUID();
+      if (browserId !== stored.browsermcpBrowserId) await chrome.storage.local.set({ browsermcpBrowserId: browserId });
       if (this.port === port) this.send({ type: 'hello', browserId, extensionVersion: chrome.runtime.getManifest().version, protocolRevision: PROTOCOL_REVISION, features });
     }).catch(error => { this.lastError = String(error); port.disconnect(); });
     return true;

@@ -11,7 +11,7 @@ import { Client } from '@modelcontextprotocol/client';
 import { StdioClientTransport } from '@modelcontextprotocol/client/stdio';
 
 const exec = promisify(execFile);
-const root = fs.mkdtempSync(path.join(os.tmpdir(), "opencli setup ' $ e2e-"));
+const root = fs.mkdtempSync(path.join(os.tmpdir(), "browsermcp setup ' $ e2e-"));
 const home = path.join(root, 'home');
 const preload = path.join(root, 'environment.mjs');
 const clientState = path.join(root, 'clients.json');
@@ -28,7 +28,7 @@ function installNode(version) {
   fs.symlinkSync(keg(version), opt);
 }
 installNode('22.0.0');
-const env = { ...process.env, OPENCLI_SETUP_TEST_ROOT: root, OPENCLI_SETUP_TEST_NODE: path.join(keg('22.0.0'), 'bin', 'node') };
+const env = { ...process.env, BROWSERMCP_SETUP_TEST_ROOT: root, BROWSERMCP_SETUP_TEST_NODE: path.join(keg('22.0.0'), 'bin', 'node') };
 let host;
 let mcp;
 let stderr = '';
@@ -41,10 +41,10 @@ import os from 'node:os';
 import path from 'node:path';
 import child from 'node:child_process';
 import { syncBuiltinESMExports } from 'node:module';
-const root = process.env.OPENCLI_SETUP_TEST_ROOT;
+const root = process.env.BROWSERMCP_SETUP_TEST_ROOT;
 os.homedir = () => path.join(root, 'home');
-if (process.env.OPENCLI_SETUP_TEST_NODE) Object.defineProperty(process, 'execPath', { value: process.env.OPENCLI_SETUP_TEST_NODE });
-if (process.env.OPENCLI_SETUP_TEST_TTY) {
+if (process.env.BROWSERMCP_SETUP_TEST_NODE) Object.defineProperty(process, 'execPath', { value: process.env.BROWSERMCP_SETUP_TEST_NODE });
+if (process.env.BROWSERMCP_SETUP_TEST_TTY) {
   Object.defineProperty(process.stdin, 'isTTY', { value: true });
   Object.defineProperty(process.stdout, 'isTTY', { value: true });
 }
@@ -97,7 +97,7 @@ async function cli(args, expectedCode = 0) {
 
 async function interactive(answer) {
   const child = spawn(process.execPath, ['--import', preload, entry, 'setup', '--no-open', '--wait', '0'], {
-    env: { ...env, OPENCLI_SETUP_TEST_TTY: '1' }, stdio: ['pipe', 'pipe', 'pipe'],
+    env: { ...env, BROWSERMCP_SETUP_TEST_TTY: '1' }, stdio: ['pipe', 'pipe', 'pipe'],
   });
   let output = '';
   let errors = '';
@@ -134,12 +134,20 @@ try {
   await cli(['setup', '--no-open', '--browsers', 'unknown'], 1);
   assert.deepEqual(fs.readdirSync(home), []);
 
+  const oldDir = path.join(home, '.opencli-mcp');
+  fs.mkdirSync(oldDir);
+  const oldConfig = JSON.stringify({ browserId: 'obsolete-browser' });
+  fs.writeFileSync(path.join(oldDir, 'config.json'), oldConfig);
   const first = await cli(['setup', '--no-open', '--wait', '0'], 1);
+  assert(fs.existsSync(path.join(home, '.browsermcp', 'bin', 'browsermcp-launcher')));
+  assert.equal(fs.readFileSync(path.join(oldDir, 'config.json'), 'utf8'), oldConfig);
+  assert.deepEqual(fs.readdirSync(oldDir), ['config.json']);
+  assert(!fs.existsSync(path.join(home, '.browsermcp', 'config.json')));
   assert(first.includes('registration has been saved'));
   assert(first.includes('chromewebstore.google.com'));
   assert(!first.match(/Load unpacked|Developer mode|clipboard|Setup complete/));
   const nativeDir = path.join(home, 'Library', 'Application Support', 'Google', 'Chrome', 'NativeMessagingHosts');
-  const manifestFile = path.join(nativeDir, 'com.opencli.mcp.json');
+  const manifestFile = path.join(nativeDir, 'com.browsermcp.host.json');
   const manifest = JSON.parse(fs.readFileSync(manifestFile, 'utf8'));
   assert.deepEqual(manifest.allowed_origins, ['chrome-extension://' + storeId + '/']);
   assert(fs.existsSync(manifest.path));
@@ -160,13 +168,13 @@ try {
   // Simulate brew upgrade and cleanup: the old runtime path disappears, opt follows the new keg.
   installNode('22.1.0');
   fs.rmSync(keg('22.0.0'), { recursive: true });
-  env.OPENCLI_SETUP_TEST_NODE = path.join(keg('22.1.0'), 'bin', 'node');
-  const stateDir = path.join(home, '.opencli-mcp');
+  env.BROWSERMCP_SETUP_TEST_NODE = path.join(keg('22.1.0'), 'bin', 'node');
+  const stateDir = path.join(home, '.browsermcp');
   const installationFile = path.join(stateDir, 'installation.json');
   assert.equal(JSON.parse(fs.readFileSync(installationFile, 'utf8')).node, path.join(opt, 'bin', 'node'));
   assert.equal(JSON.parse(await cli(['doctor', '--json'], 1)).launch.ready, true);
   // Execute the actual generated launcher; preload only isolates its home and process discovery.
-  const launcherEnv = { ...env, OPENCLI_SETUP_TEST_NODE: '', NODE_OPTIONS: `--import=${JSON.stringify(preload)}` };
+  const launcherEnv = { ...env, BROWSERMCP_SETUP_TEST_NODE: '', NODE_OPTIONS: `--import=${JSON.stringify(preload)}` };
   host = spawn(manifest.path, ['chrome-extension://' + storeId + '/'], { env: launcherEnv, stdio: ['pipe', 'pipe', 'pipe'] });
   host.stderr.on('data', (chunk) => { stderr += chunk; });
   const { encodeFrame, FrameDecoder } = await import('../dist/src/host/native-messaging.js');
@@ -192,7 +200,7 @@ try {
   assert(connected.advice.some((line) => line.startsWith('Warning: Extension protocol')));
   assert(!('built' in connected.extension));
   // Replace stale selected commands; do not confuse entry existence with correctness.
-  fs.writeFileSync(clientState, JSON.stringify({ '/fake/codex:opencli-mcp': ['stale'], '/fake/claude:opencli-mcp': ['stale'] }));
+  fs.writeFileSync(clientState, JSON.stringify({ '/fake/codex:browsermcp': ['stale'], '/fake/claude:browsermcp': ['stale'] }));
   const repeated = await cli(['setup', '--clients', 'claude,codex', '--no-open', '--wait', '0']);
   assert(repeated.includes('Setup complete'));
   assert(!repeated.includes('chromewebstore.google.com'));
@@ -218,13 +226,13 @@ try {
   mcp = null;
   console.log('PASS MCP: registered command executes persistent JavaScript and recovers after errors through the native host');
 
-  // Existing adapters must resolve the SDK even after the old package is removed.
-  const legacyAdapter = path.join(stateDir, 'adapters', 'legacy-check.js');
-  fs.writeFileSync(legacyAdapter, "import { defineAdapter } from 'opencli-mcp/adapter-sdk'; export default defineAdapter({description:'legacy',access:'read',args:[],run:async()=>42});");
-  const legacyResult = await exec(process.execPath, ['--input-type=module', '-e',
-    `const {default: adapter} = await import(${JSON.stringify(pathToFileURL(legacyAdapter).href)}); console.log(await adapter.run());`], { env });
-  assert.equal(legacyResult.stdout.trim(), '42');
-  console.log('PASS rename: MCP identity and legacy adapter SDK imports');
+  // User adapters resolve the SDK through the published package name.
+  const userAdapter = path.join(stateDir, 'adapters', 'sdk-check.js');
+  fs.writeFileSync(userAdapter, "import { defineAdapter } from '@jackwener/browsermcp/adapter-sdk'; export default defineAdapter({description:'sdk',access:'read',args:[],run:async()=>42});");
+  const userResult = await exec(process.execPath, ['--input-type=module', '-e',
+    `const {default: adapter} = await import(${JSON.stringify(pathToFileURL(userAdapter).href)}); console.log(await adapter.run());`], { env });
+  assert.equal(userResult.stdout.trim(), '42');
+  console.log('PASS rename: MCP identity and scoped adapter SDK imports');
 
   // A live connection must not hide a broken on-disk registration; setup repairs it.
   manifest.allowed_origins = [];
@@ -250,7 +258,7 @@ try {
   });
   // With no stable alias available, setup uses the new known runtime; clients stay unchanged.
   await cli(['setup', '--clients', 'none', '--no-open', '--wait', '0']);
-  assert.equal(JSON.parse(fs.readFileSync(installationFile, 'utf8')).node, env.OPENCLI_SETUP_TEST_NODE);
+  assert.equal(JSON.parse(fs.readFileSync(installationFile, 'utf8')).node, env.BROWSERMCP_SETUP_TEST_NODE);
   assert.deepEqual(JSON.parse(fs.readFileSync(clientState, 'utf8')), entries);
 
   // Exercise package relocation using a real entry symlink and the same installation writer.
@@ -292,7 +300,7 @@ try {
   fs.mkdirSync(path.dirname(openCodeFile), { recursive: true });
   fs.mkdirSync(piHome);
   for (const [file, section] of [[openCodeFile, 'mcp'], [piFile, 'mcpServers']]) {
-    fs.writeFileSync(file, `{// keep my settings\n"theme":"dark","${section}":{"other":{"command":"other"},"opencli-mcp":{"command":"stale"}}}`);
+    fs.writeFileSync(file, `{// keep my settings\n"theme":"dark","${section}":{"other":{"command":"other"},"browsermcp":{"command":"stale"}}}`);
   }
   registerOpenCode(command, configHome);
   registerPi(command, piHome);
@@ -302,7 +310,6 @@ try {
     assert(text.includes('// keep my settings'));
     assert.equal(config.theme, 'dark');
     assert.equal(config[section].other.command, 'other');
-    assert.equal(config[section]['opencli-mcp'], undefined);
     const own = config[section]['browsermcp'];
     assert.deepEqual(section === 'mcp' ? own.command : [own.command, ...own.args], [manifest.path, 'stdio']);
   }

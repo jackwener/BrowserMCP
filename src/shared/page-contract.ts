@@ -3,10 +3,10 @@ import type { FrameStep } from '../protocol.js';
 /**
  * Contract between the host-side engine (src/shared/engine.ts) and the page-side module
  * (extension/src/page/index.ts) that runs inside the extension's isolated world next to Playwright's
- * InjectedScript. Only plain JSON crosses this boundary: the host calls `globalThis.__opencliPage.<fn>(args)`.
+ * InjectedScript. Only plain JSON crosses this boundary: the host calls `globalThis.__browsermcpPage.<fn>(args)`.
  */
-export const ENGINE_GLOBAL = '__opencliInjected';
-export const PAGE_GLOBAL = '__opencliPage';
+export const ENGINE_GLOBAL = '__browsermcpInjected';
+export const PAGE_GLOBAL = '__browsermcpPage';
 
 export interface ResolveArgs {
   selector: string;

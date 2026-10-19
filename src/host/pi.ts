@@ -9,5 +9,5 @@ export function registerPi(command: StdioCommand, agentDir = process.env.PI_CODI
   const expanded = agentDir === '~' ? os.homedir() : agentDir.startsWith('~/') ? path.join(os.homedir(), agentDir.slice(2)) : agentDir;
   const file = path.join(path.resolve(expanded), 'mcp.json');
   const entry = { command: command.command, args: [...command.args], protocolVersion: 'auto' };
-  return setMcpEntry(file, 'mcpServers', 'browsermcp', entry, 'opencli-mcp');
+  return setMcpEntry(file, 'mcpServers', 'browsermcp', entry);
 }

@@ -1,7 +1,7 @@
 /**
  * Page-side module of the interaction engine. Bundled by esbuild and installed in the extension's isolated world of
- * every frame, next to Playwright's InjectedScript (globalThis.__opencliInjected). Exposes plain functions on
- * globalThis.__opencliPage; the host calls them with JSON arguments. Nothing here is assembled from strings, so this
+ * every frame, next to Playwright's InjectedScript (globalThis.__browsermcpInjected). Exposes plain functions on
+ * globalThis.__browsermcpPage; the host calls them with JSON arguments. Nothing here is assembled from strings, so this
  * file is type-checked with the extension and exercised by the browser smoke test.
  */
 import {

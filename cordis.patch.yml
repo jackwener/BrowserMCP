@@ -5,10 +5,8 @@
         serverName: browsermcp
         transport: stdio
         command: !!js >-
-          process.env.BROWSERMCP_BIN ||
-          process.env.OPENCLI_MCP_BIN ||
           (process.platform === 'win32' ? process.env.USERPROFILE : process.env.HOME) +
-          '/.opencli-mcp/bin/opencli-mcp-launcher' +
+          '/.browsermcp/bin/browsermcp-launcher' +
           (process.platform === 'win32' ? '.cmd' : '')
         args: ['stdio']
         env: {}

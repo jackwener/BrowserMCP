@@ -15,7 +15,7 @@ export async function runStdio(opts: { version: string }): Promise<void> {
 }
 
 async function proxyToHost(version: string, log: (m: string) => void): Promise<void> {
-  let browserId = process.env.BROWSERMCP_BROWSER ?? process.env.OPENCLI_MCP_BROWSER ?? readConfig().browserId;
+  let browserId = readConfig().browserId;
   let hasConnected = false;
   let sessionRestarted = false;
   const catalog = await localCatalog(version);

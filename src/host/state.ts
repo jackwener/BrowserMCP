@@ -1,13 +1,12 @@
 /** Per-browser host discovery. Endpoints are local IPC, never network addresses. */
 import fs from 'node:fs';
-import os from 'node:os';
+import { BROWSERMCP_DIR } from '../lib/paths.js';
 import path from 'node:path';
 import { Client } from '@modelcontextprotocol/client';
 import { connectSocket, probeSocket, attachSocket, removeIpcEndpoint, type SocketTransport } from './socket.js';
 
-export const OPENCLI_MCP_DIR = path.join(os.homedir(), '.opencli-mcp');
-export const RUN_DIR = path.join(OPENCLI_MCP_DIR, 'run');
-export const CONFIG_FILE = path.join(OPENCLI_MCP_DIR, 'config.json');
+export const RUN_DIR = path.join(BROWSERMCP_DIR, 'run');
+export const CONFIG_FILE = path.join(BROWSERMCP_DIR, 'config.json');
 export interface HostState { pid: number; browserId: string; instanceId: string; endpoint: string; version: string; startedAt: number }
 export interface Config { browserId?: string; cursor?: boolean; sites?: string[]; sitesWrite?: string[] }
 export function readConfig(): Config {
@@ -44,7 +43,7 @@ export interface HostConnection { state: HostState; client: Client; transport: S
 export interface HostDiagnostic { state: HostState; status: 'ready' | 'extension_unresponsive' | 'unreachable' | 'identity_mismatch' | 'attach_failed'; error?: string; selected?: boolean }
 
 /** Probe without creating sessions. Browser identity is separate from process incarnation. */
-export async function connectHost(browserId = process.env.BROWSERMCP_BROWSER ?? process.env.OPENCLI_MCP_BROWSER ?? readConfig().browserId, states = readHostStates(), diagnostics: HostDiagnostic[] = []): Promise<HostConnection> {
+export async function connectHost(browserId = readConfig().browserId, states = readHostStates(), diagnostics: HostDiagnostic[] = []): Promise<HostConnection> {
   const ready: Array<{ state: HostState; transport: SocketTransport; diagnostic: HostDiagnostic }> = [];
   await Promise.all(states.filter(s => !browserId || s.browserId === browserId).map(async registered => {
     const diagnostic: HostDiagnostic = { state: registered, status: 'unreachable' };
@@ -69,7 +68,7 @@ export async function connectHost(browserId = process.env.BROWSERMCP_BROWSER ?? 
   }));
   try {
     const browsers = [...new Set(ready.map(c => c.state.browserId))].sort();
-    if (browsers.length > 1) throw new HostConnectionError('browser_selection_required', `Multiple browsers are available. Set browserId in ~/.opencli-mcp/config.json or OPENCLI_MCP_BROWSER to one of: ${browsers.join(', ')}`);
+    if (browsers.length > 1) throw new HostConnectionError('browser_selection_required', `Multiple browsers are available. Set browserId in ~/.browsermcp/config.json to one of: ${browsers.join(', ')}`);
     ready.sort((a, b) => b.state.startedAt - a.state.startedAt || b.state.instanceId.localeCompare(a.state.instanceId));
     for (const candidate of ready) {
       const client = new Client({ name: 'browsermcp', version: '1' });

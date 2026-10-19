@@ -16,7 +16,7 @@ const digest = createHash('sha256').update(Buffer.from(manifest.key, 'base64')).
 const id = digest.replace(/[0-9a-f]/g, digit => String.fromCharCode(97 + parseInt(digit, 16)));
 if (id !== EXTENSION_ID) throw new Error(`Extension ID ${id} does not match native host ID ${EXTENSION_ID}`);
 
-const staging = mkdtempSync(join(tmpdir(), 'opencli-pack-'));
+const staging = mkdtempSync(join(tmpdir(), 'browsermcp-pack-'));
 const out = resolve(root, `browsermcp-extension-${mode === 'manual' ? 'manual-install' : 'store'}-${manifest.version}.zip`);
 try {
   cpSync(dist, staging, { recursive: true });

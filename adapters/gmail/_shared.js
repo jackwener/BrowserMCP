@@ -96,7 +96,7 @@ export async function gmailLabels(tab, account = 0) {
   let status;
   try { status = await tab.fetchJson(statusUrl, { method: 'POST', headers, body: [] }); }
   catch (cause) { throw errors.upstream(`Gmail label-status API failed: ${String(cause?.message || cause)}`); }
-  const accountPath = `/mail/u/${account}/?opencli_labels=1`;
+  const accountPath = `/mail/u/${account}/?browsermcp_labels=1`;
   const script = `(async () => { const response = await fetch(${JSON.stringify(accountPath)}, { credentials: 'include' }); if (!response.ok) return { httpError: response.status }; return (${parseBootstrapUserLabels.toString()})(await response.text()); })()`;
   const bootstrap = await tab.evaluate(script);
   if (bootstrap?.httpError) throw errors.upstream(`Gmail label bootstrap returned HTTP ${bootstrap.httpError}`);

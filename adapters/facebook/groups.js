@@ -38,7 +38,7 @@ export default defineAdapter({
     await tab.goto('https://www.facebook.com/groups/feed/', { waitUntil: 'load' });
     await tab.network.start('/api/graphql/');
     let cursor = (await tab.network.read({ pattern: '/api/graphql/', limit: 1000 })).cursor;
-    await tab.goto(`https://www.facebook.com/groups/feed/?opencli_probe=${Date.now()}`, { waitUntil: 'load' });
+    await tab.goto(`https://www.facebook.com/groups/feed/?browsermcp_probe=${Date.now()}`, { waitUntil: 'load' });
     let entry;
     for (let attempt = 0; attempt < 24 && !entry; attempt++) {
       const page = await tab.network.read({ pattern: '/api/graphql/', afterSequence: cursor, limit: 100 });

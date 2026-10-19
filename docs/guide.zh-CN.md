@@ -6,7 +6,7 @@ BrowserMCP 是一个连接到真实 Chrome 的 MCP browser service。Chrome exte
 
 需要 Node.js 22+、Google Chrome 和一个 MCP client。
 
-1. 从 [Chrome Web Store](https://chromewebstore.google.com/detail/opencli-mcp/lnaoghmfcdnbhgcihkakfobckmfhllkg) 安装 **BrowserMCP Connector**。
+1. 从 [Chrome Web Store](https://chromewebstore.google.com/detail/browsermcp-connector/lnaoghmfcdnbhgcihkakfobckmfhllkg) 安装 **BrowserMCP Connector**。
 2. 在终端运行 `npm install -g @jackwener/browsermcp`，然后运行 `browsermcp setup`。
 3. 按提示选择要配置的 MCP client。重启或重新连接 client 后即可使用。`browsermcp doctor` 只检查启动依赖与连接状态，不修改配置。
 
@@ -44,6 +44,6 @@ MCP client 通过 stdio 连接 launcher，launcher 通过本地 Unix domain sock
 
 开发构建与测试命令见 [README](../README.md#development)。Browser 操作的错误代码见 [错误说明](errors.md)，`js` API 见 [生成的参考](api-reference.md)。
 
-## 从 opencli-mcp 升级
+## 本地配置
 
-安装 `@jackwener/browsermcp` 后重新运行 `browsermcp setup`，所选 MCP client 的旧 entry 会迁移为 `browsermcp`；手动配置的 client 需要自行更新。extension 保留原 Web Store ID，`~/.opencli-mcp`、固定 launcher 和 Native Messaging 标识保持兼容。旧 adapters 的 `opencli-mcp/adapter-sdk` import 仍可使用。
+数据、配置与用户 adapters 使用 `~/.browsermcp`，launcher 为 `~/.browsermcp/bin/browsermcp-launcher`（Windows 使用 `.cmd`）。运行 `browsermcp setup` 注册新路径。旧目录、环境变量和 adapter import 别名不会继续使用；旧 MCP client entry 需要手动移除。adapters 使用 `@jackwener/browsermcp/adapter-sdk`。

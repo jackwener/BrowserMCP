@@ -13,7 +13,7 @@ export interface IpcServerHandle { endpoint: string; instanceId: string; started
 export async function startIpcServer(rt: Runtime, opts: { version: string; probe: () => Promise<{ browserId: string; extensionResponsive: boolean }> }): Promise<IpcServerHandle> {
   const instanceId = randomUUID();
   const startedAt = Date.now();
-  const dir = process.platform === 'win32' ? null : fs.mkdtempSync(path.join(os.tmpdir(), 'opencli-ipc-'));
+  const dir = process.platform === 'win32' ? null : fs.mkdtempSync(path.join(os.tmpdir(), 'browsermcp-ipc-'));
   const endpoint = dir ? path.join(dir, 'host.sock') : `\\\\.\\pipe\\browsermcp-${instanceId}`;
   const connections = new Set<SocketTransport>();
   const cleanup = new Set<Promise<void>>();

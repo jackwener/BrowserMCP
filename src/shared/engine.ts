@@ -10,7 +10,7 @@ import type { ActSpec, ActResult, ActTarget, FrameStep } from '../protocol.js';
 import { ENGINE_GLOBAL, PAGE_GLOBAL, type ResolveOutcome, type Resolved, type PointInfo, type SelectResult } from './page-contract.js';
 export { ENGINE_GLOBAL, PAGE_GLOBAL } from './page-contract.js';
 
-/** Evaluate once per world: installs Playwright's InjectedScript as globalThis.__opencliInjected, then the page module. */
+/** Evaluate once per world: installs Playwright's InjectedScript as globalThis.__browsermcpInjected, then the page module. */
 export function installEngineJs(injectedSource: string, pageModuleSource: string): string {
   return `(() => {
     if (!globalThis.${ENGINE_GLOBAL}) {
@@ -31,7 +31,7 @@ export function installEngineJs(injectedSource: string, pageModuleSource: string
 export function pageCallJs(fn: string, args: unknown): string {
   if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(fn)) throw new Error(`invalid page function name ${fn}`);
   return `(async () => { try { return await globalThis.${PAGE_GLOBAL}.${fn}(${args === undefined ? '' : JSON.stringify(args)}); }
-    catch (e) { return { __opencliPageError: { code: e?.code ?? 'page_error', message: e?.message ?? String(e), hint: e?.hint } }; } })()`;
+    catch (e) { return { __browsermcpPageError: { code: e?.code ?? 'page_error', message: e?.message ?? String(e), hint: e?.hint } }; } })()`;
 }
 
 export class ActError extends Error {
@@ -40,7 +40,7 @@ export class ActError extends Error {
 
 /** Restore page errors after the JSON boundary, including observation and frame-routing failures. */
 export function unwrapPageResult(value: unknown): unknown {
-  const error = (value as { __opencliPageError?: { code: string; message: string; hint?: string } } | null)?.__opencliPageError;
+  const error = (value as { __browsermcpPageError?: { code: string; message: string; hint?: string } } | null)?.__browsermcpPageError;
   if (error) throw new ActError(error.code, error.message, error.hint);
   return value;
 }
@@ -113,7 +113,7 @@ export function parseKey(spec: string): { def: KeyDef; modifiers: number } {
 
 /** What a runtime edge provides: page-module calls in the target world, raw CDP on the attached target, cursor, navigation wait. */
 export interface ActIO {
-  /** Call `globalThis.__opencliPage.<fn>(args)` in the world the action targets. */
+  /** Call `globalThis.__browsermcpPage.<fn>(args)` in the world the action targets. */
   call(fn: string, args?: unknown, timeoutMs?: number): Promise<unknown>;
   cdp(method: string, params?: Record<string, unknown>): Promise<unknown>;
   /** Set files on the remembered Element in its owning isolated world/session. */

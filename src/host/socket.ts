@@ -78,7 +78,7 @@ export async function connectSocket(endpoint: string, timeoutMs = 1500): Promise
 export function removeIpcEndpoint(endpoint: string): void {
   if (process.platform === 'win32') return;
   const dir = path.dirname(endpoint);
-  if (path.basename(endpoint) !== 'host.sock' || path.dirname(dir) !== path.resolve(os.tmpdir()) || !/^opencli-ipc-[\w-]+$/.test(path.basename(dir))) return;
+  if (path.basename(endpoint) !== 'host.sock' || path.dirname(dir) !== path.resolve(os.tmpdir()) || !/^browsermcp-ipc-[\w-]+$/.test(path.basename(dir))) return;
   fs.rmSync(endpoint, { force: true });
   try { fs.rmdirSync(dir); } catch (error) {
     if (!['ENOENT', 'ENOTEMPTY'].includes((error as NodeJS.ErrnoException).code ?? '')) throw error;

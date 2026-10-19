@@ -12,12 +12,12 @@ export async function createEvaluator() {
     inspector.post(method, params, (error, result) => error ? reject(error) : resolve(result));
   });
   let contextId;
-  const onContext = ({ params }) => { if (params.context.name === 'opencli-repl') contextId = params.context.id; };
+  const onContext = ({ params }) => { if (params.context.name === 'browsermcp-repl') contextId = params.context.id; };
   inspector.on('Runtime.executionContextCreated', onContext);
   await post('Runtime.enable');
   const context = vm.createContext({
     require: createRequire(path.join(process.cwd(), 'repl.js')),
-  }, { name: 'opencli-repl', importModuleDynamically: vm.constants.USE_MAIN_CONTEXT_DEFAULT_LOADER });
+  }, { name: 'browsermcp-repl', importModuleDynamically: vm.constants.USE_MAIN_CONTEXT_DEFAULT_LOADER });
   // Keep realm-local JS intrinsics; expose the Node globals provided by this runtime.
   const intrinsics = new Set(vm.runInContext('Object.getOwnPropertyNames(globalThis)', context));
   for (const name of Object.getOwnPropertyNames(globalThis)) {
@@ -34,7 +34,7 @@ export async function createEvaluator() {
   async function unwrap(remote) {
     if (!remote.objectId && !remote.unserializableValue) return remote.value;
     // Transfer the actual reference, preserving API proxies, functions and typed arrays.
-    const key = `__opencli_result_${randomUUID().replaceAll('-', '')}`;
+    const key = `__browsermcp_result_${randomUUID().replaceAll('-', '')}`;
     try {
       await post('Runtime.callFunctionOn', {
         executionContextId: contextId,

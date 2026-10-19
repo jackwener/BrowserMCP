@@ -8,7 +8,7 @@ export async function facebookGraphql(tab, pageUrl, operation, variables, { allo
   await tab.network.start('/api/graphql/');
   const before = (await tab.network.read({ pattern: '/api/graphql/', limit: 1000 })).cursor;
   const url = new URL(pageUrl);
-  url.searchParams.set('opencli_probe', String(Date.now()));
+  url.searchParams.set('browsermcp_probe', String(Date.now()));
   await tab.goto(url.href, { waitUntil: 'load' });
   let entry;
   let cursor = before;

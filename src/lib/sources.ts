@@ -1,7 +1,7 @@
 /** Where adapters live: the built-in corpus (ships with the package) and the user's writable, overriding source. */
 import fs from 'node:fs';
 import path from 'node:path';
-import os from 'node:os';
+import { BROWSERMCP_DIR } from './paths.js';
 import { fileURLToPath } from 'node:url';
 import type { Source } from '../sites/loader.js';
 
@@ -20,7 +20,7 @@ function findBuiltinAdapters(): string {
 }
 
 export const BUILTIN_ADAPTERS_DIR = findBuiltinAdapters();
-export const USER_ADAPTERS_DIR = path.join(os.homedir(), '.opencli-mcp', 'adapters');
+export const USER_ADAPTERS_DIR = path.join(BROWSERMCP_DIR, 'adapters');
 
 /** Ordered sources; a later one overrides an earlier one for the same `<site>/<command>`. */
 export function defaultSources(): Source[] {

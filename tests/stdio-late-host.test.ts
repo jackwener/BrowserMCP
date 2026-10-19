@@ -14,7 +14,7 @@ describe('stdio launcher when Chrome starts later', () => {
   afterEach(async () => { for (const close of cleanup.splice(0).reverse()) await close(); });
 
   it('keeps tool discovery and the same MCP connection alive until the host appears', async () => {
-    const home = fs.mkdtempSync(path.join(os.tmpdir(), 'opencli-late-host-'));
+    const home = fs.mkdtempSync(path.join(os.tmpdir(), 'browsermcp-late-host-'));
     cleanup.push(() => fs.rmSync(home, { recursive: true, force: true }));
     const transport = new StdioClientTransport({
       command: process.execPath,
@@ -31,7 +31,7 @@ describe('stdio launcher when Chrome starts later', () => {
 
     expect(client.getInstructions()).toContain('BrowserMCP');
     expect((await client.listTools()).tools.map((tool) => tool.name)).toContain('js');
-    expect((await client.listResources()).resources.some((resource) => resource.uri.startsWith('opencli://docs/'))).toBe(true);
+    expect((await client.listResources()).resources.some((resource) => resource.uri.startsWith('browsermcp://docs/'))).toBe(true);
     const offline = await client.callTool({ name: 'js', arguments: { code: 'await browser.tabs.new("https://example.com")' } });
     expect(offline.isError).toBe(true);
     expect(offline.content).toMatchObject([{ type: 'text', text: expect.stringContaining('host_unavailable') }]);
@@ -41,7 +41,7 @@ describe('stdio launcher when Chrome starts later', () => {
     const host = await startIpcServer(rt, { version: 'test', probe: async () => ({ browserId: 'late-browser', extensionResponsive: true }) });
     let activeHost = host;
     cleanup.push(async () => { await activeHost.close(); await rt.shutdown(); });
-    const run = path.join(home, '.opencli-mcp', 'run');
+    const run = path.join(home, '.browsermcp', 'run');
     fs.mkdirSync(run, { recursive: true });
     const publish = (instance: typeof host, browserId = 'late-browser') => {
       const file = path.join(run, `${instance.instanceId}.json`);
@@ -65,7 +65,7 @@ describe('stdio launcher when Chrome starts later', () => {
 
     // A crashed host leaves a record and endpoint; discovery reclaims both.
     const dead = spawnSync(process.execPath, ['-e', '']);
-    const staleDir = fs.mkdtempSync(path.join(os.tmpdir(), 'opencli-ipc-'));
+    const staleDir = fs.mkdtempSync(path.join(os.tmpdir(), 'browsermcp-ipc-'));
     cleanup.push(() => fs.rmSync(staleDir, { recursive: true, force: true }));
     const staleEndpoint = path.join(staleDir, 'host.sock');
     fs.writeFileSync(staleEndpoint, '');
@@ -85,7 +85,7 @@ describe('stdio launcher when Chrome starts later', () => {
     expect((await client.listTools()).tools.map((tool) => tool.name)).toContain('js');
     await client.callTool({ name: 'js', arguments: { code: 'let oldBinding = 42' } });
     // A business error containing "closed" must not tear down a healthy session.
-    await expect(client.readResource({ uri: 'opencli://closed' })).rejects.toThrow();
+    await expect(client.readResource({ uri: 'browsermcp://closed' })).rejects.toThrow();
     const retained = await client.callTool({ name: 'js', arguments: { code: 'oldBinding' } });
     expect(retained.content).toMatchObject([{ type: 'text', text: expect.stringContaining('"value":42') }]);
     await host.close();

@@ -28,7 +28,7 @@ async function eventForm(tab, limit, cursor) {
   await tab.goto('https://www.facebook.com/events', { waitUntil: 'load' });
   await tab.network.start('/api/graphql/');
   let networkCursor = (await tab.network.read({ pattern: '/api/graphql/', limit: 1000 })).cursor;
-  await tab.goto(`https://www.facebook.com/events?opencli_events=${Date.now()}`, { waitUntil: 'load' });
+  await tab.goto(`https://www.facebook.com/events?browsermcp_events=${Date.now()}`, { waitUntil: 'load' });
   let entry;
   for (let attempt = 0; attempt < 24 && !entry; attempt++) {
     const page = await tab.network.read({ pattern: '/api/graphql/', afterSequence: networkCursor, limit: 100 });

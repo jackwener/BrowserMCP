@@ -48,7 +48,7 @@ export function nativeHostDirs(): Array<{ browser: string; dir: string }> {
       { browser: 'brave', dir: path.join(base, 'BraveSoftware', 'Brave-Browser', 'NativeMessagingHosts') },
     ];
   }
-  return [{ browser: 'chrome', dir: path.join(process.env.LOCALAPPDATA ?? path.join(home, 'AppData', 'Local'), 'opencli-mcp') }];
+  return [{ browser: 'chrome', dir: path.join(process.env.LOCALAPPDATA ?? path.join(home, 'AppData', 'Local'), 'browsermcp') }];
 }
 
 /**
@@ -76,7 +76,7 @@ export function registerHost(opts: { browsers?: string[]; userDataDirs?: string[
   const unknown = opts.browsers?.filter((browser) => !supported.some((target) => target.browser === browser));
   if (unknown?.length) throw new Error(`Unknown browser(s): ${unknown.join(', ')}. Supported: ${supported.map((target) => target.browser).join(', ')}.`);
   const launcher = writeLauncher(path.join(projectRoot(), 'dist', 'src', 'main.js'));
-  const manifest = { name: NATIVE_HOST_NAME, description: 'browsermcp browser runtime host', path: launcher, type: 'stdio', allowed_origins: [`chrome-extension://${EXTENSION_ID}/`] };
+  const manifest = { name: NATIVE_HOST_NAME, description: 'BrowserMCP browser runtime host', path: launcher, type: 'stdio', allowed_origins: [`chrome-extension://${EXTENSION_ID}/`] };
   const manifests: Array<{ browser: string; file: string; written: boolean }> = [];
   // Chrome resolves user-level hosts relative to its user data dir: custom --user-data-dir profiles get their own copy
   const profiles = new Set([...(opts.userDataDirs ?? []), ...runningProfileDirs()]);

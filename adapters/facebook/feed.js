@@ -31,7 +31,7 @@ async function bootstrap(tab) {
   await tab.goto(`${ORIGIN}/`, { waitUntil: 'load' });
   await tab.network.start('/api/graphql/');
   let cursor = (await tab.network.read({ pattern: '/api/graphql/', limit: 1000 })).cursor;
-  await tab.goto(`${ORIGIN}/?opencli_feed=${Date.now()}`, { waitUntil: 'load' });
+  await tab.goto(`${ORIGIN}/?browsermcp_feed=${Date.now()}`, { waitUntil: 'load' });
   let entry;
   for (let attempt = 0; attempt < 24 && !entry; attempt++) {
     const page = await tab.network.read({ pattern: '/api/graphql/', afterSequence: cursor, limit: 100 });
@@ -46,7 +46,7 @@ async function bootstrap(tab) {
     const initial = require('${INITIAL}_facebookRelayOperation');
     const page = await new Promise((resolve, reject) => {
       const timer = setTimeout(() => reject(Error('pagination operation unavailable')), 5000);
-      require('Bootloader').loadModules(['${PAGE}_facebookRelayOperation'], (id) => { clearTimeout(timer); resolve(id); }, 'opencli-feed');
+      require('Bootloader').loadModules(['${PAGE}_facebookRelayOperation'], (id) => { clearTimeout(timer); resolve(id); }, 'browsermcp-feed');
     });
     const variables = require('CometHomeRootEntryPointVariables').getCometFeedVariablesForSk(undefined, undefined, 'COLD_START');
     const providers = require('${INITIAL}$Parameters').params.providedVariables;

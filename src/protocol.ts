@@ -207,7 +207,7 @@ export type ExtToHost =
   | { type: 'result'; result: Result }
   | { type: 'event'; event: BrowserEvent };
 
-export const NATIVE_HOST_NAME = 'com.opencli.mcp';
+export const NATIVE_HOST_NAME = 'com.browsermcp.host';
 /** Chrome caps host → extension frames at 1 MiB. */
 export const MAX_FRAME_BYTES = 1024 * 1024;
 

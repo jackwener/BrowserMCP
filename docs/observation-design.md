@@ -40,7 +40,7 @@ Runtime instructions and the REPL quickstart explain the observation choices. Th
 
 `npm run build && npm run smoke:observation` launches a temporary Chromium profile and a test extension using the production engine, chrome.debugger transport, frame routing and action implementation. The host uses the actual Tab API and ExtensionPage. Only Native Messaging delivery is substituted with a service-worker call, so the test does not touch an installed extension or native-host registration.
 
-The fixture covers long labels/URLs, custom controls, live form values, open shadow roots, same-origin/cross-origin/nested/shadow iframe owners, non-scrolling observation, exact reads, DOM pagination and query, scoped diffs, and observation-derived refs used for real click/fill. Set `OPENCLI_TEST_CHROMIUM` to an installed Chromium executable if needed. Canvas interpretation, closed shadow roots and exhaustive virtual-grid extraction are outside this change.
+The fixture covers long labels/URLs, custom controls, live form values, open shadow roots, same-origin/cross-origin/nested/shadow iframe owners, non-scrolling observation, exact reads, DOM pagination and query, scoped diffs, and observation-derived refs used for real click/fill. Set `BROWSERMCP_TEST_CHROMIUM` to an installed Chromium executable if needed. Canvas interpretation, closed shadow roots and exhaustive virtual-grid extraction are outside this change.
 
 ## AX refinement
 

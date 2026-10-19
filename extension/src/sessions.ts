@@ -38,9 +38,9 @@ export class SessionError extends Error { constructor(readonly code: string, mes
 
 function isHttp(url?: string): boolean { return Boolean(url && (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('data:text/html'))); }
 
-const STORE_KEY = 'opencli_mcp_sessions_v1';
+const STORE_KEY = 'browsermcp_sessions_v1';
 type StoredSession = Omit<Session, 'leases' | 'idleTimer'> & { leases: Lease[] };
-const RELEASED_KEY = 'opencli_mcp_released_v2';
+const RELEASED_KEY = 'browsermcp_released_v2';
 
 export class SessionManager {
   readonly sessions = new Map<string, Session>();
@@ -100,7 +100,7 @@ export class SessionManager {
     chrome.windows.onFocusChanged.addListener(() => { for (const tabId of this.cursorState.keys()) void this.publishCursor(tabId); });
     // a freshly loaded document (navigation, bfcache restore) asks for the current overlay state instead of starting blank
     chrome.runtime.onMessage.addListener((msg: { type?: string }, sender, respond) => {
-      if (msg?.type !== 'opencli:cursor-state?' || sender.tab?.id === undefined) return false;
+      if (msg?.type !== 'browsermcp:cursor-state?' || sender.tab?.id === undefined) return false;
       void this.observedState(sender.tab.id).then((state) => respond({ state })); return true;
     });
     chrome.tabGroups.onRemoved.addListener((g) => { for (const s of this.sessions.values()) if (s.groupId === g.id) s.groupId = null; });
@@ -515,7 +515,7 @@ export class SessionManager {
 
   // ── human visibility: content script for cursor overlay ──
   private async ensureContent(tabId: number): Promise<boolean> {
-    try { const r = await chrome.tabs.sendMessage(tabId, { type: 'opencli:ping' }); if (r?.ok) return true; } catch { /* inject */ }
+    try { const r = await chrome.tabs.sendMessage(tabId, { type: 'browsermcp:ping' }); if (r?.ok) return true; } catch { /* inject */ }
     try { await chrome.scripting.executeScript({ target: { tabId }, files: [CONTENT_FILE], injectImmediately: true }); return true; } catch { return false; }
   }
   /**
@@ -544,7 +544,7 @@ export class SessionManager {
     const state = await this.observedState(tabId);
     if (!state) return;
     if (!(await this.ensureContent(tabId))) return;
-    await chrome.tabs.sendMessage(tabId, { type: 'opencli:cursor-state', state: { ...state, animate: false } }).catch(() => {});
+    await chrome.tabs.sendMessage(tabId, { type: 'browsermcp:cursor-state', state: { ...state, animate: false } }).catch(() => {});
   }
 
   async cursor(s: Session, tabId: number, x: number, y: number, waitForArrival: boolean, timeoutMs = 1200): Promise<boolean> {
@@ -552,7 +552,7 @@ export class SessionManager {
     this.cursorState.set(tabId, { session: s.key, x, y, seq, shown: true });
     const observed = await this.isObserved(tabId);
     if (!(await this.ensureContent(tabId))) return false;
-    const p = chrome.tabs.sendMessage(tabId, { type: 'opencli:cursor-state', state: { x, y, seq, visible: observed, animate: observed && waitForArrival } });
+    const p = chrome.tabs.sendMessage(tabId, { type: 'browsermcp:cursor-state', state: { x, y, seq, visible: observed, animate: observed && waitForArrival } });
     if (!observed || !waitForArrival) { p.catch(() => {}); return false; }
     const result = await Promise.race([p.catch(() => null), new Promise<null>((r) => setTimeout(() => r(null), timeoutMs))]);
     return Boolean(result && (result as { arrived?: boolean; seq?: number }).arrived && (result as { seq?: number }).seq === seq);
@@ -562,6 +562,6 @@ export class SessionManager {
   async hideCursor(tabId: number): Promise<void> {
     if (!this.cursorState.delete(tabId)) return;
     if (!(await this.ensureContent(tabId))) return;
-    await chrome.tabs.sendMessage(tabId, { type: 'opencli:cursor-state', state: null }).catch(() => {});
+    await chrome.tabs.sendMessage(tabId, { type: 'browsermcp:cursor-state', state: null }).catch(() => {});
   }
 }

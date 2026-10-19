@@ -1,6 +1,6 @@
 // Real Chromium + chrome.debugger + production frame/page/action code, in a throwaway extension/profile.
 // Only the native transport is replaced with a worker call; no installed browser or native host is touched.
-// Run after npm run build. Set OPENCLI_TEST_CHROMIUM if the Playwright browser is installed elsewhere.
+// Run after npm run build. Set BROWSERMCP_TEST_CHROMIUM if the Playwright browser is installed elsewhere.
 import assert from 'node:assert/strict';
 import { mkdtemp, writeFile, copyFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -14,7 +14,7 @@ import { Tab } from '../dist/src/api/tab.js';
 import { Runtime } from '../dist/src/runtime/runtime.js';
 import { createExtensionPage } from '../dist/src/backends/extension-page.js';
 
-const directory = await mkdtemp(join(tmpdir(), 'opencli-observation-'));
+const directory = await mkdtemp(join(tmpdir(), 'browsermcp-observation-'));
 const longText = 'Business detail '.repeat(40) + 'END-OF-DETAIL';
 const longUrl = 'https://example.test/details?q=' + 'x'.repeat(300) + '&end=complete';
 let port;
@@ -60,7 +60,7 @@ try {
     };
   ` }, bundle: true, format: 'esm', platform: 'browser', target: 'chrome120', outfile: join(directory, 'worker.js') });
   context = await chromium.launchPersistentContext(join(directory, 'profile'), {
-    ...(process.env.OPENCLI_TEST_CHROMIUM && { executablePath: process.env.OPENCLI_TEST_CHROMIUM }),
+    ...(process.env.BROWSERMCP_TEST_CHROMIUM && { executablePath: process.env.BROWSERMCP_TEST_CHROMIUM }),
     headless: false, args: [`--disable-extensions-except=${directory}`, `--load-extension=${directory}`, '--site-per-process'], viewport: { width: 1200, height: 900 },
   });
   const worker = context.serviceWorkers()[0] ?? await context.waitForEvent('serviceworker');
@@ -261,7 +261,7 @@ try {
   await page.evaluate(() => document.querySelector('#many').remove());
   // Inject a capture/resolver contract failure. No native ref may escape as a successful observation.
   await bridge.send('exec', {world:'engine', code:`(() => {
-    const engine = globalThis.__opencliInjected;
+    const engine = globalThis.__browsermcpInjected;
     globalThis.savedAriaSnapshot = engine.ariaSnapshot;
     engine.ariaSnapshot = function(...args) { const raw = globalThis.savedAriaSnapshot.apply(this,args); this._lastAriaSnapshotForQuery = undefined; return raw; };
   })()`});
@@ -269,10 +269,10 @@ try {
     await assert.rejects(tab.observe({includeFrames:false}), e => e.code === 'snapshot_ref_unavailable' && /format:"dom"/.test(e.hint));
     assert((await tab.observe({format:'dom', includeFrames:false})).dom.entries.length);
   } finally {
-    await bridge.send('exec', {world:'engine', code:'(() => { globalThis.__opencliInjected.ariaSnapshot = globalThis.savedAriaSnapshot; delete globalThis.savedAriaSnapshot; })()'});
+    await bridge.send('exec', {world:'engine', code:'(() => { globalThis.__browsermcpInjected.ariaSnapshot = globalThis.savedAriaSnapshot; delete globalThis.savedAriaSnapshot; })()'});
   }
   const beforeReset = (await tab.find({selector:'#custom'})).entries[0].ref;
-  await bridge.send('exec', {world:'engine', code:'globalThis.__opencliInjected = new Proxy(globalThis.__opencliInjected, {})'});
+  await bridge.send('exec', {world:'engine', code:'globalThis.__browsermcpInjected = new Proxy(globalThis.__browsermcpInjected, {})'});
   await assert.rejects(tab.read({target:{ref:beforeReset}}), e => e.code === 'stale_ref');
   const beforeNavigation = (await tab.find({selector:'#custom'})).entries[0].ref;
   await page.reload();
@@ -298,7 +298,7 @@ try {
   assert(partial.frames.find(frame => frame.owner.id === 'outer').unavailable);
   bridge.send = send;
   console.log('Passed: detached child reports unavailable without losing other observations.');
-  await send('exec', {world:'engine', code:'(() => { globalThis.savedObserveFrame = globalThis.__opencliPage.observeFrame; delete globalThis.__opencliPage.observeFrame; })()'});
+  await send('exec', {world:'engine', code:'(() => { globalThis.savedObserveFrame = globalThis.__browsermcpPage.observeFrame; delete globalThis.__browsermcpPage.observeFrame; })()'});
   // Simulate the old edge, which accepted exec but ignored the newly added frame field.
   bridge.send = (action, params) => send(action, {...params, frame:undefined});
   try {
@@ -309,7 +309,7 @@ try {
     await assert.rejects(tab.find({frame:['#outer'], selector:'button'}), /updated extension/);
   } finally {
     bridge.send = send;
-    await send('exec', {world:'engine', code:'(() => { globalThis.__opencliPage.observeFrame = globalThis.savedObserveFrame; delete globalThis.savedObserveFrame; })()'});
+    await send('exec', {world:'engine', code:'(() => { globalThis.__browsermcpPage.observeFrame = globalThis.savedObserveFrame; delete globalThis.savedObserveFrame; })()'});
   }
   console.log('Passed: old-extension capability simulation keeps core ARIA usable and rejects wrong-frame reads.');
   // Exercise input behavior through the public API and real debugger events, not mocked setters.

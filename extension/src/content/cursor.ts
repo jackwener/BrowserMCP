@@ -112,15 +112,15 @@ function alive(): boolean { try { return Boolean(chrome.runtime?.id); } catch { 
 function pullState(): void {
   if (!alive()) return; // this content script belongs to a replaced extension version; the fresh one loads on next navigation
   try {
-    chrome.runtime.sendMessage({ type: 'opencli:cursor-state?' })
+    chrome.runtime.sendMessage({ type: 'browsermcp:cursor-state?' })
       .then((r: { state?: CursorState } | undefined) => { if (r && r.state !== undefined) void render(r.state ? { ...r.state, animate: false } : null); })
       .catch(() => { /* context invalidated or no listener */ });
   } catch { /* context invalidated */ }
 }
 
 chrome.runtime.onMessage.addListener((msg: { type?: string; state?: CursorState }, _sender, sendResponse) => {
-  if (msg?.type === 'opencli:ping') { sendResponse({ ok: true }); return false; }
-  if (msg?.type === 'opencli:cursor-state') { void render(msg.state ?? null).then(sendResponse); return true; }
+  if (msg?.type === 'browsermcp:ping') { sendResponse({ ok: true }); return false; }
+  if (msg?.type === 'browsermcp:cursor-state') { void render(msg.state ?? null).then(sendResponse); return true; }
   return false;
 });
 window.addEventListener('pageshow', pullState);

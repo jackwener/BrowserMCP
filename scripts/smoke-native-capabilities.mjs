@@ -17,7 +17,7 @@ import { connectSocket, probeSocket, attachSocket } from '../dist/src/host/socke
 import { PROTOCOL_REVISION } from '../dist/src/protocol.js';
 import { timeline, searchUrl } from '../tests/fixtures/twitter-search.mjs';
 
-const scratch = await mkdtemp(join(tmpdir(), 'opencli-native-smoke-'));
+const scratch = await mkdtemp(join(tmpdir(), 'browsermcp-native-smoke-'));
 const ext = join(scratch, 'extension');
 await cp('extension/dist', ext, { recursive: true });
 await build({ entryPoints: ['extension/src/background.ts'], bundle: true, format: 'esm', platform: 'browser', target: 'chrome120', outfile: join(ext, 'background.js'),
@@ -31,7 +31,7 @@ await build({ entryPoints: ['extension/src/background.ts'], bundle: true, format
   } }],
 });
 const fixture = createServer((req, res) => {
-  if (req.url === '/file') { res.setHeader('content-disposition', 'attachment; filename="opencli-smoke.txt"'); res.end('download fixture'); return; }
+  if (req.url === '/file') { res.setHeader('content-disposition', 'attachment; filename="browsermcp-smoke.txt"'); res.end('download fixture'); return; }
   res.setHeader('content-type', 'text/html');
   res.end(`<!doctype html><title>Native smoke</title><h1>Ready</h1><button onclick="document.querySelector('h1').textContent='Done'">Continue</button><script>window.mainWorldMarker=42</script>`);
 });
@@ -39,7 +39,7 @@ await new Promise(r => fixture.listen(0, '127.0.0.1', r));
 const url = `http://127.0.0.1:${fixture.address().port}/`;
 let context, client, session, channel;
 try {
-  let executablePath = process.env.OPENCLI_SMOKE_CHROME;
+  let executablePath = process.env.BROWSERMCP_SMOKE_CHROME;
   if (!executablePath && process.platform === 'darwin') {
     const cache = join(homedir(), 'Library/Caches/ms-playwright');
     const revisions = (await readdir(cache)).filter(p => /^chromium-\d+$/.test(p)).sort().reverse();

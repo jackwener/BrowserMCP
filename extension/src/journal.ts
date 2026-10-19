@@ -18,7 +18,7 @@
 
 import type { Command, Result } from '../../src/protocol.js';
 
-const JOURNAL_KEY = 'opencli_command_journal_v1';
+const JOURNAL_KEY = 'browsermcp_command_journal_v1';
 const JOURNAL_MAX_ENTRIES = 64;
 /** Results larger than this are not recorded; a replayed id re-fails honestly. */
 const JOURNAL_RESULT_MAX_BYTES = 64 * 1024;

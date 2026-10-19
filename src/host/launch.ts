@@ -1,11 +1,11 @@
 /** One stable entrypoint shared by Native Messaging and MCP clients. */
 import fs from 'node:fs';
 import path from 'node:path';
-import { OPENCLI_MCP_DIR } from './state.js';
+import { BROWSERMCP_DIR } from '../lib/paths.js';
 
 type Installation = { node: string; entry: string };
-export const LAUNCHER_PATH = path.join(OPENCLI_MCP_DIR, 'bin', `opencli-mcp-launcher${process.platform === 'win32' ? '.cmd' : ''}`);
-const INSTALLATION_FILE = path.join(OPENCLI_MCP_DIR, 'installation.json');
+export const LAUNCHER_PATH = path.join(BROWSERMCP_DIR, 'bin', `browsermcp-launcher${process.platform === 'win32' ? '.cmd' : ''}`);
+const INSTALLATION_FILE = path.join(BROWSERMCP_DIR, 'installation.json');
 
 /** Keep Homebrew's formula alias, but only when it names the file actually being installed. */
 function stablePath(file: string): string {

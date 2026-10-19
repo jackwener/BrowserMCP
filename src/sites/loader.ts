@@ -5,7 +5,7 @@
  * a small in-memory index (rebuilt on directory mtime change) for cross-site search.
  *
  * Sources are an ordered list; a later source overrides an earlier one for the same `<site>/<command>` — so the
- * built-in corpus, the user's `~/.opencli-mcp/adapters`, and agent-defined tools are one mechanism, not three.
+ * built-in corpus, the user's `~/.browsermcp/adapters`, and agent-defined tools are one mechanism, not three.
  */
 import fs from 'node:fs';
 import path from 'node:path';

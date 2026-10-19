@@ -31,7 +31,7 @@ async function discordHeaders(tab) {
   await tab.network.start('/api/');
   const before = (await tab.network.read({ pattern: '/api/', limit: 1000 })).cursor;
   const url = new URL(target);
-  url.searchParams.set('opencli_mcp_probe', String(Date.now()));
+  url.searchParams.set('browsermcp_probe', String(Date.now()));
   await tab.goto(url.href, { waitUntil: 'load' });
   let cursor = before;
   let entry;

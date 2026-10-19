@@ -5,7 +5,7 @@
 BrowserMCP lets MCP clients observe and operate your Chrome tabs through a local extension and host. Optional site adapters package verified workflows as reusable tools.
 
 [![npm](https://img.shields.io/npm/v/@jackwener/browsermcp)](https://www.npmjs.com/package/@jackwener/browsermcp)
-[![Chrome Web Store](https://img.shields.io/badge/Chrome_Web_Store-Install_extension-4285F4?logo=googlechrome&logoColor=white)](https://chromewebstore.google.com/detail/opencli-mcp/lnaoghmfcdnbhgcihkakfobckmfhllkg)
+[![Chrome Web Store](https://img.shields.io/badge/Chrome_Web_Store-Install_extension-4285F4?logo=googlechrome&logoColor=white)](https://chromewebstore.google.com/detail/browsermcp-connector/lnaoghmfcdnbhgcihkakfobckmfhllkg)
 [![Node.js](https://img.shields.io/badge/Node.js-%3E%3D22-339933)](package.json)
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 
@@ -28,7 +28,7 @@ You need **Node.js 22 or newer**, **Google Chrome**, and an **MCP client**. The 
 
 ### 1. Install the Chrome extension
 
-[**Install BrowserMCP Connector from the Chrome Web Store →**](https://chromewebstore.google.com/detail/opencli-mcp/lnaoghmfcdnbhgcihkakfobckmfhllkg)
+[**Install BrowserMCP Connector from the Chrome Web Store →**](https://chromewebstore.google.com/detail/browsermcp-connector/lnaoghmfcdnbhgcihkakfobckmfhllkg)
 
 For an extension version ahead of the Web Store, download the **manual-install zip** from [GitHub Releases](https://github.com/jackwener/browsermcp/releases) and follow the [manual installation steps](docs/setup.md#manual-extension-installation).
 
@@ -59,17 +59,17 @@ For **Pi**, install `pi-mcp-adapter`, then run `browsermcp setup --clients pi`. 
 
 Restart or reconnect your MCP client, then ask:
 
-> Use browsermcp to read the top five Hacker News stories and summarize them with links.
+> Use BrowserMCP to read the top five Hacker News stories and summarize them with links.
 
 You can rerun `browsermcp setup` to repair the browser registration or select newly installed clients to configure. Selected clients have their `browsermcp` entry updated to a stable launcher; other server entries are preserved. The launcher follows Homebrew upgrades within the same formula. If Node or the package moves, rerun setup. For a read-only startup and connection check, run `browsermcp doctor`.
 
 Connection issues? See [troubleshooting](docs/setup.md#troubleshooting).
 
-## Upgrading from opencli-mcp
+## Local configuration
 
-Install `@jackwener/browsermcp` and rerun `browsermcp setup`, selecting the MCP clients you want to update. Setup replaces their old `opencli-mcp` entry with `browsermcp`. For manually configured clients, update the entry yourself. The extension is now named **BrowserMCP Connector** and keeps its existing Web Store ID.
+Data, configuration, and user adapters live in `~/.browsermcp`. The launcher is `~/.browsermcp/bin/browsermcp-launcher` (`.cmd` on Windows). Run `browsermcp setup` to register it with Chrome and your selected MCP clients.
 
-Existing data in `~/.opencli-mcp`, the stable launcher, and the Native Messaging host identity are retained for compatibility. Existing adapters can still import `opencli-mcp/adapter-sdk`; new adapters use `@jackwener/browsermcp/adapter-sdk`. `BROWSERMCP_BROWSER` and `BROWSERMCP_BIN` take precedence over their legacy `OPENCLI_MCP_*` equivalents.
+This is a fresh configuration: old directories, environment variables, and adapter import aliases are not used. Remove obsolete MCP client entries manually. User adapters import `@jackwener/browsermcp/adapter-sdk`.
 
 ## Usage
 
@@ -175,4 +175,4 @@ Found a bug or have a feature request? [Open an issue](https://github.com/jackwe
 
 The REPL also exposes `browser.chrome.call(method, argsArray)` for native Chrome APIs, `tab.cdp.send(method, params)` for an explicit Tab, and writable Main World `tab.evaluate(script, {arg, timeoutMs})`. Use `browser.chrome.describe("tabs.query")` for on-demand signatures and runtime availability. Chrome/CDP events and page/extension logs support bounded subscriptions with explicit loss/reset information. Read `docs_get {name:"capabilities/chrome"}` inside MCP for examples and lifecycle rules, or [the native capabilities guide](docs/capabilities/chrome.md).
 
-For development, `npm run smoke:native` runs the new flows in a disposable Chromium profile after a build. Set `OPENCLI_SMOKE_CHROME` to a Chromium executable when it is not available in the local Playwright cache. It does not modify the everyday browser profile or native-host registration.
+For development, `npm run smoke:native` runs the new flows in a disposable Chromium profile after a build. Set `BROWSERMCP_SMOKE_CHROME` to a Chromium executable when it is not available in the local Playwright cache. It does not modify the everyday browser profile or native-host registration.

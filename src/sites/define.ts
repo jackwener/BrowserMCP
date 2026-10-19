@@ -39,23 +39,20 @@ export function validateDefinition(def: ToolDefinition): void {
 /** Ensure the user source dir can resolve the SDK subpath of this browsermcp installation. */
 export function ensureUserSource(): string {
   fs.mkdirSync(USER_ADAPTERS_DIR, { recursive: true });
-  const home = path.dirname(USER_ADAPTERS_DIR); // ~/.opencli-mcp
+  const home = path.dirname(USER_ADAPTERS_DIR); // ~/.browsermcp
   const nodeModules = path.join(home, 'node_modules');
   fs.mkdirSync(nodeModules, { recursive: true });
   const sdkDir = path.dirname(createRequire(import.meta.url).resolve('@jackwener/browsermcp/adapter-sdk'));
   const packageDir = path.dirname(sdkDir);
-  // Old user adapters keep importing the SDK through its previous package name.
-  for (const name of ['@jackwener/browsermcp', 'opencli-mcp']) {
-    const link = path.join(nodeModules, name);
-    fs.mkdirSync(path.dirname(link), { recursive: true });
-    const existing = fs.lstatSync(link, { throwIfNoEntry: false });
-    let current: string | null = null;
-    try { current = fs.realpathSync(link); } catch { /* a dangling link needs replacement */ }
-    if (current !== fs.realpathSync(packageDir)) {
-      if (existing && !existing.isSymbolicLink()) throw new Error(`${link} exists and is not a symlink`);
-      if (existing) fs.unlinkSync(link);
-      fs.symlinkSync(packageDir, link, 'dir');
-    }
+  const link = path.join(nodeModules, '@jackwener/browsermcp');
+  fs.mkdirSync(path.dirname(link), { recursive: true });
+  const existing = fs.lstatSync(link, { throwIfNoEntry: false });
+  let current: string | null = null;
+  try { current = fs.realpathSync(link); } catch { /* a dangling link needs replacement */ }
+  if (current !== fs.realpathSync(packageDir)) {
+    if (existing && !existing.isSymbolicLink()) throw new Error(`${link} exists and is not a symlink`);
+    if (existing) fs.unlinkSync(link);
+    fs.symlinkSync(packageDir, link, 'dir');
   }
   const pkg = path.join(home, 'package.json');
   if (!fs.existsSync(pkg)) fs.writeFileSync(pkg, JSON.stringify({ name: 'browsermcp-user-adapters', private: true, type: 'module' }, null, 2));

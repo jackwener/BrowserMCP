@@ -98,7 +98,7 @@ jobs:
           if [ -n "$existing" ]; then
             test "$existing" = "$(git rev-parse HEAD)" || { echo "$tag points to another commit" >&2; exit 1; }
           else
-            git tag -a "$tag" -m "browsermcp ${RELEASE_VERSION}"
+            git tag -a "$tag" -m "BrowserMCP ${RELEASE_VERSION}"
             git push origin "$tag"
           fi
       - name: Publish to npm with trusted publishing
@@ -123,7 +123,7 @@ jobs:
             gh release upload "$tag" "$tarball" "${extension_zip[0]}" --clobber
             gh release edit "$tag" --notes-file "$RUNNER_TEMP/release-notes.md"
           else
-            gh release create "$tag" "$tarball" "${extension_zip[0]}" --verify-tag --title "browsermcp ${RELEASE_VERSION}" --notes-file "$RUNNER_TEMP/release-notes.md"
+            gh release create "$tag" "$tarball" "${extension_zip[0]}" --verify-tag --title "BrowserMCP ${RELEASE_VERSION}" --notes-file "$RUNNER_TEMP/release-notes.md"
           fi
       - name: Verify npm availability
         run: |

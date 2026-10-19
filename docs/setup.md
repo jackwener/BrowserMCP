@@ -37,9 +37,9 @@ A timeout leaves the configuration in place: enable the extension and rerun setu
 
 ## Stable launch entrypoint
 
-Both Chrome and MCP clients use `~/.opencli-mcp/bin/opencli-mcp-launcher` (`.cmd` on Windows). Chrome starts the launcher in host mode; MCP clients pass `stdio`. Paths and arguments are printed by setup, so desktop apps do not need your terminal's npm `PATH`.
+Both Chrome and MCP clients use `~/.browsermcp/bin/browsermcp-launcher` (`.cmd` on Windows). Chrome starts the launcher in host mode; MCP clients pass `stdio`. Paths and arguments are printed by setup, so desktop apps do not need your terminal's npm `PATH`.
 
-Setup records the Node executable and package entry in `~/.opencli-mcp/installation.json` and generates the launcher from that record. Treat both as setup-managed files. Doctor checks the runtime, program entry, launcher, browser registration, and live connection separately. A running host does not hide missing files needed at the next start.
+Setup records the Node executable and package entry in `~/.browsermcp/installation.json` and generates the launcher from that record. Treat both as setup-managed files. Doctor checks the runtime, program entry, launcher, browser registration, and live connection separately. A running host does not hide missing files needed at the next start.
 
 For Homebrew installations, setup uses the corresponding formula's stable `opt` path when it resolves to the current file. This applies to both Node and the package entry. Other installations use their current absolute paths. The launcher does not search version managers, download Node, or fetch an npm package on startup.
 
@@ -56,7 +56,7 @@ browsermcp setup --clients none
 dsh plugin --profile web add @jackwener/browsermcp
 ```
 
-Restart `dsh web`. The main package's bundle inserts one `@deepseek-ai/dsh-mcp-client` entry using the launcher created by setup, so dsh discovers the same MCP tools without depending on npm's `PATH`. Set `BROWSERMCP_BIN` only if you need a different executable. To remove the dsh registration, run `dsh plugin --profile web remove @jackwener/browsermcp`. Replace `web` with your active dsh profile when needed.
+Restart `dsh web`. The main package's bundle inserts one `@deepseek-ai/dsh-mcp-client` entry using the launcher created by setup, so dsh discovers the same MCP tools without depending on npm's `PATH`. To remove the dsh registration, run `dsh plugin --profile web remove @jackwener/browsermcp`. Replace `web` with your active dsh profile when needed.
 
 ## Pi
 
@@ -142,19 +142,33 @@ When configuring a client for the first time with the managed launcher, select i
 
 Chrome updates the store extension independently. If the old host is still running, disable and re-enable the extension to start the updated program, the running MCP launcher reconnects automatically. Use `doctor` to check both the live connection and the files needed for the next startup.
 
+## Runtime names and clean setup
+
+| Component | Name or location |
+| --- | --- |
+| Data and settings | `~/.browsermcp` |
+| User adapters | `~/.browsermcp/adapters` |
+| Launcher | `~/.browsermcp/bin/browsermcp-launcher` (`.cmd` on Windows) |
+| Native Messaging host | `com.browsermcp.host` |
+| MCP client entry | `browsermcp` |
+| MCP resource URIs | `browsermcp://docs/{name}`, `browsermcp://sites` |
+| Adapter SDK | `@jackwener/browsermcp/adapter-sdk` |
+
+Install the matching updated extension and run `browsermcp setup` to register this host and launcher. Old directories, environment variables, SDK aliases, and client entries are not migrated. Remove obsolete client entries manually. The new extension storage keys start fresh, including the browser ID; choose a new ID with `browsermcp doctor --json` if selecting a particular profile.
+
 ## Local connections and browser selection
 
 MCP clients use the managed launcher's standard stdio command. The launcher connects to the Chrome-owned host through a Unix domain socket (macOS/Linux) or a named pipe (Windows). There is no HTTP endpoint, network port, bearer token, or remote MCP mode to configure.
 
 Each connection owns one MCP/REPL session. Closing the client releases that session's resources. A host restart does not kill the client's stdio connection: the launcher reconnects to the **same browser profile**, reports `session_restarted` before running another tool, and requires fresh REPL bindings and Tab handles. Calls interrupted by a disconnect return an unknown-outcome error and are never automatically replayed.
 
-A single connected browser is selected automatically. If several profiles are connected, `browsermcp doctor --json` lists their `browserId` values and endpoints. Set `browserId` in the configuration below, or set `BROWSERMCP_BROWSER` in the MCP command's environment, to choose one. Each extension profile keeps its browser ID across host restarts; reinstalling the extension can change it. Once connected, a launcher remains pinned to that browser even if another profile opens or closes.
+A single connected browser is selected automatically. If several profiles are connected, `browsermcp doctor --json` lists their `browserId` values and endpoints. Set `browserId` in the configuration below to choose one. Each extension profile keeps its browser ID across host restarts; reinstalling the extension can change it. Once connected, a launcher remains pinned to that browser even if another profile opens or closes.
 
 ## Configuration
 
-The legacy `OPENCLI_MCP_BROWSER` and `OPENCLI_MCP_BIN` variables remain supported when the corresponding `BROWSERMCP_*` variable is unset.
+BrowserMCP requires no product-specific environment variables. Setup registers the launcher, and a single connected browser is selected automatically.
 
-Settings live in `~/.opencli-mcp/config.json`. For example:
+Settings live in `~/.browsermcp/config.json`. For example:
 
 ```json
 {
@@ -199,7 +213,7 @@ Chrome may report:
 [browsermcp] native host disconnected after 4ms (attempt 1) Specified native messaging host not found.
 ```
 
-An enabled MCP client entry does not establish the browser connection. The two connections are separate: the MCP client launches the MCP transport, while Chrome locates and launches the Native Messaging host through its own registration. On Windows, setup writes the host manifest and launcher, and registers the manifest path under `HKCU\Software\Google\Chrome\NativeMessagingHosts\com.opencli.mcp` for the current Windows user. Run setup as the same user who runs Chrome; administrator access is not required.
+An enabled MCP client entry does not establish the browser connection. The two connections are separate: the MCP client launches the MCP transport, while Chrome locates and launches the Native Messaging host through its own registration. On Windows, setup writes the host manifest and launcher, and registers the manifest path under `HKCU\Software\Google\Chrome\NativeMessagingHosts\com.browsermcp.host` for the current Windows user. Run setup as the same user who runs Chrome; administrator access is not required.
 
 1. If using an old package, update it with `npm install -g @jackwener/browsermcp@latest`. After an update or a Node.js installation change, refresh the browser registration:
 
@@ -225,7 +239,7 @@ An enabled MCP client entry does not establish the browser connection. The two c
 3. Run `browsermcp doctor` again after reconnecting. If Chrome still says `Specified native messaging host not found.`, inspect the registration from the same Windows account:
 
    ```powershell
-   reg query "HKCU\Software\Google\Chrome\NativeMessagingHosts\com.opencli.mcp" /ve
+   reg query "HKCU\Software\Google\Chrome\NativeMessagingHosts\com.browsermcp.host" /ve
    ```
 
    The default value must point to the existing Chrome manifest reported by doctor. Doctor checks the runtime and program entry, launcher consistency, manifest file, authorized extension origin, and live connection; it does **not** currently verify the Windows registry value. A missing or stale registry value needs setup again under the Windows account running Chrome.
