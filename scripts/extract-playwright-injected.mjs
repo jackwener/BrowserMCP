@@ -1,5 +1,5 @@
 // Vendor Playwright's injected script (Apache-2.0) from playwright-core's bundle.
-// The page-side engine opencli-mcp relies on: selector engines (role/text/label/testid/css/xpath),
+// The page-side engine browsermcp relies on: selector engines (role/text/label/testid/css/xpath),
 // element states, fill/select helpers, hit-target checks, selector generation and aria snapshots.
 import { readFileSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';

@@ -1,7 +1,7 @@
 import { routeFrames } from './frames';
 import { frameSteps } from '../../src/shared/engine';
 /**
- * opencli-mcp extension service worker — the browser runtime.
+ * browsermcp extension service worker — the browser runtime.
  * Connects to the Chrome-spawned host over Native Messaging, owns chrome.debugger sessions,
  * tab leases / groups / claims / finalize, and the cursor overlay.
  * Page semantics arrive as commands (exec/navigate/…) from the host runtime.
@@ -131,7 +131,7 @@ async function handleCommand(cmd: Command): Promise<Result> {
         const op = cmd.historyOp ?? 'reload';
         // fire, do not await: with a debugger attached the reload/goBack promise can resolve only after the navigation, or never
         const trigger = op === 'reload' ? chrome.tabs.reload(tabId) : op === 'back' ? chrome.tabs.goBack(tabId) : chrome.tabs.goForward(tabId);
-        trigger.catch((e) => console.warn(`[opencli-mcp] ${op} trigger: ${e instanceof Error ? e.message : String(e)}`));
+        trigger.catch((e) => console.warn(`[browsermcp] ${op} trigger: ${e instanceof Error ? e.message : String(e)}`));
         await Promise.race([trigger, new Promise((r) => setTimeout(r, 300))]); // let the navigation start before polling status
         const t = await waitForLoad(tabId, 15_000);
         const lease = s.leases.get(tabId); if (lease) { lease.url = t.url; lease.title = t.title; }

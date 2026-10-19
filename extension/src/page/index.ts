@@ -389,7 +389,7 @@ function skipRead(el: Element | null, visible: WeakMap<Element, boolean>): boole
   while (el) {
     const tag = el.tagName;
     if (tag === 'SCRIPT' || tag === 'STYLE' || tag === 'NOSCRIPT') return true;
-    if (el.id === 'opencli-mcp-annotate') return true;
+    if (el.id === 'browsermcp-annotate') return true;
     if (el.hasAttribute('hidden')) return true;
     const cached = visible.get(el);
     if (cached === false) return true;
@@ -703,7 +703,7 @@ export function elementAt(args: { x: number; y: number }): ElementAtResult {
 }
 
 // ── screenshot annotation: public refs from the last successful ARIA capture ──
-const ANNOTATE_ID = 'opencli-mcp-annotate';
+const ANNOTATE_ID = 'browsermcp-annotate';
 export function annotate(): number {
   unannotate();
   resetRefsIfEngineChanged();

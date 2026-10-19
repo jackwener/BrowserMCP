@@ -155,7 +155,7 @@ export class Runtime extends EventEmitter<RuntimeEvents> implements PageProvider
   private async createPage(opts: { session: string; surface: 'browser' | 'adapter'; page?: string }): Promise<RuntimePage> {
     const backend = this.backend();
     if (backend === 'extension' && this.bridge) return createExtensionPage(this.bridge, opts);
-    throw Object.assign(new Error('No browser backend is connected'), { code: 'browser_unavailable', hint: 'Run `opencli-mcp doctor`. Chrome with the opencli-mcp extension must be running.' });
+    throw Object.assign(new Error('No browser backend is connected'), { code: 'browser_unavailable', hint: 'Run `browsermcp doctor`. Chrome with the browsermcp extension must be running.' });
   }
 
   /** Adapters run on the browser object model: a Tab bound to the adapter page, plus sites/recon. */

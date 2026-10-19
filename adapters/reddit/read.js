@@ -1,4 +1,4 @@
-import { defineAdapter, errors } from 'opencli-mcp/adapter-sdk';
+import { defineAdapter, errors } from 'browsermcp/adapter-sdk';
 import { ensureOnReddit, toPostId, redditPost } from './_shared.js';
 
 const EXPAND_ROUNDS_MIN = 1;

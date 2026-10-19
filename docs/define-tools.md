@@ -22,4 +22,4 @@ async ({ tab, args }) => {
 }
 ```
 
-Use stable semantic targets and `tab.expect()` when the adapter must interact with the UI. `await tools.list()` and `await tools.remove(site, name)` manage user-defined adapters. Built-in adapters and user adapters use the same loader; a user adapter with the same site and name takes precedence. If writing an adapter file directly, import `defineAdapter` and `errors` from `opencli-mcp/adapter-sdk`; this SDK is part of the main package.
+Use stable semantic targets and `tab.expect()` when the adapter must interact with the UI. `await tools.list()` and `await tools.remove(site, name)` manage user-defined adapters. Built-in adapters and user adapters use the same loader; a user adapter with the same site and name takes precedence. If writing an adapter file directly, import `defineAdapter` and `errors` from `browsermcp/adapter-sdk`; this SDK is part of the main package.

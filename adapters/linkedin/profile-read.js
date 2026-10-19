@@ -1,4 +1,4 @@
-import { defineAdapter } from 'opencli-mcp/adapter-sdk';
+import { defineAdapter } from 'browsermcp/adapter-sdk';
 import { compact, ensureLinkedIn } from './_shared.js';
 import { linkedinProfile, profileIdentity } from './_profile.js';
 import { cardText, linkedinProfileCard, sectionLines } from './_profile-card.js';

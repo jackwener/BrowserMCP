@@ -1,10 +1,10 @@
-# opencli-mcp
+# BrowserMCP
 
 **A browser service for MCP agents, connected to the Chrome you're already logged into.**
 
-opencli-mcp lets MCP clients observe and operate your Chrome tabs through a local extension and host. Optional site adapters package verified workflows as reusable tools.
+BrowserMCP lets MCP clients observe and operate your Chrome tabs through a local extension and host. Optional site adapters package verified workflows as reusable tools.
 
-[![npm](https://img.shields.io/npm/v/opencli-mcp)](https://www.npmjs.com/package/opencli-mcp)
+[![npm](https://img.shields.io/npm/v/browsermcp)](https://www.npmjs.com/package/browsermcp)
 [![Chrome Web Store](https://img.shields.io/badge/Chrome_Web_Store-Install_extension-4285F4?logo=googlechrome&logoColor=white)](https://chromewebstore.google.com/detail/opencli-mcp/lnaoghmfcdnbhgcihkakfobckmfhllkg)
 [![Node.js](https://img.shields.io/badge/Node.js-%3E%3D22-339933)](package.json)
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
@@ -26,42 +26,48 @@ You need **Node.js 22 or newer**, **Google Chrome**, and an **MCP client**. The 
 
 ### 1. Install the Chrome extension
 
-[**Install opencli-mcp from the Chrome Web Store →**](https://chromewebstore.google.com/detail/opencli-mcp/lnaoghmfcdnbhgcihkakfobckmfhllkg)
+[**Install BrowserMCP Connector from the Chrome Web Store →**](https://chromewebstore.google.com/detail/opencli-mcp/lnaoghmfcdnbhgcihkakfobckmfhllkg)
 
-For an extension version ahead of the Web Store, download the **manual-install zip** from [GitHub Releases](https://github.com/jackwener/opencli-mcp/releases) and follow the [manual installation steps](docs/setup.md#manual-extension-installation).
+For an extension version ahead of the Web Store, download the **manual-install zip** from [GitHub Releases](https://github.com/jackwener/browsermcp/releases) and follow the [manual installation steps](docs/setup.md#manual-extension-installation).
 
 ### 2. Install the npm package and set up the connection
 
 ```bash
-npm install -g opencli-mcp
-opencli-mcp setup
+npm install -g browsermcp
+BrowserMCP setup
 ```
 
 Keep Chrome open. `setup` connects the extension to the local program, asks which MCP clients to configure, registers only your selection, and checks the browser connection. If you have not installed the extension yet, it opens the Chrome Web Store for you.
 
 For **Cursor, Claude Desktop, and other MCP clients**, choose `manual` and copy the configuration printed by `setup` into your client's MCP settings. It uses absolute paths so desktop apps can find the program.
 
-For **OpenCode**, run `opencli-mcp setup --clients opencode`. It adds a global MCP entry while preserving your other settings.
+For **OpenCode**, run `browsermcp setup --clients opencode`. It adds a global MCP entry while preserving your other settings.
 
-For **DeepSeek Harness (`dsh`)**, run `opencli-mcp setup --clients none`, then add the same npm package to your dsh profile:
+For **DeepSeek Harness (`dsh`)**, run `browsermcp setup --clients none`, then add the same npm package to your dsh profile:
 
 ```bash
-dsh plugin --profile web add opencli-mcp
+dsh plugin --profile web add browsermcp
 ```
 
 Restart `dsh web`. The package's dsh bundle uses dsh's MCP client to connect to the browser service. See the [dsh setup details](docs/setup.md#deepseek-harness-dsh).
 
-For **Pi**, install `pi-mcp-adapter`, then run `opencli-mcp setup --clients pi`. See the [Pi setup steps](docs/setup.md#pi).
+For **Pi**, install `pi-mcp-adapter`, then run `browsermcp setup --clients pi`. See the [Pi setup steps](docs/setup.md#pi).
 
 ### 3. Start using it
 
 Restart or reconnect your MCP client, then ask:
 
-> Use opencli-mcp to read the top five Hacker News stories and summarize them with links.
+> Use browsermcp to read the top five Hacker News stories and summarize them with links.
 
-You can rerun `opencli-mcp setup` to repair the browser registration or select newly installed clients to configure. Selected clients have their `opencli-mcp` entry updated to a stable launcher; other server entries are preserved. The launcher follows Homebrew upgrades within the same formula. If Node or the package moves, rerun setup. For a read-only startup and connection check, run `opencli-mcp doctor`.
+You can rerun `browsermcp setup` to repair the browser registration or select newly installed clients to configure. Selected clients have their `browsermcp` entry updated to a stable launcher; other server entries are preserved. The launcher follows Homebrew upgrades within the same formula. If Node or the package moves, rerun setup. For a read-only startup and connection check, run `browsermcp doctor`.
 
 Connection issues? See [troubleshooting](docs/setup.md#troubleshooting).
+
+## Upgrading from opencli-mcp
+
+Install `browsermcp` and rerun `browsermcp setup`, selecting the MCP clients you want to update. Setup replaces their old `opencli-mcp` entry with `browsermcp`. For manually configured clients, update the entry yourself. The extension is now named **BrowserMCP Connector** and keeps its existing Web Store ID.
+
+Existing data in `~/.opencli-mcp`, the stable launcher, and the Native Messaging host identity are retained for compatibility. Existing adapters can still import `opencli-mcp/adapter-sdk`; new adapters use `browsermcp/adapter-sdk`. `BROWSERMCP_BROWSER` and `BROWSERMCP_BIN` take precedence over their legacy `OPENCLI_MCP_*` equivalents.
 
 ## Usage
 
@@ -105,14 +111,14 @@ See the [JavaScript guide](docs/js-tool.md), [API reference](docs/api-reference.
 ## How it works
 
 ```text
-MCP client → opencli-mcp launcher → local host ⇄ Chrome extension → website
+MCP client → browsermcp launcher → local host ⇄ Chrome extension → website
                 stdio              Native Messaging             your session
 ```
 
 Chrome starts the local host through Native Messaging. The extension operates browser tabs using Chrome's debugger APIs and Playwright's injected locator engine. The host exposes browser operations, site commands, and tool authoring through MCP.
 Each MCP client connection has its own tab and JavaScript session, so one client's cleanup does not close another client's tabs.
 
-The MCP launcher can start before Chrome. It keeps the client connection open and reconnects when the Chrome-owned host appears or restarts. Browser operations and site adapters use that host; run `opencli-mcp doctor` if it stays unavailable.
+The MCP launcher can start before Chrome. It keeps the client connection open and reconnects when the Chrome-owned host appears or restarts. Browser operations and site adapters use that host; run `browsermcp doctor` if it stays unavailable.
 
 Connections are local-only: standard MCP stdio to the launcher, then Unix domain socket (macOS/Linux) or named pipe (Windows) to the host. No port or token configuration. See [browser selection and configuration](docs/setup.md#local-connections-and-browser-selection).
 
@@ -138,8 +144,8 @@ Site commands execute directly without additional approval prompts. The read/wri
 ## Development
 
 ```bash
-git clone https://github.com/jackwener/opencli-mcp.git
-cd opencli-mcp
+git clone https://github.com/jackwener/browsermcp.git browsermcp
+cd browsermcp
 npm install
 npm run typecheck
 ```
@@ -157,7 +163,7 @@ Keep the automated suite focused on MCP browser flow, REPL persistence and inter
 
 Maintainers: use the [release workflow](docs/releasing.md) to publish the npm package and GitHub Release.
 
-Found a bug or have a feature request? [Open an issue](https://github.com/jackwener/opencli-mcp/issues). See [CHANGELOG.md](CHANGELOG.md) for release history.
+Found a bug or have a feature request? [Open an issue](https://github.com/jackwener/browsermcp/issues). See [CHANGELOG.md](CHANGELOG.md) for release history.
 
 ## License and credits
 

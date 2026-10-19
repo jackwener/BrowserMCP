@@ -1,4 +1,4 @@
-import { defineAdapter, errors } from 'opencli-mcp/adapter-sdk';
+import { defineAdapter, errors } from 'browsermcp/adapter-sdk';
 import { accountNumber, gmailFetchThread, syncThreadId } from './_shared.js';
 import { gmailCreateDraft, gmailSendDraft } from './send.js';
 

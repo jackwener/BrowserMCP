@@ -70,7 +70,7 @@ export async function discoverEndpoints(page: RuntimePage, opts: { maxScripts?: 
     const ctrl = new AbortController();
     const timer = setTimeout(() => ctrl.abort(), opts.fetchTimeoutMs ?? 15_000);
     try {
-      const res = await fetch(s.src, { signal: ctrl.signal, headers: { 'user-agent': 'Mozilla/5.0 (opencli-mcp recon)' } });
+      const res = await fetch(s.src, { signal: ctrl.signal, headers: { 'user-agent': 'Mozilla/5.0 (browsermcp recon)' } });
       if (!res.ok) { entry.error = `HTTP ${res.status}`; return; }
       const text = await res.text();
       entry.bytes = text.length;

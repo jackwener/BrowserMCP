@@ -3,7 +3,7 @@
  * about to act (closed shadow root, pointer-events:none, never intercepts clicks). Real input still comes from CDP.
  */
 
-const ROOT_ID = 'opencli-mcp-overlay-root';
+const ROOT_ID = 'browsermcp-overlay-root';
 let host: HTMLElement | null = null;
 let cursor: HTMLElement | null = null;
 let keeper: MutationObserver | null = null;

@@ -26,7 +26,7 @@ export function createAgentApi(rt: Runtime, sessionId: string): AgentApi {
   const ctx: SessionContext = { rt, sessionId, state };
   // One user, one Chrome — there is no browser fleet to route among; getDefault is the single accessor.
   const getDefault = async (): Promise<Browser> => {
-    if (rt.backend() !== 'extension') throw new ActionError('browser_unavailable', 'No browser backend is connected', 'Run opencli-mcp doctor and keep Chrome with the extension running.');
+    if (rt.backend() !== 'extension') throw new ActionError('browser_unavailable', 'No browser backend is connected', 'Run browsermcp doctor and keep Chrome with the extension running.');
     return new Browser('chrome', 'extension', ctx);
   };
 

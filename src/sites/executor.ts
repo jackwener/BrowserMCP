@@ -50,7 +50,7 @@ export async function runAdapter(
     const args = coerceArgs(cmd.args, rawArgs);
     if (opts.signal?.aborted) throw new ActionError('cancelled', `${key} cancelled by the client`);
     if (!provider.browserAvailable()) {
-      throw new ActionError('browser_unavailable', `${key} needs a logged-in browser, but the Chrome extension is not connected`, 'Install the opencli-mcp extension and keep Chrome running (run `opencli-mcp doctor`).');
+      throw new ActionError('browser_unavailable', `${key} needs a logged-in browser, but the Chrome extension is not connected`, 'Install the browsermcp extension and keep Chrome running (run `browsermcp doctor`).');
     }
     const page = await provider.getAdapterPage(cmd.site);
     const model = await provider.toolContext(page, cmd.site);

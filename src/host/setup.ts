@@ -77,12 +77,15 @@ function registerClients(c: StdioCommand, selected: string[]): ClientRegistratio
     const options = { stdio: 'ignore' as const, timeout: 15_000 };
     let exists = false;
     try {
-      execFileSync(bin, ['mcp', 'get', 'opencli-mcp'], options);
+      execFileSync(bin, ['mcp', 'get', 'browsermcp'], options);
       exists = true;
     } catch { /* No readable registration; let add report any configuration error. */ }
     try {
-      if (exists) execFileSync(bin, ['mcp', 'remove', ...client.scope, 'opencli-mcp'], options);
-      execFileSync(bin, ['mcp', 'add', ...client.scope, 'opencli-mcp', '--', c.command, ...c.args], options);
+      if (exists) execFileSync(bin, ['mcp', 'remove', ...client.scope, 'browsermcp'], options);
+      execFileSync(bin, ['mcp', 'add', ...client.scope, 'browsermcp', '--', c.command, ...c.args], options);
+      let legacyExists = false;
+      try { execFileSync(bin, ['mcp', 'get', 'opencli-mcp'], options); legacyExists = true; } catch { /* No legacy registration. */ }
+      if (legacyExists) execFileSync(bin, ['mcp', 'remove', ...client.scope, 'opencli-mcp'], options);
       results.push({ name: client.name, status: 'registered' });
     } catch { results.push({ name: client.name, status: 'failed' }); }
   }
@@ -127,13 +130,13 @@ export async function setup(opts: { waitMs?: number; noOpen?: boolean; browsers?
     say(`     ${client.name}: ${status}.`);
   }
   if (selected.includes('none')) say('     Skipped; no MCP client settings were changed.');
-  if (selected.includes('manual') || clients.some((client) => client.status === 'failed')) say(`     Manual configuration (Cursor, Claude Desktop, or other clients):\n${JSON.stringify({ mcpServers: { 'opencli-mcp': command } }, null, 2)}`);
+  if (selected.includes('manual') || clients.some((client) => client.status === 'failed')) say(`     Manual configuration (Cursor, Claude Desktop, or other clients):\n${JSON.stringify({ mcpServers: { 'browsermcp': command } }, null, 2)}`);
 
   say('3/3  Checking the Chrome extension connection…');
   let status = await doctor();
   if (!status.ok) {
     const opened = !opts.noOpen && await openStorePage();
-    say(`     ${opened ? 'Opened the Chrome Web Store. Install or enable opencli-mcp in Chrome:' : 'Install or enable opencli-mcp in Chrome:'} ${EXTENSION_STORE_URL}`);
+    say(`     ${opened ? 'Opened the Chrome Web Store. Install or enable BrowserMCP Connector in Chrome:' : 'Install or enable BrowserMCP Connector in Chrome:'} ${EXTENSION_STORE_URL}`);
     say('     Already installed? Keep Chrome open; the extension reconnects automatically.');
     if (waitMs > 0) say(`     Waiting up to ${waitMs / 1000} seconds for the browser connection…`);
     const until = Date.now() + waitMs;
@@ -145,7 +148,7 @@ export async function setup(opts: { waitMs?: number; noOpen?: boolean; browsers?
   if (!status.ok) {
     say('Browser is not connected yet. Your registration has been saved.');
     for (const advice of status.advice) say(`     ${advice}`);
-    say('If the extension is already enabled, disable and re-enable it in chrome://extensions. Then run `opencli-mcp setup` again.');
+    say('If the extension is already enabled, disable and re-enable it in chrome://extensions. Then run `browsermcp setup` again.');
     return false;
   }
   say('Browser connected.');

@@ -18,7 +18,7 @@ function pageModuleSource(): Promise<string> {
 }
 const READY = `(globalThis.${ENGINE_GLOBAL} && globalThis.${PAGE_GLOBAL})`;
 
-const WORLD_NAME = 'opencli-mcp-engine';
+const WORLD_NAME = 'browsermcp-engine';
 const contexts = new Map<string, number>(); // `${tabId}:${frameId}` → engine-world executionContextId
 /** Default (main-world) execution contexts of in-process child frames, reported by Runtime on the root session. */
 const mainContexts = new Map<string, number>();

@@ -1,6 +1,6 @@
 import { EventBuffer } from './event-buffer';
 import type { StreamEntry, StreamReadOptions, StreamBatch } from '../../src/protocol.js';
-// Derived from OpenCLI (https://github.com/jackwener/OpenCLI), Apache-2.0. Adapted for opencli-mcp.
+// Derived from OpenCLI (https://github.com/jackwener/OpenCLI), Apache-2.0. Adapted for browsermcp.
 import type { DownloadWaitResult } from '../../src/protocol.js';
 /**
  * CDP execution via chrome.debugger API.
@@ -310,7 +310,7 @@ async function attachNow(tabId: number, aggressiveRetry: boolean): Promise<void>
     } catch (e: unknown) {
       lastError = e instanceof Error ? e.message : String(e);
       if (attempt < MAX_ATTACH_RETRIES) {
-        console.warn(`[opencli-mcp] attach attempt ${attempt}/${MAX_ATTACH_RETRIES} failed: ${lastError}, retrying in ${RETRY_DELAY_MS}ms...`);
+        console.warn(`[browsermcp] attach attempt ${attempt}/${MAX_ATTACH_RETRIES} failed: ${lastError}, retrying in ${RETRY_DELAY_MS}ms...`);
         await new Promise(resolve => setTimeout(resolve, RETRY_DELAY_MS));
         // Re-verify tab URL before retrying (it may have changed)
         try {
@@ -338,7 +338,7 @@ async function attachNow(tabId: number, aggressiveRetry: boolean): Promise<void>
       finalUrl = tab.url ?? 'undefined';
       finalWindowId = String(tab.windowId);
     } catch { /* tab gone */ }
-    console.warn(`[opencli-mcp] attach failed for tab ${tabId}: url=${finalUrl}, windowId=${finalWindowId}, error=${lastError}`);
+    console.warn(`[browsermcp] attach failed for tab ${tabId}: url=${finalUrl}, windowId=${finalWindowId}, error=${lastError}`);
 
     const hint = lastError.includes('chrome-extension://')
       ? '. Tip: another Chrome extension may be interfering — try disabling other extensions'
@@ -569,7 +569,7 @@ function trackOopifs(source: chrome.debugger.Debuggee, method: string, params: a
 
 /** Auto-attach is armed at tab attach (see attachNow) so OOPIF sessions exist before anyone asks for them. */
 export async function armOopifAutoAttach(tabId: number): Promise<void> {
-  await sendDebuggerCommand({ tabId }, 'Target.setAutoAttach', { autoAttach: true, waitForDebuggerOnStart: false, flatten: true }, 3_000).catch((e) => console.warn(`[opencli-mcp] Target.setAutoAttach failed for tab ${tabId}: ${e instanceof Error ? e.message : String(e)}`));
+  await sendDebuggerCommand({ tabId }, 'Target.setAutoAttach', { autoAttach: true, waitForDebuggerOnStart: false, flatten: true }, 3_000).catch((e) => console.warn(`[browsermcp] Target.setAutoAttach failed for tab ${tabId}: ${e instanceof Error ? e.message : String(e)}`));
 }
 
 /** Sessions we opened ourselves by attaching to the iframe target (the plugin's approach); keyed `${tabId}:${frameId}`. */
@@ -656,7 +656,7 @@ export async function listFrames(tabId: number): Promise<FrameEntry[]> {
         await visit(child, true, depth + 1);
       } catch (e) {
         push({ id, url: '' }, true);
-        console.warn(`[opencli-mcp] frame ${id}: ${e instanceof Error ? e.message : String(e)}`);
+        console.warn(`[browsermcp] frame ${id}: ${e instanceof Error ? e.message : String(e)}`);
       }
     }
   };

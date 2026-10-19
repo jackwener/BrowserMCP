@@ -1,4 +1,4 @@
-import { defineAdapter, errors } from 'opencli-mcp/adapter-sdk';
+import { defineAdapter, errors } from 'browsermcp/adapter-sdk';
 import { mutate, tweetIdFrom, statusUrl } from './_shared.js';
 
 const newId = (d) => d?.data?.create_tweet?.tweet_results?.result?.rest_id;

@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.0.32 — 2026-10-20
+
+- Rename the project, npm package, and CLI to browsermcp; rename the Chrome extension to BrowserMCP Connector (0.0.24).
+- Migrate selected MCP client registrations while retaining the extension ID, native host identity, local data, and legacy adapter SDK imports.
+- Move the repository to jackwener/browsermcp and update setup, documentation, and release artifacts.
+
+Upgrade: npm install -g browsermcp, then browsermcp setup. Reload the extension and reconnect your MCP client.
+
 ## 0.0.31 — 2026-10-20
 
 - Probe browser health before creating MCP sessions. Automatically choose a responsive host when multiple instances share one browserId; preserve already connected sessions.

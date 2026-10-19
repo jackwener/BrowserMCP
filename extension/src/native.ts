@@ -6,7 +6,7 @@
 import type { Command, ExtToHost, HostToExt, Result, BrowserEvent, BrowserFeature } from '../../src/protocol.js';
 import { NATIVE_HOST_NAME, PROTOCOL_REVISION } from '../../src/protocol.js';
 
-const RECONNECT_ALARM = 'opencli-mcp-reconnect';
+const RECONNECT_ALARM = 'browsermcp-reconnect';
 
 export class NativeHost {
   private port: chrome.runtime.Port | null = null;
@@ -47,7 +47,7 @@ export class NativeHost {
       this.status = 'disconnected';
       const lived = Date.now() - openedAt;
       this.attempt++; // any disconnect without a host frame in between counts as a failure (reset happens on messages)
-      if (this.attempt <= 1 || this.attempt % 10 === 0) console.warn(`[opencli-mcp] native host disconnected after ${lived}ms (attempt ${this.attempt})`, err ?? '');
+      if (this.attempt <= 1 || this.attempt % 10 === 0) console.warn(`[browsermcp] native host disconnected after ${lived}ms (attempt ${this.attempt})`, err ?? '');
       this.scheduleReconnect();
     });
     this.status = 'connected';
@@ -72,13 +72,13 @@ export class NativeHost {
 
   send(msg: ExtToHost): void {
     if (!this.port) return;
-    try { this.port.postMessage(msg); } catch (err) { console.warn('[opencli-mcp] postMessage failed', err); }
+    try { this.port.postMessage(msg); } catch (err) { console.warn('[browsermcp] postMessage failed', err); }
   }
   event(event: BrowserEvent): void { this.send({ type: 'event', event }); }
 
   private async handle(msg: HostToExt): Promise<void> {
     if (!msg) return;
-    if (msg.type === 'ready') { console.log(`[opencli-mcp] host ${msg.version} ready`); return; }
+    if (msg.type === 'ready') { console.log(`[browsermcp] host ${msg.version} ready`); return; }
     if (msg.type !== 'command') return;
     const cmd = msg.command;
     let result: Result;

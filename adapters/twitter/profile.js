@@ -1,4 +1,4 @@
-import { defineAdapter, errors } from 'opencli-mcp/adapter-sdk';
+import { defineAdapter, errors } from 'browsermcp/adapter-sdk';
 import { ensureOnX, gql, resolveLoggedInUser, normalizeScreenName, USER_BY_SCREEN_NAME_QUERY_ID, USER_BY_SCREEN_NAME_FEATURES, apiError } from './_shared.js';
 
 const str = (v) => (typeof v === 'string' ? v : '');

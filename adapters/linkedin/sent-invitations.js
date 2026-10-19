@@ -1,4 +1,4 @@
-import { defineAdapter, errors } from 'opencli-mcp/adapter-sdk';
+import { defineAdapter, errors } from 'browsermcp/adapter-sdk';
 import { compact, ensureLinkedIn, linkedinApi, requireElements } from './_shared.js';
 
 export function mapInvitation(element, rank) {

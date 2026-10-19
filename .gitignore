@@ -6,3 +6,4 @@ extension/dist/
 coverage/
 *.tgz
 opencli-mcp-extension-*.zip
+browsermcp-extension-*.zip

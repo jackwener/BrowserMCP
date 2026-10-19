@@ -22,8 +22,8 @@ function renderLauncher({ node, entry }: Installation): string {
     const quote = (value: string): string => `"${value.replaceAll('%', '%%')}"`;
     // Chrome supplies its extension origin (and sometimes a window handle), not a mode.
     return ['@echo off', 'setlocal DisableDelayedExpansion',
-      `if not exist ${quote(node)} (`, '  echo [opencli-mcp] Node runtime missing. Reinstall Node and run opencli-mcp setup. 1>&2', '  exit /b 1', ')',
-      `if not exist ${quote(entry)} (`, '  echo [opencli-mcp] Program entry missing. Reinstall opencli-mcp and run opencli-mcp setup. 1>&2', '  exit /b 1', ')',
+      `if not exist ${quote(node)} (`, '  echo [browsermcp] Node runtime missing. Reinstall Node and run browsermcp setup. 1>&2', '  exit /b 1', ')',
+      `if not exist ${quote(entry)} (`, '  echo [browsermcp] Program entry missing. Reinstall browsermcp and run browsermcp setup. 1>&2', '  exit /b 1', ')',
       'if "%~1"=="stdio" goto stdio',
       `${quote(node)} ${quote(entry)} host %*`, 'exit /b %errorlevel%',
       ':stdio', `${quote(node)} ${quote(entry)} %*`, 'exit /b %errorlevel%', ''].join('\r\n');
@@ -33,11 +33,11 @@ function renderLauncher({ node, entry }: Installation): string {
 node=${quote(node)}
 entry=${quote(entry)}
 if [ ! -x "$node" ]; then
-  printf '%s\\n' "[opencli-mcp] Node runtime missing or not executable: $node. Reinstall Node and run opencli-mcp setup." >&2
+  printf '%s\\n' "[browsermcp] Node runtime missing or not executable: $node. Reinstall Node and run browsermcp setup." >&2
   exit 1
 fi
 if [ ! -r "$entry" ]; then
-  printf '%s\\n' "[opencli-mcp] Program entry missing or unreadable: $entry. Reinstall opencli-mcp and run opencli-mcp setup." >&2
+  printf '%s\\n' "[browsermcp] Program entry missing or unreadable: $entry. Reinstall browsermcp and run browsermcp setup." >&2
   exit 1
 fi
 if [ "\${1-}" = stdio ]; then

@@ -1,5 +1,5 @@
 // Shared helpers for the Bilibili adapters. Files starting with `_` are not commands.
-import { errors } from 'opencli-mcp/adapter-sdk';
+import { errors } from 'browsermcp/adapter-sdk';
 import { createHash } from 'node:crypto';
 import https from 'node:https';
 

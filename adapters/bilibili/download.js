@@ -1,4 +1,4 @@
-import { defineAdapter, errors } from 'opencli-mcp/adapter-sdk';
+import { defineAdapter, errors } from 'browsermcp/adapter-sdk';
 import { ensureOnBili, biliApi, biliApiSigned, resolveBvid, parsePageArg, selectVideoPart } from './_shared.js';
 
 const PAYMENT_LABELS = { vip: 'VIP/paid OGV', ugc_pay: 'paid UGC', upower: 'charge-exclusive' };

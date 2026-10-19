@@ -1,4 +1,4 @@
-# opencli-mcp
+# BrowserMCP
 
 Use `js` as a persistent browser workspace. Pre-bound: `browser` (your logged-in Chrome), `sites`, `tools`, `recon`, `agent`, `session`, and `nodeRepl`. Await API methods; keep Tab handles and working data in variables across calls.
 

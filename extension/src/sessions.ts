@@ -106,7 +106,7 @@ export class SessionManager {
     chrome.tabGroups.onRemoved.addListener((g) => { for (const s of this.sessions.values()) if (s.groupId === g.id) s.groupId = null; });
     chrome.webNavigation.onCreatedNavigationTarget.addListener((d) => {
       const child = this.onChildTab(d.sourceTabId, d.tabId).catch((error) => {
-        console.warn(`[opencli-mcp] child tab ${d.tabId} could not be claimed: ${String(error)}`);
+        console.warn(`[browsermcp] child tab ${d.tabId} could not be claimed: ${String(error)}`);
         return null;
       });
       for (const observer of this.childObservers.get(d.sourceTabId) ?? []) observer(child);
@@ -182,7 +182,7 @@ export class SessionManager {
 
   private async ensureGroup(s: Session, tabId: number): Promise<void> {
     if (s.surface === 'adapter') return; // background adapter runs stay out of the user's tab strip folders
-    const title = s.name ?? 'opencli-mcp';
+    const title = s.name ?? 'BrowserMCP';
     if (s.groupId !== null) {
       try { await chrome.tabs.group({ groupId: s.groupId, tabIds: [tabId] }); return; } catch { s.groupId = null; }
     }
@@ -232,7 +232,7 @@ export class SessionManager {
         tab = await chrome.tabs.get(createdId).catch(() => tab);
         if (navError) throw new SessionError('page_not_loaded', `navigation to ${target} failed: ${navError}`, 'The browser blocked or could not reach the URL (policy, offline, DNS, or an extension). Check chrome://policy and the network.');
         if (!loaded && tab.url === 'about:blank') throw new SessionError('page_not_loaded', `navigation to ${target} did not start`);
-        if (!loaded) console.warn(`[opencli-mcp] tab ${createdId} did not finish loading ${target} within 15s (url=${tab.url ?? ''})`);
+        if (!loaded) console.warn(`[browsermcp] tab ${createdId} did not finish loading ${target} within 15s (url=${tab.url ?? ''})`);
       }
       if (!s.visible) await chrome.tabs.update(createdId, { muted: true }).catch(() => {});
       await this.ensureGroup(s, createdId);

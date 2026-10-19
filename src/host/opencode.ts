@@ -12,5 +12,5 @@ export function registerOpenCode(command: StdioCommand, configHome = process.env
   const jsonc = path.join(dir, 'opencode.jsonc');
   const file = fs.existsSync(json) ? json : fs.existsSync(jsonc) ? jsonc : json;
   const entry = { type: 'local', command: [command.command, ...command.args], enabled: true };
-  return setMcpEntry(file, 'mcp', 'opencli-mcp', entry);
+  return setMcpEntry(file, 'mcp', 'browsermcp', entry, 'opencli-mcp');
 }

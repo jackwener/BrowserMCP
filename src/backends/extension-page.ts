@@ -186,7 +186,7 @@ class ExtensionPage implements ExtensionRuntimePage {
   async evaluateInFrame(js: string, frameIndex: number, timeoutMs?: number): Promise<unknown> { return this.evaluateCommand(js, { frameIndex, timeoutMs }); }
   async cdp(method: string, params?: Record<string, unknown>, target?: { frameId: string }): Promise<unknown> { return (await this.send('cdp', { cdpMethod: method, cdpParams: params, cdpTarget: target })).data; }
 
-  // ── opencli-mcp extras ──
+  // ── browsermcp extras ──
   async nameSession(name: string): Promise<void> { await this.bridge.send('session-name', { ...this.sessionOpts(), name }); }
   async userTabs(options: { query?: string; limit?: number } = {}): Promise<UserTabInfo[]> { const r = await this.bridge.send('user-tabs', { ...this.sessionOpts(), ...options }); return Array.isArray(r.data) ? r.data as UserTabInfo[] : []; }
   async claim(tab: { tabId?: number; active?: boolean; title?: string; url?: string; expectedUrl?: string; expectedTitle?: string }): Promise<{ page: string; tabId: number; url?: string; title?: string }> {

@@ -1,5 +1,5 @@
 /**
- * opencli-mcp host ⇄ extension protocol.
+ * browsermcp host ⇄ extension protocol.
  *
  * Transport: Chrome Native Messaging (4-byte LE length + JSON) between the
  * Chrome-spawned host process and the extension service worker. The host is

@@ -4,14 +4,14 @@ For the recommended npm + Chrome Web Store installation, follow the [README quic
 
 ## What setup does
 
-`npm install -g opencli-mcp` installs the software. `opencli-mcp setup` configures the two connections it needs:
+`npm install -g browsermcp` installs the software. `browsermcp setup` configures the two connections it needs:
 
 1. **Chrome → local program:** writes the Native Messaging registration so Chrome can start the program when the extension connects.
-2. **MCP client → local program:** asks you to select `claude`, `codex`, `opencode`, `pi`, or a combination when their CLIs are on your PATH. Only selected clients are configured; their `opencli-mcp` entry is set to the managed launcher. Other server entries are unchanged. Pi requires `pi-mcp-adapter`. Choose `manual` (the default) for a ready-to-copy configuration using absolute paths, or `none` to configure only the browser connection.
+2. **MCP client → local program:** asks you to select `claude`, `codex`, `opencode`, `pi`, or a combination when their CLIs are on your PATH. Only selected clients are configured; their `browsermcp` entry is set to the managed launcher. Other server entries are unchanged. Pi requires `pi-mcp-adapter`. Choose `manual` (the default) for a ready-to-copy configuration using absolute paths, or `none` to configure only the browser connection.
 
 It then checks the live browser connection. If disconnected, it opens the Chrome Web Store and waits for the extension to connect. The extension retries automatically, so you can install it before or after running setup. Already connected? No store page is opened.
 
-`setup` never installs an extension silently. Add it through the Chrome Web Store or from the manual-install zip in GitHub Releases. Rerunning setup updates the managed launcher. Selecting a client also replaces its `opencli-mcp` entry, so setup can repair an incorrect command.
+`setup` never installs an extension silently. Add it through the Chrome Web Store or from the manual-install zip in GitHub Releases. Rerunning setup updates the managed launcher. Selecting a client also replaces its `browsermcp` entry, so setup can repair an incorrect command.
 
 ### Setup options
 
@@ -20,20 +20,20 @@ In a terminal, enter client IDs separated by commas at the prompt. Press Enter t
 For scripts, select clients explicitly. Without `--clients`, non-interactive setup prints manual configuration and leaves all MCP client settings unchanged:
 
 ```bash
-opencli-mcp setup --clients codex
-opencli-mcp setup --clients claude,codex
-opencli-mcp setup --clients opencode
-opencli-mcp setup --clients pi
-opencli-mcp setup --clients manual  # show configuration for any MCP client
-opencli-mcp setup --clients none    # configure only the browser connection
-opencli-mcp setup --no-open       # print the store link without opening it
-opencli-mcp setup --wait 60       # wait up to 60 seconds (default: 180)
-opencli-mcp setup --no-open --wait 0  # save registration, then check the connection once
+browsermcp setup --clients codex
+browsermcp setup --clients claude,codex
+browsermcp setup --clients opencode
+browsermcp setup --clients pi
+browsermcp setup --clients manual  # show configuration for any MCP client
+browsermcp setup --clients none    # configure only the browser connection
+browsermcp setup --no-open       # print the store link without opening it
+browsermcp setup --wait 60       # wait up to 60 seconds (default: 180)
+browsermcp setup --no-open --wait 0  # save registration, then check the connection once
 ```
 
 A timeout leaves the configuration in place: enable the extension and rerun setup. In particular, `--wait 0` can exit with code **1** after printing `Browser connection registered` and `Your registration has been saved`: registration succeeded, but the extension was not connected at the one-time check. Exit code **0** means both the live connection check and any selected client registrations succeeded. A detected client registration failure is reported as incomplete even if the browser is connected. If a selected CLI is unavailable, setup reports it before writing any configuration. In an interactive terminal, invalid input can be corrected and Ctrl+C cancels without making changes.
 
-`opencli-mcp doctor` checks registration and the live connection without changing settings. It is for troubleshooting; it is not a required setup step.
+`browsermcp doctor` checks registration and the live connection without changing settings. It is for troubleshooting; it is not a required setup step.
 
 ## Stable launch entrypoint
 
@@ -45,18 +45,18 @@ For Homebrew installations, setup uses the corresponding formula's stable `opt` 
 
 ## OpenCode
 
-Run `opencli-mcp setup --clients opencode`. Setup adds a local MCP server to your global OpenCode config (`~/.config/opencode/opencode.json`, or `opencode.jsonc` if that is your existing file). It updates the `opencli-mcp` entry while preserving comments outside that entry and other settings. Restart OpenCode, then use `opencode mcp list` to check the connection. The launcher path is absolute, so OpenCode does not need your terminal's npm `PATH`.
+Run `browsermcp setup --clients opencode`. Setup adds a local MCP server to your global OpenCode config (`~/.config/opencode/opencode.json`, or `opencode.jsonc` if that is your existing file). It updates the `browsermcp` entry while preserving comments outside that entry and other settings. Restart OpenCode, then use `opencode mcp list` to check the connection. The launcher path is absolute, so OpenCode does not need your terminal's npm `PATH`.
 
 ## DeepSeek Harness (dsh)
 
-After installing the Chrome extension and `opencli-mcp` globally, connect the browser without configuring another MCP client, then add the dsh bundle to your active profile:
+After installing the Chrome extension and `browsermcp` globally, connect the browser without configuring another MCP client, then add the dsh bundle to your active profile:
 
 ```bash
-opencli-mcp setup --clients none
-dsh plugin --profile web add opencli-mcp
+browsermcp setup --clients none
+dsh plugin --profile web add browsermcp
 ```
 
-Restart `dsh web`. The main package's bundle inserts one `@deepseek-ai/dsh-mcp-client` entry using the launcher created by setup, so dsh discovers the same MCP tools without depending on npm's `PATH`. Set `OPENCLI_MCP_BIN` only if you need a different executable. To remove the dsh registration, run `dsh plugin --profile web remove opencli-mcp`. Replace `web` with your active dsh profile when needed.
+Restart `dsh web`. The main package's bundle inserts one `@deepseek-ai/dsh-mcp-client` entry using the launcher created by setup, so dsh discovers the same MCP tools without depending on npm's `PATH`. Set `BROWSERMCP_BIN` only if you need a different executable. To remove the dsh registration, run `dsh plugin --profile web remove browsermcp`. Replace `web` with your active dsh profile when needed.
 
 ## Pi
 
@@ -64,7 +64,7 @@ Pi does not include an MCP client. Install the community [pi-mcp-adapter](https:
 
 ```bash
 pi install npm:pi-mcp-adapter
-opencli-mcp setup --clients pi
+browsermcp setup --clients pi
 ```
 
 Restart Pi. Setup adds one entry to Pi's own global `mcp.json` (normally `~/.pi/agent/mcp.json`) using absolute paths, without changing other servers. Use the adapter's `mcp` tool to discover and call browser tools.
@@ -76,13 +76,13 @@ Setup recognizes Chrome, Chromium, Edge, and Brave on macOS and Linux, plus Chro
 Chrome is registered even before its first launch. Other browsers are detected from their existing profile directories, or can be selected explicitly:
 
 ```bash
-opencli-mcp setup --browsers edge --no-open
+browsermcp setup --browsers edge --no-open
 ```
 
 Install the extension in that browser. For a browser launched with a custom user data directory:
 
 ```bash
-opencli-mcp setup --user-data-dir /absolute/path/to/profile
+browsermcp setup --user-data-dir /absolute/path/to/profile
 ```
 
 Setup also detects running custom profiles on macOS and Linux.
@@ -90,8 +90,8 @@ Setup also detects running custom profiles on macOS and Linux.
 ## From source
 
 ```bash
-git clone https://github.com/jackwener/opencli-mcp.git
-cd opencli-mcp
+git clone https://github.com/jackwener/browsermcp.git browsermcp
+cd browsermcp
 npm install
 node dist/src/main.js setup
 ```
@@ -110,21 +110,21 @@ The development manifest uses the published extension's key, so it has the same 
 
 ## Manual extension installation
 
-Starting with v0.0.20, each [GitHub Release](https://github.com/jackwener/opencli-mcp/releases) includes `opencli-mcp-extension-manual-install-<extension-version>.zip`. The extension version is separate from the npm package version.
+Each new [GitHub Release](https://github.com/jackwener/browsermcp/releases) includes `browsermcp-extension-manual-install-<extension-version>.zip`. Older releases use the `opencli-mcp-extension-` filename prefix. The extension version is separate from the npm package version.
 
 1. Download and extract the zip. Select the extracted directory containing `manifest.json`; Chrome cannot load the zip directly.
 2. In `chrome://extensions`, enable **Developer mode**. Disable the Web Store copy if present, then choose **Load unpacked** and select that directory.
-3. Run `opencli-mcp setup --no-open` and `opencli-mcp doctor` to verify the connection.
+3. Run `browsermcp setup --no-open` and `browsermcp doctor` to verify the connection.
 
 Keep the extracted directory in place while using the extension. For an update, extract the newer zip to a stable directory and reload the extension in Chrome. The manual zip includes `manifest.key`, so Chrome uses the same extension ID as the Web Store copy. Do not use the separate Web Store upload zip with **Load unpacked**.
 
 ## From a release tarball
 
-Download a package from [GitHub Releases](https://github.com/jackwener/opencli-mcp/releases), then run:
+Download a package from [GitHub Releases](https://github.com/jackwener/browsermcp/releases), then run:
 
 ```bash
-npm install -g ./opencli-mcp-<version>.tgz
-opencli-mcp setup
+npm install -g ./browsermcp-<version>.tgz
+browsermcp setup
 ```
 
 Install the Chrome extension from the Web Store or use the manual-install zip above.
@@ -132,13 +132,13 @@ Install the Chrome extension from the Web Store or use the manual-install zip ab
 ## Updating
 
 ```bash
-npm install -g opencli-mcp@latest
-opencli-mcp setup
+npm install -g browsermcp@latest
+browsermcp setup
 ```
 
 Homebrew upgrades within the same formula normally need no configuration change: the `opt` path follows the installed version. This assumes the package is still installed at its recorded location. Switching formulas (for example, `node@22` to `node@24`), switching version managers, moving the source checkout, or losing the global npm package requires installing the package under the chosen runtime and rerunning setup. Existing clients using the managed launcher keep the same command.
 
-When configuring a client for the first time with the managed launcher, select it explicitly, for example `opencli-mcp setup --clients claude,codex`. For other clients, copy the configuration printed by `--clients manual`.
+When configuring a client for the first time with the managed launcher, select it explicitly, for example `browsermcp setup --clients claude,codex`. For other clients, copy the configuration printed by `--clients manual`.
 
 Chrome updates the store extension independently. If the old host is still running, disable and re-enable the extension to start the updated program, the running MCP launcher reconnects automatically. Use `doctor` to check both the live connection and the files needed for the next startup.
 
@@ -148,9 +148,11 @@ MCP clients use the managed launcher's standard stdio command. The launcher conn
 
 Each connection owns one MCP/REPL session. Closing the client releases that session's resources. A host restart does not kill the client's stdio connection: the launcher reconnects to the **same browser profile**, reports `session_restarted` before running another tool, and requires fresh REPL bindings and Tab handles. Calls interrupted by a disconnect return an unknown-outcome error and are never automatically replayed.
 
-A single connected browser is selected automatically. If several profiles are connected, `opencli-mcp doctor --json` lists their `browserId` values and endpoints. Set `browserId` in the configuration below, or set `OPENCLI_MCP_BROWSER` in the MCP command's environment, to choose one. Each extension profile keeps its browser ID across host restarts; reinstalling the extension can change it. Once connected, a launcher remains pinned to that browser even if another profile opens or closes.
+A single connected browser is selected automatically. If several profiles are connected, `browsermcp doctor --json` lists their `browserId` values and endpoints. Set `browserId` in the configuration below, or set `BROWSERMCP_BROWSER` in the MCP command's environment, to choose one. Each extension profile keeps its browser ID across host restarts; reinstalling the extension can change it. Once connected, a launcher remains pinned to that browser even if another profile opens or closes.
 
 ## Configuration
+
+The legacy `OPENCLI_MCP_BROWSER` and `OPENCLI_MCP_BIN` variables remain supported when the corresponding `BROWSERMCP_*` variable is unset.
 
 Settings live in `~/.opencli-mcp/config.json`. For example:
 
@@ -175,16 +177,16 @@ The same state directory contains one discovery record per host under `run/<inst
 
 ## Troubleshooting
 
-Run `opencli-mcp doctor` first. It reports startup dependencies, browser registration, and whether the local host and extension are connected, with recovery steps for failures. Use `doctor --json` for machine-readable diagnostics.
+Run `browsermcp doctor` first. It reports startup dependencies, browser registration, and whether the local host and extension are connected, with recovery steps for failures. Use `doctor --json` for machine-readable diagnostics.
 
 | Symptom | What to check |
 |---|---|
 | `Specified native messaging host not found.` | Chrome cannot find its Native Messaging registration; follow the [Windows recovery path](#windows-native-messaging-recovery) below |
 | `browser_unavailable` or host unreachable | Keep Chrome running, enable the extension, and verify the host registration |
-| Web Store extension cannot connect | Run `opencli-mcp setup`; if it stays disconnected, disable and re-enable the extension |
+| Web Store extension cannot connect | Run `browsermcp setup`; if it stays disconnected, disable and re-enable the extension |
 | No host manifest was written | Rerun `setup`; for custom profiles, pass `--user-data-dir` |
-| Node runtime or program entry missing | Install Node/package as needed, then run `opencli-mcp setup`; select clients if their commands also need repair |
-| MCP client cannot find `opencli-mcp` | Use the absolute executable path in the client configuration |
+| Node runtime or program entry missing | Install Node/package as needed, then run `browsermcp setup`; select clients if their commands also need repair |
+| MCP client cannot find `browsermcp` | Use the absolute executable path in the client configuration |
 | Development changes do not appear | Rebuild the extension and click **Reload** on the extensions page |
 
 For runtime errors such as `dialog_open` or stale tabs, see [browser troubleshooting](troubleshooting.md) and [error codes](errors.md).
@@ -194,19 +196,19 @@ For runtime errors such as `dialog_open` or stale tabs, see [browser troubleshoo
 Chrome may report:
 
 ```text
-[opencli-mcp] native host disconnected after 4ms (attempt 1) Specified native messaging host not found.
+[browsermcp] native host disconnected after 4ms (attempt 1) Specified native messaging host not found.
 ```
 
 An enabled MCP client entry does not establish the browser connection. The two connections are separate: the MCP client launches the MCP transport, while Chrome locates and launches the Native Messaging host through its own registration. On Windows, setup writes the host manifest and launcher, and registers the manifest path under `HKCU\Software\Google\Chrome\NativeMessagingHosts\com.opencli.mcp` for the current Windows user. Run setup as the same user who runs Chrome; administrator access is not required.
 
-1. If using an old package, update it with `npm install -g opencli-mcp@latest`. After an update or a Node.js installation change, refresh the browser registration:
+1. If using an old package, update it with `npm install -g browsermcp@latest`. After an update or a Node.js installation change, refresh the browser registration:
 
    ```powershell
-   opencli-mcp setup --clients none --no-open --wait 0
-   opencli-mcp doctor --json
+   browsermcp setup --clients none --no-open --wait 0
+   browsermcp doctor --json
    ```
 
-   `--clients none` preserves existing MCP client settings. Use `opencli-mcp setup` instead if the client also needs configuring. Check the setup output: exit code 1 together with `Your registration has been saved` means the live browser connection is still pending, not that registration was rolled back.
+   `--clients none` preserves existing MCP client settings. Use `browsermcp setup` instead if the client also needs configuring. Check the setup output: exit code 1 together with `Your registration has been saved` means the live browser connection is still pending, not that registration was rolled back.
 
 2. Interpret the diagnostics by stage:
 
@@ -220,7 +222,7 @@ An enabled MCP client entry does not establish the browser connection. The two c
 
    For an unpacked extension, use **Reload** after updating its files. Chrome Web Store extensions update separately from the npm package.
 
-3. Run `opencli-mcp doctor` again after reconnecting. If Chrome still says `Specified native messaging host not found.`, inspect the registration from the same Windows account:
+3. Run `browsermcp doctor` again after reconnecting. If Chrome still says `Specified native messaging host not found.`, inspect the registration from the same Windows account:
 
    ```powershell
    reg query "HKCU\Software\Google\Chrome\NativeMessagingHosts\com.opencli.mcp" /ve

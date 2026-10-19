@@ -12,4 +12,4 @@ if (end < 0) end = lines.length;
 const body = lines.slice(start + 1, end).join('\n').trim();
 if (!body) throw new Error(`CHANGELOG.md has no notes for ${version}`);
 const extensionVersion = JSON.parse(readFileSync('extension/manifest.json', 'utf8')).version;
-process.stdout.write(`${body}\n\n### Manual Chrome extension installation\n\nDownload \`opencli-mcp-extension-manual-install-${extensionVersion}.zip\`, extract it, then open \`chrome://extensions\`, enable Developer mode, and choose **Load unpacked** on the extracted folder. Disable the Chrome Web Store copy first if it is installed.\n`);
+process.stdout.write(`${body}\n\n### Manual Chrome extension installation\n\nDownload \`browsermcp-extension-manual-install-${extensionVersion}.zip\`, extract it, then open \`chrome://extensions\`, enable Developer mode, and choose **Load unpacked** on the extracted folder. Disable the Chrome Web Store copy first if it is installed.\n`);

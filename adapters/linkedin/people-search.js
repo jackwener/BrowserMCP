@@ -1,4 +1,4 @@
-import { defineAdapter, errors } from 'opencli-mcp/adapter-sdk';
+import { defineAdapter, errors } from 'browsermcp/adapter-sdk';
 import { compact, ensureLinkedIn, integer, linkedinApi } from './_shared.js';
 
 const QUERY_ID = 'voyagerSearchDashClusters.e438ab99259203e9c1cd3f358e217282';

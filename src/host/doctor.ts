@@ -62,9 +62,9 @@ export async function doctor(): Promise<DoctorResult> {
   }
   const advice: string[] = [];
   const registered = manifests.some((m) => m.present && m.launcherExists && m.launcherMatches && m.authorized);
-  if (!registered) advice.push('Run `opencli-mcp setup` to register or repair the browser connection.');
-  for (const d of running) if (!manifests.find((m) => m.browser === `profile:${d}`)?.present) advice.push(`Chrome is running with --user-data-dir=${d} but that profile has no host manifest: run \`opencli-mcp setup\` (it writes to running profiles automatically) and reload the extension there.`);
-  if (!launch.ready) advice.push(...launch.errors, 'Run `opencli-mcp setup` from a working Node installation to repair startup. If the package is missing, reinstall opencli-mcp first.');
+  if (!registered) advice.push('Run `browsermcp setup` to register or repair the browser connection.');
+  for (const d of running) if (!manifests.find((m) => m.browser === `profile:${d}`)?.present) advice.push(`Chrome is running with --user-data-dir=${d} but that profile has no host manifest: run \`browsermcp setup\` (it writes to running profiles automatically) and reload the extension there.`);
+  if (!launch.ready) advice.push(...launch.errors, 'Run `browsermcp setup` from a working Node installation to repair startup. If the package is missing, reinstall browsermcp first.');
   if (selectionRequired) advice.push(error!);
   else if (launch.ready && !health.ok) advice.push(`Host not reachable (${health.error ?? 'unknown'}). Open Chrome and install or enable the extension: ${EXTENSION_STORE_URL}. It reconnects automatically; if it stays disconnected, disable and re-enable it in chrome://extensions.`);
   else if (health.ok && !health.extensionConnected) advice.push('Host is running but the browser is not connected. Enable the extension in Chrome; if it stays disconnected, disable and re-enable it in chrome://extensions.');

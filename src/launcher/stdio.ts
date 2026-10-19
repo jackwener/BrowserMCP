@@ -10,12 +10,12 @@ import { buildInstructions } from '../docs/manifest.js';
 import { localCatalog } from '../mcp/catalog.js';
 
 export async function runStdio(opts: { version: string }): Promise<void> {
-  const log = (m: string): void => { process.stderr.write(`[opencli-mcp] ${m}\n`); };
+  const log = (m: string): void => { process.stderr.write(`[browsermcp] ${m}\n`); };
   await proxyToHost(opts.version, log);
 }
 
 async function proxyToHost(version: string, log: (m: string) => void): Promise<void> {
-  let browserId = process.env.OPENCLI_MCP_BROWSER ?? readConfig().browserId;
+  let browserId = process.env.BROWSERMCP_BROWSER ?? process.env.OPENCLI_MCP_BROWSER ?? readConfig().browserId;
   let hasConnected = false;
   let sessionRestarted = false;
   const catalog = await localCatalog(version);
@@ -71,7 +71,7 @@ async function proxyToHost(version: string, log: (m: string) => void): Promise<v
     content: [{ type: 'text' as const, text: JSON.stringify({ ok: false, error: { code, message, ...(hint && { hint }), retryable } }) }], isError: true,
   });
 
-  server = new Server({ name: 'opencli-mcp', version }, {
+  server = new Server({ name: 'browsermcp', version }, {
     capabilities: { tools: { listChanged: true }, resources: { listChanged: true }, prompts: { listChanged: true }, logging: {} },
     instructions: buildInstructions({ backend: 'extension', capabilities: [] }),
   });

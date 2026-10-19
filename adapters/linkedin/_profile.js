@@ -1,4 +1,4 @@
-import { errors } from 'opencli-mcp/adapter-sdk';
+import { errors } from 'browsermcp/adapter-sdk';
 import { compact, linkedinApi, requireElements } from './_shared.js';
 
 export function profileIdentity(value) {

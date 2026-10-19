@@ -1,5 +1,5 @@
 // Adapted from OpenCLI 1.8.7 (https://github.com/jackwener/opencli), Apache-2.0.
-// Kept only the page scripts used by opencli-mcp; see LICENSE.
+// Kept only the page scripts used by browsermcp; see LICENSE.
 
 /**
  * Wrap JS code for CDP Runtime.evaluate:

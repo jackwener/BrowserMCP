@@ -1,4 +1,4 @@
-import { defineAdapter, errors } from 'opencli-mcp/adapter-sdk';
+import { defineAdapter, errors } from 'browsermcp/adapter-sdk';
 import { compact, ensureLinkedIn, linkedinApi } from './_shared.js';
 
 export function jobId(value) {

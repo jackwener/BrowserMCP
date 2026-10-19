@@ -1,4 +1,4 @@
-import { defineAdapter, errors } from 'opencli-mcp/adapter-sdk';
+import { defineAdapter, errors } from 'browsermcp/adapter-sdk';
 import { ensureMarketplace, marketplaceQuery, textOf } from './_marketplace.js';
 
 const QUERIES = {

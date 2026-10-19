@@ -26,7 +26,7 @@ export interface RuntimePage {
   evaluateInFrame(js: string, frameIndex: number, timeoutMs?: number): Promise<unknown>;
   getCurrentUrl(): Promise<string | null>;
   evaluateWithArgs(js: string, args: Record<string, unknown>): Promise<unknown>;
-  /** opencli-mcp extras */
+  /** browsermcp extras */
   readonly session: string;
   readonly surface: 'browser' | 'adapter';
   /** The interaction engine at this backend's edge (locate → wait → hit-test → real input → settle). */

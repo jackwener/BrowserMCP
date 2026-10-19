@@ -1,12 +1,12 @@
 #!/usr/bin/env node
 /**
- * opencli-mcp — entry point.
- *   opencli-mcp                 stdio MCP (proxies to the Chrome-spawned host)
- *   opencli-mcp host            the Native Messaging host (spawned by Chrome; do not run by hand)
- *   opencli-mcp setup           register browser + MCP clients, guide Web Store installation, verify connection
- *   opencli-mcp uninstall
- *   opencli-mcp doctor
- *   opencli-mcp extension-path  print the unpacked extension directory
+ * browsermcp — entry point.
+ *   browsermcp                 stdio MCP (proxies to the Chrome-spawned host)
+ *   browsermcp host            the Native Messaging host (spawned by Chrome; do not run by hand)
+ *   browsermcp setup           register browser + MCP clients, guide Web Store installation, verify connection
+ *   browsermcp uninstall
+ *   browsermcp doctor
+ *   browsermcp extension-path  print the unpacked extension directory
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -16,7 +16,7 @@ import { parseArgs } from 'node:util';
 const here = path.dirname(fileURLToPath(import.meta.url));
 function findVersion(): string {
   let dir = here;
-  for (let i = 0; i < 6; i++) { const pkg = path.join(dir, 'package.json'); try { const j = JSON.parse(fs.readFileSync(pkg, 'utf8')) as { name?: string; version?: string }; if (j.name === 'opencli-mcp' && j.version) return j.version; } catch { /* walk */ } dir = path.dirname(dir); }
+  for (let i = 0; i < 6; i++) { const pkg = path.join(dir, 'package.json'); try { const j = JSON.parse(fs.readFileSync(pkg, 'utf8')) as { name?: string; version?: string }; if (j.name === 'browsermcp' && j.version) return j.version; } catch { /* walk */ } dir = path.dirname(dir); }
   return '0.0.0';
 }
 const VERSION = findVersion();
@@ -25,7 +25,7 @@ const argv = process.argv.slice(2);
 const cmd = argv[0] ?? (process.stdin.isTTY ? 'help' : 'stdio');
 const has = (name: string): boolean => argv.includes(name);
 
-const HELP = `Usage: opencli-mcp <command>
+const HELP = `Usage: browsermcp <command>
 
   setup                 Connect Chrome and configure MCP clients
   doctor [--json]        Check the browser connection without changing settings
@@ -111,4 +111,4 @@ async function main(): Promise<void> {
   }
 }
 
-main().catch((err) => { process.stderr.write(`[opencli-mcp] ${cmd === 'setup' || cmd === 'doctor' ? (err as Error).message : (err as Error).stack ?? err}\n`); process.exit(1); });
+main().catch((err) => { process.stderr.write(`[browsermcp] ${cmd === 'setup' || cmd === 'doctor' ? (err as Error).message : (err as Error).stack ?? err}\n`); process.exit(1); });

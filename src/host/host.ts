@@ -11,7 +11,7 @@ import { startIpcServer } from './ipc.js';
 import { clearHostState, readConfig, writeHostState } from './state.js';
 
 export async function runNativeHost(opts: { version: string }): Promise<void> {
-  const log = (m: string): void => { process.stderr.write(`[opencli-mcp host] ${m}\n`); };
+  const log = (m: string): void => { process.stderr.write(`[browsermcp host] ${m}\n`); };
   // stdout belongs to Native Messaging: route every other stdout write (console.log, library logs) to stderr
   const rawWrite = process.stdout.write.bind(process.stdout);
   const frames = new Writable({ write(chunk, _enc, cb) { rawWrite(chunk as Buffer, cb); } });

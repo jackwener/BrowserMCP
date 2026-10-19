@@ -35,7 +35,7 @@ export function createMcpServer(rt: Runtime, sessionId: string, opts: { version?
   const api = createAgentApi(rt, sessionId);
   const state = rt.session(sessionId);
   const docCtx = (): DocContext => ({ backend: rt.backend(), capabilities: rt.features() });
-  const server = new McpServer({ name: 'opencli-mcp', version: opts.version ?? '0.0.0' }, {
+  const server = new McpServer({ name: 'browsermcp', version: opts.version ?? '0.0.0' }, {
     capabilities: { tools: { listChanged: true }, resources: { listChanged: true }, prompts: {}, logging: {} },
     instructions: buildInstructions(docCtx()),
   });
@@ -165,7 +165,7 @@ export function createMcpServer(rt: Runtime, sessionId: string, opts: { version?
   rt.on('tools-changed', onToolsChanged);
   const onFeaturesChanged = (): void => { if (server.isConnected()) server.sendResourceListChanged(); };
   rt.on('features-changed', onFeaturesChanged);
-  const onLog = (msg: string): void => { if (server.isConnected()) void server.sendLoggingMessage({ level: 'info', logger: 'opencli-mcp', data: msg }).catch(() => {}); };
+  const onLog = (msg: string): void => { if (server.isConnected()) void server.sendLoggingMessage({ level: 'info', logger: 'browsermcp', data: msg }).catch(() => {}); };
   rt.on('log', onLog);
   const onBrowserEvent = (e: { kind: string; session?: string }): void => {
     if (!server.isConnected()) return;

@@ -1,8 +1,8 @@
 /** One adapter argument contract drives discovery, MCP schemas, and runtime validation. */
 import { z, type ZodTypeAny } from 'zod';
 import { ActionError } from '../api/errors.js';
-import type { Arg, ArgValue } from 'opencli-mcp/adapter-sdk';
-export type { Arg } from 'opencli-mcp/adapter-sdk';
+import type { Arg, ArgValue } from 'browsermcp/adapter-sdk';
+export type { Arg } from 'browsermcp/adapter-sdk';
 
 export type ArgView = Arg;
 

@@ -1,4 +1,4 @@
-import { defineAdapter, errors } from 'opencli-mcp/adapter-sdk';
+import { defineAdapter, errors } from 'browsermcp/adapter-sdk';
 import { ensureOnX, rest, resolveUserId, normalizeScreenName } from './_shared.js';
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));

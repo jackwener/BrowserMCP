@@ -1,4 +1,4 @@
-import { errors } from 'opencli-mcp/adapter-sdk';
+import { errors } from 'browsermcp/adapter-sdk';
 import { facebookGraphql } from './_graphql.js';
 
 const HOME = 'https://www.facebook.com/';

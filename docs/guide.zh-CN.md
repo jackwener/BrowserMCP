@@ -1,20 +1,20 @@
-# opencli-mcp 中文指南
+# BrowserMCP 中文指南
 
-opencli-mcp 是一个连接到真实 Chrome 的 MCP browser service。Chrome extension 负责 tab、CDP 和页面操作；本地 host 把这些能力提供给 MCP client。site Adapter 是建立在同一个 browser API 之上的可选能力，用来封装经过验证的站点操作。
+BrowserMCP 是一个连接到真实 Chrome 的 MCP browser service。Chrome extension 负责 tab、CDP 和页面操作；本地 host 把这些能力提供给 MCP client。site Adapter 是建立在同一个 browser API 之上的可选能力，用来封装经过验证的站点操作。
 
 ## 安装
 
 需要 Node.js 22+、Google Chrome 和一个 MCP client。
 
-1. 从 [Chrome Web Store](https://chromewebstore.google.com/detail/opencli-mcp/lnaoghmfcdnbhgcihkakfobckmfhllkg) 安装 extension。
-2. 在终端运行 `npm install -g opencli-mcp`，然后运行 `opencli-mcp setup`。
-3. 按提示选择要配置的 MCP client。重启或重新连接 client 后即可使用。`opencli-mcp doctor` 只检查启动依赖与连接状态，不修改配置。
+1. 从 [Chrome Web Store](https://chromewebstore.google.com/detail/opencli-mcp/lnaoghmfcdnbhgcihkakfobckmfhllkg) 安装 **BrowserMCP Connector**。
+2. 在终端运行 `npm install -g browsermcp`，然后运行 `browsermcp setup`。
+3. 按提示选择要配置的 MCP client。重启或重新连接 client 后即可使用。`browsermcp doctor` 只检查启动依赖与连接状态，不修改配置。
 
-`setup` 注册 Chrome Native Messaging host，按你的选择配置 MCP client，并等待 extension 连接。所选 client 的 `opencli-mcp` entry 会更新为固定的 launcher 路径，其他 server entry 保持不变。Homebrew 同一 formula 内升级时，launcher 使用稳定的 `opt` 路径；切换 Node 安装或移动 package 后，重新运行 setup 即可更新启动路径。它不会自动安装 extension。详细选项与排障步骤见 [安装说明](setup.md)。
+`setup` 注册 Chrome Native Messaging host，按你的选择配置 MCP client，并等待 extension 连接。所选 client 的 `browsermcp` entry 会更新为固定的 launcher 路径，其他 server entry 保持不变。Homebrew 同一 formula 内升级时，launcher 使用稳定的 `opt` 路径；切换 Node 安装或移动 package 后，重新运行 setup 即可更新启动路径。它不会自动安装 **BrowserMCP Connector**。详细选项与排障步骤见 [安装说明](setup.md)。
 
-使用 DeepSeek Harness (`dsh`) 时，先运行 `opencli-mcp setup --clients none`，再运行 `dsh plugin --profile web add opencli-mcp`。主包内的 bundle 通过 dsh 自带的 MCP client 接入 browser service；具体说明见 [dsh 安装步骤](setup.md#deepseek-harness-dsh)。
+使用 DeepSeek Harness (`dsh`) 时，先运行 `browsermcp setup --clients none`，再运行 `dsh plugin --profile web add browsermcp`。主包内的 bundle 通过 dsh 自带的 MCP client 接入 browser service；具体说明见 [dsh 安装步骤](setup.md#deepseek-harness-dsh)。
 
-使用 OpenCode 时，运行 `opencli-mcp setup --clients opencode`；使用 Pi 时，先安装 `pi-mcp-adapter`，再运行 `opencli-mcp setup --clients pi`。具体见 [OpenCode 与 Pi 安装步骤](setup.md#opencode)。
+使用 OpenCode 时，运行 `browsermcp setup --clients opencode`；使用 Pi 时，先安装 `pi-mcp-adapter`，再运行 `browsermcp setup --clients pi`。具体见 [OpenCode 与 Pi 安装步骤](setup.md#opencode)。
 
 ## Browser 工作流
 
@@ -43,3 +43,7 @@ MCP client → stdio launcher → local host ⇄ Chrome extension → website
 MCP client 通过 stdio 连接 launcher，launcher 通过本地 Unix domain socket（Windows 使用 named pipe）连接 host，不提供远程 MCP 或 HTTP 服务。host 由 Chrome 通过 Native Messaging 启动；extension 管理 tab lease、CDP 附着和虚拟光标。每个 MCP client 使用独立的 tab 与 JavaScript session，避免相互清理。`src/api/` 是 browser object model，`src/mcp/` 暴露 MCP tools 与 `js`，`src/sites/` 加载和执行 Adapter。
 
 开发构建与测试命令见 [README](../README.md#development)。Browser 操作的错误代码见 [错误说明](errors.md)，`js` API 见 [生成的参考](api-reference.md)。
+
+## 从 opencli-mcp 升级
+
+安装 `browsermcp` 后重新运行 `browsermcp setup`，所选 MCP client 的旧 entry 会迁移为 `browsermcp`；手动配置的 client 需要自行更新。extension 保留原 Web Store ID，`~/.opencli-mcp`、固定 launcher 和 Native Messaging 标识保持兼容。旧 adapters 的 `opencli-mcp/adapter-sdk` import 仍可使用。

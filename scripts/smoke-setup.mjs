@@ -6,6 +6,7 @@ import path from 'node:path';
 import { spawn, execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { once } from 'node:events';
+import { pathToFileURL } from 'node:url';
 import { Client } from '@modelcontextprotocol/client';
 import { StdioClientTransport } from '@modelcontextprotocol/client/stdio';
 
@@ -60,17 +61,18 @@ child.execFileSync = (file, args) => {
     const statePath = path.join(root, 'clients.json');
     const state = JSON.parse(fs.readFileSync(statePath, 'utf8'));
     if (args[1] === 'get') {
-      if (state[file]) return JSON.stringify(state[file]);
+      if (state[file + ':' + args[2]]) return JSON.stringify(state[file + ':' + args[2]]);
       throw new Error('not registered');
     }
     if (args[1] === 'remove') {
-      delete state[file];
+      delete state[file + ':' + args.at(-1)];
       fs.writeFileSync(statePath, JSON.stringify(state));
       return '';
     }
     if (args[1] === 'add') {
-      if (state[file]) throw new Error('remove the existing entry before adding');
-      state[file] = args;
+      const key = file + ':' + args[args.indexOf('--') - 1];
+      if (state[key]) throw new Error('remove the existing entry before adding');
+      state[key] = args;
       fs.writeFileSync(statePath, JSON.stringify(state));
       return '';
     }
@@ -147,7 +149,7 @@ try {
   assert(cancelled.includes('cancelled'));
   assert.equal(fs.readFileSync(clientState, 'utf8'), '{}');
   await interactive('codex\n');
-  assert.deepEqual(Object.keys(JSON.parse(fs.readFileSync(clientState, 'utf8'))), ['/fake/codex']);
+  assert.deepEqual(Object.keys(JSON.parse(fs.readFileSync(clientState, 'utf8'))), ['/fake/codex:browsermcp']);
   await cli(['setup', '--clients', 'claude', '--no-open', '--wait', '0'], 1);
   const clients = fs.readFileSync(clientState, 'utf8');
   const entries = JSON.parse(clients);
@@ -190,7 +192,7 @@ try {
   assert(connected.advice.some((line) => line.startsWith('Warning: Extension protocol')));
   assert(!('built' in connected.extension));
   // Replace stale selected commands; do not confuse entry existence with correctness.
-  fs.writeFileSync(clientState, JSON.stringify({ '/fake/codex': ['stale'], '/fake/claude': ['stale'] }));
+  fs.writeFileSync(clientState, JSON.stringify({ '/fake/codex:opencli-mcp': ['stale'], '/fake/claude:opencli-mcp': ['stale'] }));
   const repeated = await cli(['setup', '--clients', 'claude,codex', '--no-open', '--wait', '0']);
   assert(repeated.includes('Setup complete'));
   assert(!repeated.includes('chromewebstore.google.com'));
@@ -202,6 +204,7 @@ try {
   mcp = new Client({ name: 'setup-e2e', version: '0.0.0' });
   await mcp.connect(transport);
   const tools = await mcp.listTools();
+  assert.equal(mcp.getServerVersion().name, 'browsermcp');
   assert(tools.tools.some((tool) => tool.name === 'js'));
   assert(tools.tools.some((tool) => tool.name === 'doctor'));
   const js = async code => {
@@ -214,6 +217,14 @@ try {
   await mcp.close();
   mcp = null;
   console.log('PASS MCP: registered command executes persistent JavaScript and recovers after errors through the native host');
+
+  // Existing adapters must resolve the SDK even after the old package is removed.
+  const legacyAdapter = path.join(stateDir, 'adapters', 'legacy-check.js');
+  fs.writeFileSync(legacyAdapter, "import { defineAdapter } from 'opencli-mcp/adapter-sdk'; export default defineAdapter({description:'legacy',access:'read',args:[],run:async()=>42});");
+  const legacyResult = await exec(process.execPath, ['--input-type=module', '-e',
+    `const {default: adapter} = await import(${JSON.stringify(pathToFileURL(legacyAdapter).href)}); console.log(await adapter.run());`], { env });
+  assert.equal(legacyResult.stdout.trim(), '42');
+  console.log('PASS rename: MCP identity and legacy adapter SDK imports');
 
   // A live connection must not hide a broken on-disk registration; setup repairs it.
   manifest.allowed_origins = [];
@@ -249,7 +260,7 @@ try {
   await exec(process.execPath, ['--import', preload, '--input-type=module', '-e',
     `import { writeLauncher } from ${JSON.stringify(launchModule)}; writeLauncher(${JSON.stringify(stagedEntry)});`], { env });
   const forwarded = await exec(manifest.path, ['stdio', '--help'], { env: launcherEnv, timeout: 5000 });
-  assert.match(forwarded.stdout, /Usage: opencli-mcp/);
+  assert.match(forwarded.stdout, /Usage: browsermcp/);
   fs.rmSync(stagedEntry);
   const missingEntry = JSON.parse(await cli(['doctor', '--json'], 1));
   assert.equal(missingEntry.host.extensionConnected, true);
@@ -291,7 +302,8 @@ try {
     assert(text.includes('// keep my settings'));
     assert.equal(config.theme, 'dark');
     assert.equal(config[section].other.command, 'other');
-    const own = config[section]['opencli-mcp'];
+    assert.equal(config[section]['opencli-mcp'], undefined);
+    const own = config[section]['browsermcp'];
     assert.deepEqual(section === 'mcp' ? own.command : [own.command, ...own.args], [manifest.path, 'stdio']);
   }
   assert.equal(registerOpenCode(command, configHome), 'existing');

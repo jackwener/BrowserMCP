@@ -1,4 +1,4 @@
-import { errors } from 'opencli-mcp/adapter-sdk';
+import { errors } from 'browsermcp/adapter-sdk';
 
 const ORIGIN = 'https://www.facebook.com';
 const SEARCH_OPERATION = 'SearchCometResultsPaginatedResultsQuery';

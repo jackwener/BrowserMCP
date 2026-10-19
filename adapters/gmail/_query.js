@@ -1,4 +1,4 @@
-import { defineAdapter, errors } from 'opencli-mcp/adapter-sdk';
+import { defineAdapter, errors } from 'browsermcp/adapter-sdk';
 import { accountNumber, gmailBatchView, parseBatchView } from './_shared.js';
 
 export function fixedQueryAdapter(name, query) {

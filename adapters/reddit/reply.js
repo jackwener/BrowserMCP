@@ -1,4 +1,4 @@
-import { defineAdapter, errors } from 'opencli-mcp/adapter-sdk';
+import { defineAdapter, errors } from 'browsermcp/adapter-sdk';
 import { ensureOnReddit, redditPost, toCommentFullname } from './_shared.js';
 
 export default defineAdapter({

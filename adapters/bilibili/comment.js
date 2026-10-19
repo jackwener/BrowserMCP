@@ -1,4 +1,4 @@
-import { defineAdapter, errors } from 'opencli-mcp/adapter-sdk';
+import { defineAdapter, errors } from 'browsermcp/adapter-sdk';
 import { ensureOnBili, biliApi, biliPost, resolveBvid, resolveUid } from './_shared.js';
 
 export default defineAdapter({

@@ -9,7 +9,7 @@ export async function localCatalog(version: string) {
   const rt = new Runtime();
   const session = createMcpServer(rt, 'catalog', { version });
   const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
-  const client = new Client({ name: 'opencli-mcp-catalog', version }, { capabilities: {} });
+  const client = new Client({ name: 'browsermcp-catalog', version }, { capabilities: {} });
   try {
     await session.server.connect(serverTransport);
     await client.connect(clientTransport);

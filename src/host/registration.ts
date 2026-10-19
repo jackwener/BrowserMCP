@@ -13,10 +13,10 @@ export function projectRoot(): string {
   let dir = path.dirname(fileURLToPath(import.meta.url));
   for (let i = 0; i < 6; i++) {
     const pkg = path.join(dir, 'package.json');
-    try { if ((JSON.parse(fs.readFileSync(pkg, 'utf8')) as { name?: string }).name === 'opencli-mcp') return dir; } catch { /* keep walking */ }
+    try { if ((JSON.parse(fs.readFileSync(pkg, 'utf8')) as { name?: string }).name === 'browsermcp') return dir; } catch { /* keep walking */ }
     dir = path.dirname(dir);
   }
-  throw new Error('opencli-mcp project root not found');
+  throw new Error('browsermcp project root not found');
 }
 export function extensionDir(): string {
   const root = projectRoot();
@@ -76,7 +76,7 @@ export function registerHost(opts: { browsers?: string[]; userDataDirs?: string[
   const unknown = opts.browsers?.filter((browser) => !supported.some((target) => target.browser === browser));
   if (unknown?.length) throw new Error(`Unknown browser(s): ${unknown.join(', ')}. Supported: ${supported.map((target) => target.browser).join(', ')}.`);
   const launcher = writeLauncher(path.join(projectRoot(), 'dist', 'src', 'main.js'));
-  const manifest = { name: NATIVE_HOST_NAME, description: 'opencli-mcp browser runtime host', path: launcher, type: 'stdio', allowed_origins: [`chrome-extension://${EXTENSION_ID}/`] };
+  const manifest = { name: NATIVE_HOST_NAME, description: 'browsermcp browser runtime host', path: launcher, type: 'stdio', allowed_origins: [`chrome-extension://${EXTENSION_ID}/`] };
   const manifests: Array<{ browser: string; file: string; written: boolean }> = [];
   // Chrome resolves user-level hosts relative to its user data dir: custom --user-data-dir profiles get their own copy
   const profiles = new Set([...(opts.userDataDirs ?? []), ...runningProfileDirs()]);

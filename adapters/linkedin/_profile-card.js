@@ -1,4 +1,4 @@
-import { errors } from 'opencli-mcp/adapter-sdk';
+import { errors } from 'browsermcp/adapter-sdk';
 import { compact, linkedinApi } from './_shared.js';
 
 export function profileCardUrn(profile, type) {

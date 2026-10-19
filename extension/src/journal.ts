@@ -1,4 +1,4 @@
-// Derived from OpenCLI (https://github.com/jackwener/OpenCLI), Apache-2.0. Adapted for opencli-mcp.
+// Derived from OpenCLI (https://github.com/jackwener/OpenCLI), Apache-2.0. Adapted for browsermcp.
 /**
  * Command journal — the executor-side half of the transport's retry contract.
  *

@@ -1,4 +1,4 @@
-import { defineAdapter, errors } from 'opencli-mcp/adapter-sdk';
+import { defineAdapter, errors } from 'browsermcp/adapter-sdk';
 import { ensureMarketplace, marketplaceQuery, textOf } from './_marketplace.js';
 
 const ACTIVE = ['MarketplaceYouSellingFastActiveSectionPaginationQuery', '8133580450085625', 'marketplace_listing_sets'];

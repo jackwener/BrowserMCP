@@ -1,4 +1,4 @@
-import { defineAdapter, errors } from 'opencli-mcp/adapter-sdk';
+import { defineAdapter, errors } from 'browsermcp/adapter-sdk';
 import { ensureOnX, gql, resolveUserId, normalizeScreenName, apiError } from './_shared.js';
 
 const LIST_REMOVE_MEMBER_QUERY_ID = 'Com5Rc7DZWUC5EPWTZjvXQ';

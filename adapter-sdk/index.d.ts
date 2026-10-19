@@ -1,4 +1,4 @@
-// opencli-mcp/adapter-sdk — the adapter contract (types). This file is the source of truth for what an adapter may use.
+// browsermcp/adapter-sdk — the adapter contract (types). This file is the source of truth for what an adapter may use.
 
 export type Access = 'read' | 'write';
 

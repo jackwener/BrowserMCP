@@ -1,4 +1,4 @@
-import { defineAdapter, errors } from 'opencli-mcp/adapter-sdk';
+import { defineAdapter, errors } from 'browsermcp/adapter-sdk';
 import { ensureOnX, gql, apiError } from './_shared.js';
 
 const QUERY_ID = 'i78YDd0Tza-dWKw5H2Y7WA';

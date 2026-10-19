@@ -10,7 +10,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { defineAdapter, type AdapterDescriptor } from 'opencli-mcp/adapter-sdk';
+import { defineAdapter, type AdapterDescriptor } from 'browsermcp/adapter-sdk';
 import { argSpec, validateArgDefinitions, type Arg, type ArgView } from './schema.js';
 
 export type SourceKind = 'builtin' | 'user';
@@ -152,7 +152,7 @@ export class SiteRegistry {
     for (const [site, cmds] of map) {
       for (const [name, file] of cmds) {
         try { const { run: _run, ...meta } = this.toCommand(site, name, file, await this.importDescriptor(file)); out.push(meta); }
-        catch (err) { process.stderr.write(`[opencli-mcp] failed to load adapter ${file}: ${(err as Error).message}\n`); }
+        catch (err) { process.stderr.write(`[browsermcp] failed to load adapter ${file}: ${(err as Error).message}\n`); }
       }
     }
     this.index = out; this.indexStamp = stamp;

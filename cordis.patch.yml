@@ -1,10 +1,11 @@
 - insert:
-    - id: opencli-mcp
+    - id: browsermcp
       name: '@deepseek-ai/dsh-mcp-client'
       config:
-        serverName: opencli-mcp
+        serverName: browsermcp
         transport: stdio
         command: !!js >-
+          process.env.BROWSERMCP_BIN ||
           process.env.OPENCLI_MCP_BIN ||
           (process.platform === 'win32' ? process.env.USERPROFILE : process.env.HOME) +
           '/.opencli-mcp/bin/opencli-mcp-launcher' +

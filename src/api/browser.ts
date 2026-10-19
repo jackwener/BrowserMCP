@@ -18,7 +18,7 @@ export class Browser {
   toJSON(): { type: 'Browser'; id: string; backend: string } { return { type: 'Browser', id: this.id, backend: this.type }; }
   private page(): Promise<RuntimePage> { return this.ctx.rt.getBrowserPage(this.ctx.sessionId); }
   private ext(page: RuntimePage): ExtensionRuntimePage {
-    if (!this.ctx.rt.isExtensionPage(page)) throw new ActionError('unsupported_backend', 'This operation needs the Chrome extension backend', 'Run doctor; make sure Chrome is running with the opencli-mcp extension.');
+    if (!this.ctx.rt.isExtensionPage(page)) throw new ActionError('unsupported_backend', 'This operation needs the Chrome extension backend', 'Run doctor; make sure Chrome is running with the browsermcp extension.');
     return page;
   }
 

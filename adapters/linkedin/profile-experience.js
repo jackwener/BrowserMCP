@@ -1,4 +1,4 @@
-import { defineAdapter } from 'opencli-mcp/adapter-sdk';
+import { defineAdapter } from 'browsermcp/adapter-sdk';
 import { ensureLinkedIn } from './_shared.js';
 import { linkedinProfile, profileIdentity } from './_profile.js';
 import { mapExperience, profileSection } from './_profile-sections.js';

@@ -44,7 +44,7 @@ export interface HostConnection { state: HostState; client: Client; transport: S
 export interface HostDiagnostic { state: HostState; status: 'ready' | 'extension_unresponsive' | 'unreachable' | 'identity_mismatch' | 'attach_failed'; error?: string; selected?: boolean }
 
 /** Probe without creating sessions. Browser identity is separate from process incarnation. */
-export async function connectHost(browserId = process.env.OPENCLI_MCP_BROWSER ?? readConfig().browserId, states = readHostStates(), diagnostics: HostDiagnostic[] = []): Promise<HostConnection> {
+export async function connectHost(browserId = process.env.BROWSERMCP_BROWSER ?? process.env.OPENCLI_MCP_BROWSER ?? readConfig().browserId, states = readHostStates(), diagnostics: HostDiagnostic[] = []): Promise<HostConnection> {
   const ready: Array<{ state: HostState; transport: SocketTransport; diagnostic: HostDiagnostic }> = [];
   await Promise.all(states.filter(s => !browserId || s.browserId === browserId).map(async registered => {
     const diagnostic: HostDiagnostic = { state: registered, status: 'unreachable' };
@@ -72,13 +72,13 @@ export async function connectHost(browserId = process.env.OPENCLI_MCP_BROWSER ??
     if (browsers.length > 1) throw new HostConnectionError('browser_selection_required', `Multiple browsers are available. Set browserId in ~/.opencli-mcp/config.json or OPENCLI_MCP_BROWSER to one of: ${browsers.join(', ')}`);
     ready.sort((a, b) => b.state.startedAt - a.state.startedAt || b.state.instanceId.localeCompare(a.state.instanceId));
     for (const candidate of ready) {
-      const client = new Client({ name: 'opencli-mcp', version: '1' });
+      const client = new Client({ name: 'browsermcp', version: '1' });
       try {
         attachSocket(candidate.transport);
         await client.connect(candidate.transport, { timeout: 1500 });
         if (candidate.transport.closed) throw new Error('Host closed during initialization');
         candidate.diagnostic.selected = true;
-        if (ready.length > 1) process.stderr.write(`[opencli-mcp] ${ready.length} healthy hosts for browser ${candidate.state.browserId}; selected ${candidate.state.instanceId}. Existing sessions remain attached.\n`);
+        if (ready.length > 1) process.stderr.write(`[browsermcp] ${ready.length} healthy hosts for browser ${candidate.state.browserId}; selected ${candidate.state.instanceId}. Existing sessions remain attached.\n`);
         return { state: candidate.state, client, transport: candidate.transport };
       } catch (error) {
         candidate.diagnostic.status = 'attach_failed'; candidate.diagnostic.error = String((error as Error).message);

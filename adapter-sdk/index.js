@@ -1,4 +1,4 @@
-// opencli-mcp/adapter-sdk — the adapter contract (runtime). Pure: validate + return a descriptor, never register.
+// browsermcp/adapter-sdk — the adapter contract (runtime). Pure: validate + return a descriptor, never register.
 
 const ACCESS = new Set(['read', 'write']);
 

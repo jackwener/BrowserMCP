@@ -1,10 +1,10 @@
 {
-  "name": "opencli-mcp",
-  "version": "0.0.31",
+  "name": "browsermcp",
+  "version": "0.0.32",
   "description": "Chrome-backed MCP browser service with optional site adapters.",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/jackwener/opencli-mcp.git"
+    "url": "git+https://github.com/jackwener/browsermcp.git"
   },
   "keywords": [
     "mcp",
@@ -16,7 +16,7 @@
     "node": ">=22"
   },
   "bin": {
-    "opencli-mcp": "dist/src/main.js"
+    "browsermcp": "dist/src/main.js"
   },
   "scripts": {
     "build": "node scripts/clean.mjs && node scripts/extract-playwright-injected.mjs && tsc -p tsconfig.json && node scripts/gen-api-reference.mjs && node scripts/render-icons.mjs && node scripts/build-extension.mjs && node scripts/copy-assets.mjs",

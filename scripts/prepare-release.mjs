@@ -27,7 +27,7 @@ if (!heading.test(changelog)) {
   if (!body) {
     const lastTag = execFileSync('git', ['describe', '--tags', '--match', 'v[0-9]*', '--abbrev=0'], { encoding: 'utf8' }).trim();
     const subjects = execFileSync('git', ['log', `${lastTag}..HEAD`, '--pretty=%s', '--no-merges'], { encoding: 'utf8' })
-      .split('\n').map((line) => line.trim()).filter((line) => line && !/^chore: release opencli-mcp /.test(line));
+      .split('\n').map((line) => line.trim()).filter((line) => line && !/^chore: release (?:browsermcp|opencli-mcp) /.test(line));
     body = subjects.map((subject) => `- ${subject}`).join('\n');
   }
   if (!body) throw new Error(`No changes or release notes found for ${version}`);
@@ -36,4 +36,4 @@ if (!heading.test(changelog)) {
   const rest = changelog.slice('# Changelog\n'.length).trimStart();
   writeFileSync('CHANGELOG.md', `# Changelog\n\n## ${version} — ${date}\n\n${body}\n\n${rest}`);
 }
-console.log(`Prepared opencli-mcp ${version}`);
+console.log(`Prepared browsermcp ${version}`);

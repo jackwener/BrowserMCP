@@ -17,7 +17,7 @@ const id = digest.replace(/[0-9a-f]/g, digit => String.fromCharCode(97 + parseIn
 if (id !== EXTENSION_ID) throw new Error(`Extension ID ${id} does not match native host ID ${EXTENSION_ID}`);
 
 const staging = mkdtempSync(join(tmpdir(), 'opencli-pack-'));
-const out = resolve(root, `opencli-mcp-extension-${mode === 'manual' ? 'manual-install' : 'store'}-${manifest.version}.zip`);
+const out = resolve(root, `browsermcp-extension-${mode === 'manual' ? 'manual-install' : 'store'}-${manifest.version}.zip`);
 try {
   cpSync(dist, staging, { recursive: true });
   if (mode === 'store') delete manifest.key;

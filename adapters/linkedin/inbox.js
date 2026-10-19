@@ -1,4 +1,4 @@
-import { defineAdapter, errors } from 'opencli-mcp/adapter-sdk';
+import { defineAdapter, errors } from 'browsermcp/adapter-sdk';
 import { compact, csrf, integer } from './_shared.js';
 
 async function queryFromScriptTraffic(tab) {
