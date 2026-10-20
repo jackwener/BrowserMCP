@@ -1,3 +1,4 @@
+import { EMBEDDED_DOCS } from './embedded.js';
 /**
  * Docs-as-interface. A documents manifest (Codex documents.json style) decides which markdown
  * is delivered as server `instructions` and which is attached to tool results on demand.
@@ -21,7 +22,7 @@ export const DOCS_MANIFEST: DocEntry[] = [
   { name: 'instructions', mode: 'included' },
   { name: 'api-use', mode: 'lookup', description: 'detailed browser actions, locators, network evidence, and recovery' },
   { name: 'safety', mode: 'included' },
-  { name: 'tab-lifecycle', mode: 'lookup', description: 'session tabs, claiming user tabs, and finalization', when: { backends: ['extension'] } },
+  { name: 'tab-lifecycle', mode: 'lookup', description: 'session tabs, claiming user tabs, and finalization', when: { backends: ['extension', 'electron'] } },
   { name: 'sites', mode: 'lookup', description: 'find, run, and define site adapters' },
   { name: 'js-tool', mode: 'model', description: 'compact browser REPL quickstart' },
   { name: 'repl-session', mode: 'lookup', description: 'persistent declarations, output, timeout/reset and execution recovery' },
@@ -57,7 +58,8 @@ export function readDoc(name: string): string | null {
 
 export function readDocForContext(name: string, ctx: DocContext, member?: string): string | null {
   if (!listDocs(ctx).some((entry) => entry.name === name && entry.available)) return null;
-  const source = readDoc(name);
+  const source = ctx.backend === 'electron' && EMBEDDED_DOCS[name] ? EMBEDDED_DOCS[name] : readDoc(name);
+  if (ctx.backend === 'electron' && name === 'js-tool' && source) return source.replace('Create groups with `tabs.group`; edit them with `tabGroups.update`.', 'Only the methods reported by browser.chrome.describe are available; tab groups are host-managed.');
   if (!source || name !== 'api-reference') return source;
   const projected = projectApiReference(source, ctx.capabilities as import('../protocol.js').BrowserFeature[]);
   return member ? selectApiReference(projected, member) : projected;
@@ -82,7 +84,7 @@ export function buildInstructions(ctx: DocContext): string {
   const parts: string[] = [];
   for (const d of DOCS_MANIFEST) {
     if (d.mode !== 'included' || !applies(d, ctx)) continue;
-    const text = readDoc(d.name);
+    const text = readDocForContext(d.name, ctx);
     if (text) parts.push(text.trim());
   }
   const lookups = DOCS_MANIFEST.filter((d) => d.mode === 'lookup' && applies(d, ctx)).map((d) => `- \`${d.name}\`: ${d.description ?? ''}`);
