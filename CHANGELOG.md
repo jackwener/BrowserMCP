@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.0.34-embedded.0 — 2026-10-21
+
+- Add the embedded Electron SDK with host-owned storage, profiles and page lifecycle.
+- Support MCP sessions, adapter creation and updates, Chrome API compatibility and CDP in embedded Chromium.
+- Import @jackwener/browsermcp/embedded without CLI setup or a Chrome extension.
+
 ## 0.0.33 — 2026-10-20
 
 - refactor: standardize BrowserMCP runtime names and simplify configuration
