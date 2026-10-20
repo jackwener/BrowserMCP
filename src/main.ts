@@ -9,17 +9,13 @@
  *   browsermcp extension-path  print the unpacked extension directory
  */
 import fs from 'node:fs';
+import { getPackageVersion } from './version.js';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
-function findVersion(): string {
-  let dir = here;
-  for (let i = 0; i < 6; i++) { const pkg = path.join(dir, 'package.json'); try { const j = JSON.parse(fs.readFileSync(pkg, 'utf8')) as { name?: string; version?: string }; if (j.name === '@jackwener/browsermcp' && j.version) return j.version; } catch { /* walk */ } dir = path.dirname(dir); }
-  return '0.0.0';
-}
-const VERSION = findVersion();
+const VERSION = getPackageVersion();
 
 const argv = process.argv.slice(2);
 const cmd = argv[0] ?? (process.stdin.isTTY ? 'help' : 'stdio');

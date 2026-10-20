@@ -4,15 +4,18 @@ import { execFileSync } from 'node:child_process';
 
 const version = process.env.RELEASE_VERSION?.trim();
 const notes = process.env.RELEASE_NOTES?.trim();
-if (!version || !/^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/.test(version)) {
+if (!version || !/^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-embedded\.(0|[1-9]\d*))?$/.test(version)) {
   throw new Error('RELEASE_VERSION must be an exact version such as 0.0.19');
 }
 
 const current = JSON.parse(readFileSync('package.json', 'utf8')).version;
-const parts = (value) => value.split('.').map(Number);
+const parts = (value) => {
+  const [base, prerelease] = value.split('-');
+  return [...base.split('.').map(Number), prerelease ? Number(prerelease.split('.')[1]) : Infinity];
+};
 const compare = (a, b) => {
   const left = parts(a), right = parts(b);
-  for (let i = 0; i < 3; i++) if (left[i] !== right[i]) return Math.sign(left[i] - right[i]);
+  for (let i = 0; i < 4; i++) if (left[i] !== right[i]) return Math.sign(left[i] - right[i]);
   return 0;
 };
 if (compare(version, current) < 0) throw new Error(`${version} is older than package.json version ${current}`);

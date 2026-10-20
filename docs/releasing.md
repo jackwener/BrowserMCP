@@ -24,3 +24,13 @@ The rename creates a new npm package, `@jackwener/browsermcp`. Before the first 
 The workflow updates `package.json`, `package-lock.json`, and `CHANGELOG.md`, runs a small set of checks, builds and installs the tarball, validates that the extension's public key produces the ID allowed by the native host, commits the release version, pushes its tag, publishes to npm with provenance, creates a GitHub Release with the tarball and manual-install extension zip, and waits for npm to expose the version. Re-run the same version if publication or release creation fails after the tag was pushed; it checks the existing tag and package instead of bumping again.
 
 The manual-install zip keeps `manifest.key` and is meant to be extracted and loaded through Chrome's **Load unpacked**. The `npm run pack:store` zip removes that key and is only for Web Store upload. Do not use the store zip for manual installation. The extension manifest version is independent of the npm package version.
+
+## Embedded prereleases
+
+Run the same `release.yml` workflow on `codex/embedded-electron` with an unused version such as `0.0.34-embedded.0`. This branch publishes the same npm package under the `embedded` dist-tag and creates a GitHub prerelease. It does not update `latest` or publish a manual extension zip.
+
+The embedded job checks types and adapter isolation, builds the package, and runs real Electron smoke tests both directly and with the installed package inside `app.asar` before publishing. For an already validated build, `skip_embedded_tests` skips the type and Electron checks. It uses the same npm Trusted Publisher configuration as stable releases.
+
+Consumers install `npm install @jackwener/browsermcp@embedded` and import `@jackwener/browsermcp/embedded`. Pin the exact prerelease version for reproducible application builds.
+
+Keep `codex/embedded-electron` exactly one commit above current `main`: land shared changes on `main`, then rebase and squash the Electron-specific change. The embedded release job enforces this relationship and amends version/changelog changes into that single commit, pushing with an explicit lease. Existing published tags remain immutable.

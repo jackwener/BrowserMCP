@@ -14,7 +14,7 @@ export async function browserCommand(ctx: SessionContext, feature: import('../pr
   // Create only the session transport object, never a tab or debugger attachment.
   if (!params.session) await ctx.rt.getBrowserPage(ctx.sessionId);
   if (action === 'stream-watch' || (action === 'chrome-call' && ['tabs.create', 'tabs.duplicate', 'windows.create'].includes(params.chromeMethod ?? ''))) ctx.state.finalized = false;
-  return (await ctx.rt.bridge!.send(action, { session: `mcp:${ctx.sessionId}`, surface: 'browser', ...params })).data;
+  return (await ctx.rt.browserCommand(action, { session: `mcp:${ctx.sessionId}`, surface: 'browser', ...params })).data;
 }
 
 export async function watch(ctx: SessionContext, source: 'chrome' | 'cdp' | 'console' | 'extension', event?: string, options?: StreamOptions, page?: string, route?: { session: string; surface: 'browser' | 'adapter' }): Promise<EventStream> {

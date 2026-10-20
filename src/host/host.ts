@@ -1,3 +1,4 @@
+import { defaultSources, USER_ADAPTERS_DIR } from '../lib/sources.js';
 /**
  * The Chrome-spawned native host: Native Messaging on stdio ⇄ extension, MCP over local IPC.
  * Lives exactly as long as the extension keeps its port open (Chrome's contract) — so the bridge,
@@ -20,7 +21,7 @@ export async function runNativeHost(opts: { version: string }): Promise<void> {
   channel.on('error', (err) => log(`channel error: ${err.message}`));
   const bridge = new ExtensionBridge(channel);
   const config = readConfig();
-  const rt = new Runtime({ bridge, cursor: config.cursor ?? false, sites: config.sites, sitesWrite: config.sitesWrite, log });
+  const rt = new Runtime({ sources: defaultSources(), userAdaptersDir: USER_ADAPTERS_DIR, bridge, cursor: config.cursor ?? false, sites: config.sites, sitesWrite: config.sitesWrite, log });
   await rt.init();
   const ipc = await startIpcServer(rt, { version: opts.version, probe: async () => ({ browserId: bridge.browserId ?? '', extensionResponsive: await bridge.probe() }) });
   bridge.ready = { version: opts.version };

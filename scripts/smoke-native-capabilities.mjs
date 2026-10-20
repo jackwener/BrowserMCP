@@ -11,6 +11,7 @@ import { chromium } from 'playwright-core';
 import { Client } from '@modelcontextprotocol/client';
 import { ExtensionBridge } from '../dist/src/host/bridge.js';
 import { NativeChannel, FrameDecoder, encodeFrame } from '../dist/src/host/native-messaging.js';
+import { BUILTIN_ADAPTERS_DIR } from '../dist/src/lib/sources.js';
 import { Runtime } from '../dist/src/runtime/runtime.js';
 import { startIpcServer } from '../dist/src/host/ipc.js';
 import { connectSocket, probeSocket, attachSocket } from '../dist/src/host/socket.js';
@@ -68,7 +69,7 @@ try {
   const bridge = new ExtensionBridge(channel);
   incoming.write(encodeFrame({ type: 'hello', browserId: 'native-smoke-browser', extensionVersion: 'smoke', protocolRevision: PROTOCOL_REVISION,
     features: ['chrome-api', 'streams', 'extension-logs', 'page-evaluate', 'cdp', 'console', 'frames', 'network', 'dialogs'] }));
-  const runtime = new Runtime({ bridge });
+  const runtime = new Runtime({ bridge, sources: [{ dir: BUILTIN_ADAPTERS_DIR, kind: 'builtin' }] });
   session = await startIpcServer(runtime, { version: 'native-smoke', probe: async () => ({ browserId: bridge.browserId, extensionResponsive: await bridge.probe() }) });
   const ct = await connectSocket(session.endpoint);
   client = new Client({ name: 'native-smoke', version: '1' }, { capabilities: {} });

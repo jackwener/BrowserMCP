@@ -5,7 +5,7 @@ import { writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 const root = resolve(import.meta.dirname, '..');
-const entries = ['src/api/webmcp.ts', 'src/api/streams.ts', 'src/api/api.ts', 'src/api/browser.ts', 'src/api/tab.ts', 'src/backends/extension-page.ts', 'src/shared/page-contract.ts', 'src/protocol.ts', 'src/sites/define.ts', 'src/sites/drafts.ts', 'src/sites/executor.ts', 'src/recon/discover.ts', 'src/recon/analyzer.ts', 'adapter-sdk/index.d.ts'].map((f) => resolve(root, f));
+const entries = ['src/api/webmcp.ts', 'src/api/streams.ts', 'src/api/api.ts', 'src/api/browser.ts', 'src/api/tab.ts', 'src/backends/extension-page.ts', 'src/backends/managed-page.ts', 'src/shared/page-contract.ts', 'src/protocol.ts', 'src/sites/define.ts', 'src/sites/drafts.ts', 'src/sites/executor.ts', 'src/recon/discover.ts', 'src/recon/analyzer.ts', 'adapter-sdk/index.d.ts'].map((f) => resolve(root, f));
 const program = ts.createProgram(entries, {
   target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.NodeNext, moduleResolution: ts.ModuleResolutionKind.NodeNext,
   strict: true, exactOptionalPropertyTypes: true, skipLibCheck: true, noEmit: true, lib: ['lib.es2022.d.ts', 'lib.dom.d.ts'],

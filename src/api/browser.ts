@@ -6,7 +6,7 @@ import type { RuntimePage } from '../backends/page-types.js';
 import { browserCommand, watch } from './streams.js';
 import type { StreamOptions, StreamReadOptions, StreamBatch } from '../protocol.js';
 import type { CloseUserTabsResult } from '../protocol.js';
-import type { ExtensionRuntimePage, UserTabInfo } from '../backends/extension-page.js';
+import type { ManagedRuntimePage, UserTabInfo } from '../backends/managed-page.js';
 import { ActionError } from './errors.js';
 import { buildInstructions, readDocForContext, type DocContext } from '../docs/manifest.js';
 import { BROWSER_CAPABILITIES } from '../docs/surface.js';
@@ -14,15 +14,15 @@ import { Tab } from './tab.js';
 import type { SessionContext } from './context.js';
 
 export class Browser {
-  constructor(readonly id: 'chrome', readonly type: 'extension', private readonly ctx: SessionContext) {}
+  constructor(readonly id: string, readonly type: 'extension' | 'electron', private readonly ctx: SessionContext) {}
   toJSON(): { type: 'Browser'; id: string; backend: string } { return { type: 'Browser', id: this.id, backend: this.type }; }
   private page(): Promise<RuntimePage> { return this.ctx.rt.getBrowserPage(this.ctx.sessionId); }
-  private ext(page: RuntimePage): ExtensionRuntimePage {
-    if (!this.ctx.rt.isExtensionPage(page)) throw new ActionError('unsupported_backend', 'This operation needs the Chrome extension backend', 'Run doctor; make sure Chrome is running with the browsermcp extension.');
+  private ext(page: RuntimePage): ManagedRuntimePage {
+    if (!this.ctx.rt.isManagedPage(page)) throw new ActionError('unsupported_backend', 'This operation needs a managed browser backend', 'Run doctor; make sure Chrome is running with the browsermcp extension.');
     return page;
   }
 
-  /** Native Chrome APIs in the extension service worker. Positional JSON arguments, native return values. */
+  /** Chrome APIs through the connected backend. Electron supports an explicit compatibility subset. */
   readonly chrome = {
     call: async (method: string, args: unknown[] = []): Promise<unknown> => browserCommand(this.ctx, 'chrome-api', 'chrome-call', { chromeMethod: method, chromeArgs: args }),
     describe: async (member: string): Promise<unknown> => browserCommand(this.ctx, 'chrome-api', 'chrome-describe', { chromeMethod: member }),
@@ -77,7 +77,7 @@ export class Browser {
     finalize: async (opts: { keep?: Array<{ tab: string | Tab; status: 'deliverable' | 'handoff' }> } = {}): Promise<{ closed: string[]; kept: string[]; failed: Array<{ page: string; reason: string }> }> => {
       const page = await this.page();
       const keep = (opts.keep ?? []).map((k) => ({ page: typeof k.tab === 'string' ? k.tab : k.tab.id, status: k.status }));
-      const result = this.ctx.rt.isExtensionPage(page) ? await page.finalize(keep) : (await page.closeWindow(), { closed: [], kept: keep.map((k) => k.page), failed: [] });
+      const result = this.ctx.rt.isManagedPage(page) ? await page.finalize(keep) : (await page.closeWindow(), { closed: [], kept: keep.map((k) => k.page), failed: [] });
       for (const id of [...result.closed, ...result.kept]) this.ctx.rt.forgetPage(this.ctx.sessionId, id);
       this.ctx.state.finalized = result.failed.length === 0;
       if (this.ctx.state.finalized) { this.ctx.state.pages.clear(); this.ctx.state.tabLocks.clear(); }
@@ -104,7 +104,7 @@ export class Browser {
   async nameSession(name: string): Promise<void> {
     this.ctx.state.name = name;
     const page = await this.page();
-    if (this.ctx.rt.isExtensionPage(page)) await page.nameSession(name);
+    if (this.ctx.rt.isManagedPage(page)) await page.nameSession(name);
   }
 
   readonly capabilities = {

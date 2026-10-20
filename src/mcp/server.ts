@@ -1,3 +1,4 @@
+import { getPackageVersion } from '../version.js';
 /**
  * MCP server per session: REPL entry, dynamic site tools, diagnostics and cleanup,
  * resources (docs, sites) and prompts — all backed by the same object model.
@@ -35,7 +36,7 @@ export function createMcpServer(rt: Runtime, sessionId: string, opts: { version?
   const api = createAgentApi(rt, sessionId);
   const state = rt.session(sessionId);
   const docCtx = (): DocContext => ({ backend: rt.backend(), capabilities: rt.features() });
-  const server = new McpServer({ name: 'browsermcp', version: opts.version ?? '0.0.0' }, {
+  const server = new McpServer({ name: 'browsermcp', version: opts.version ?? getPackageVersion() }, {
     capabilities: { tools: { listChanged: true }, resources: { listChanged: true }, prompts: {}, logging: {} },
     instructions: buildInstructions(docCtx()),
   });
@@ -58,7 +59,7 @@ export function createMcpServer(rt: Runtime, sessionId: string, opts: { version?
       beat = setInterval(() => { void extra.sendNotification!({ method: 'notifications/progress', params: { progressToken: token, progress: Math.round((Date.now() - started) / 1000), message: `${site} ${command} running (${Math.round((Date.now() - started) / 1000)}s)` } }).catch(() => {}); }, 5000);
     }
     try {
-      const r = await rt.runSite(site, command, coerced, { signal: extra.signal });
+      const r = await rt.runSite(site, command, coerced, { signal: extra.signal, sessionId });
       if (!r.ok) {
         const { code, message, hint, ...restErr } = r.error;
         return fail(new ActionError(code, message, hint, { site, command, ...restErr }));
@@ -100,7 +101,7 @@ export function createMcpServer(rt: Runtime, sessionId: string, opts: { version?
     inputSchema: { code: z.string(), timeoutMs: z.number().int().min(1).max(1_800_000).default(300_000), maxChars: z.number().int().min(1000).max(120_000).default(12_000).describe('result text budget; retain large data in a variable and return only relevant parts') },
     annotations: { openWorldHint: true, destructiveHint: true },
   }, async ({ code, timeoutMs, maxChars }, extra) => run(async () => {
-    if (!state.js) state.js = new JsSession(jsGlobals, async () => { if (rt.hasFeature('streams')) await rt.bridge!.send('streams-reset', { session: `mcp:${sessionId}` }); });
+    if (!state.js) state.js = new JsSession(jsGlobals, async () => { if (rt.hasFeature('streams')) await rt.browserCommand('streams-reset', { session: `mcp:${sessionId}` }); });
     const r = await state.js.run(code, { timeoutMs, signal: ctxExtra(extra).signal });
     await syncSiteTools();
     const content: Content = [];

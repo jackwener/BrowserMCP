@@ -13,9 +13,9 @@ export interface DocEntry {
   name: string;
   mode: DocMode;
   description?: string;
-  when?: { backends?: Array<'extension' | 'none'>; capabilities?: string[] };
+  when?: { backends?: Array<'extension' | 'electron' | 'none'>; capabilities?: string[] };
 }
-export interface DocContext { backend: 'extension' | 'none'; capabilities: string[] }
+export interface DocContext { backend: 'extension' | 'electron' | 'none'; capabilities: string[] }
 
 export const DOCS_MANIFEST: DocEntry[] = [
   { name: 'instructions', mode: 'included' },

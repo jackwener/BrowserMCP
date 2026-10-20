@@ -1,3 +1,4 @@
+import { defaultSources, USER_ADAPTERS_DIR } from '../src/lib/sources.js';
 import { describe, it, expect } from 'vitest';
 import { Client, InMemoryTransport } from '@modelcontextprotocol/client';
 import { Runtime } from '../src/runtime/runtime.js';
@@ -11,7 +12,7 @@ function body(r: { content?: Array<{ type: string; text?: string }> }): Record<s
 }
 
 async function harness() {
-  const rt = new Runtime({ log: () => {} });
+  const rt = new Runtime({ sources: defaultSources(), userAdaptersDir: USER_ADAPTERS_DIR, log: () => {} });
   await rt.init();
   // Adapter execution always requires a browser page; this focused MCP test supplies one.
   rt.browserAvailable = () => true;
