@@ -197,7 +197,7 @@ jobs:
         if: ${{ !inputs.skip_tests }}
         run: |
           npm run typecheck
-          npx vitest run tests/embedded-adapters.test.ts tests/embedded-registry.test.ts tests/electron-driver.test.ts tests/api-contract.test.ts
+          npx vitest run tests/embedded-adapters.test.ts tests/embedded-registry.test.ts tests/embedded-scope.test.ts tests/electron-driver.test.ts tests/api-contract.test.ts
       - name: Build publishable package
         run: |
           npm pack --silent
