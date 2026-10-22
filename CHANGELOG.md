@@ -1,16 +1,58 @@
 # Changelog
 
+## 0.0.37-embedded.1 — 2026-10-28
+
+Embedded adapters load from the packaged defaults and application-owned dataDir. MCP instructions expose loaded sites and the sites_search to site_run workflow. Activated custom adapters are immediately usable; externally edited adapters refresh on demand during command search. Clarify source overrides and packaging requirements.
+
+## 0.0.37-embedded.0 — 2026-10-28
+
+Load packaged site adapters by default in embedded applications while keeping custom adapters in application-owned dataDir. Surface loaded adapters and direct sites_search to site_run usage at agent initialization. Explicit sources replaces built-ins; sources: [] keeps application adapters only. Activated custom adapters are immediately available to existing sessions.
+
 ## 0.0.36 — 2026-10-28
 
 Make existing site adapters discoverable at agent initialization: show loaded sites and command counts, document direct sites_search to site_run invocation without enabling, and clarify application-owned adapter storage.
+
+## 0.0.36-embedded.0 — 2026-10-28
+
+Includes stable 0.0.35 shared typed browser commands and helpers. navigate_tab reuses existing pages; close_tab is available through MCP and session.api.helper. Retained page handles stay usable until session closure.
 
 ## 0.0.35 — 2026-10-28
 
 Add shared typed browser commands and session helpers, including navigate_tab and close_tab. Reuse existing tabs and preserve handoff handles. Protocol revision 5 requires extension 0.0.27 and a matching host.
 
+## 0.0.35-embedded.0 — 2026-10-22
+
+Includes stable 0.0.34 strict evaluation and lossless RPC contracts, shared tab discovery with scope/counts/pagination, and invalid-response detection. Fixes debugger cleanup after WebContents destruction. Verified with 31 tests, real Electron MCP flows and the installed npm package inside app.asar. openTabs now returns an envelope; read items.
+
 ## 0.0.34 — 2026-10-22
 
 Enforce strict evaluate options and lossless REPL call transport. Separate user data from internal RPC references. Return explicit tab discovery scope, counts and pagination using shared backend contracts. Reject malformed backend responses. Protocol revision 4 requires updating host and extension together; read openTabs results from items.
+
+## 0.0.34-embedded.3 — 2026-10-22
+
+Host-owned logical tabs, lazy page registration, active-tab selection, session lifecycle events, and retention controls. Includes session-bound adapters and automatic npm publishing through GitHub Actions OIDC.
+
+## 0.0.34-embedded.2 — 2026-10-22
+
+- Preserve logical tab identity, session ownership and retention across WebContents replacement.
+- Define host-owned create/load/close callbacks and explicit attach/detach lifecycle operations.
+- Report structured host failures with recoverable tab state; protect cleanup against invalid keep entries.
+- Add handle-based deliverable/handoff retention and safe local remote-method inspection.
+- Verify background duplicate claims, host failure recovery and installed ASAR execution.
+
+## 0.0.34-embedded.1 — 2026-10-21
+
+- Model host tabs independently of WebContents, with stable logical IDs, explicit active selection, metadata updates and lazy loading.
+- Expose typed host events and snapshots with public MCP session IDs; reserve ownership during loading and roll back or cancel failed/revoked claims.
+- Unify tab state across MCP and Chrome APIs, and default MCP version to the installed package version.
+- Migration: use registerPage handles and reported tabId values; tabId no longer equals webContents.id. Synchronize host selection with setActivePage(scope, handle).
+- Share runtime isolation, storage injection, package version resolution and release infrastructure with main.
+
+## 0.0.34-embedded.0 — 2026-10-21
+
+- Add the embedded Electron SDK with host-owned storage, profiles and page lifecycle.
+- Support MCP sessions, adapter creation and updates, Chrome API compatibility and CDP in embedded Chromium.
+- Import @jackwener/browsermcp/embedded without CLI setup or a Chrome extension.
 
 ## 0.0.33 — 2026-10-20
 
