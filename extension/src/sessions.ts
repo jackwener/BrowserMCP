@@ -1,3 +1,4 @@
+import { discoverTabs, type TabDiscoveryOptions, type TabInventoryEntry } from '../../src/shared/api-contract';
 /**
  * Sessions & tab leases — tabs are the user's property.
  * A session ⇄ one named Chrome tab group. Agent-created tabs (and popups they spawn) join the
@@ -294,16 +295,16 @@ export class SessionManager {
     await this.touch(s);
   }
 
-  async listUserTabs(options: { query?: string; limit?: number; all?: boolean } = {}): Promise<Array<{ tabId: number; title?: string; url?: string; windowId: number; active: boolean; groupId?: number; lastAccessed?: number }>> {
+  async userTabInventory(): Promise<TabInventoryEntry[]> {
     const tabs = await chrome.tabs.query({ windowType: 'normal' });
-    const query = options.query?.trim().toLowerCase();
-    const limit = Math.min(100, Math.max(1, options.limit ?? 20));
-    // handoff tabs are the user's again: listed here so a later turn can claim them back
-    return tabs.filter((t) => t.id !== undefined && isHttp(t.url) && (this.ownerOf(t.id)?.leases.get(t.id)?.state ?? 'none') !== 'active')
-      .filter((t) => !query || (t.title ?? '').toLowerCase().includes(query) || (t.url ?? '').toLowerCase().includes(query))
-      .sort((a, b) => ((b as { lastAccessed?: number }).lastAccessed ?? 0) - ((a as { lastAccessed?: number }).lastAccessed ?? 0))
-      .slice(0, options.all ? undefined : limit)
-      .map((t) => ({ tabId: t.id!, title: t.title, url: t.url, windowId: t.windowId, active: Boolean(t.active), groupId: t.groupId && t.groupId > 0 ? t.groupId : undefined, lastAccessed: (t as { lastAccessed?: number }).lastAccessed }));
+    return tabs.filter(t => t.id !== undefined).map(t => ({
+      supported: isHttp(t.url), owned: (this.ownerOf(t.id!)?.leases.get(t.id!)?.state ?? 'none') === 'active',
+      tab: { tabId: t.id!, title: t.title, url: t.url, windowId: t.windowId, active: Boolean(t.active), groupId: t.groupId > 0 ? t.groupId : undefined, lastAccessed: t.lastAccessed },
+    }));
+  }
+
+  async listUserTabs(options: TabDiscoveryOptions = {}) {
+    return discoverTabs(await this.userTabInventory(), options);
   }
 
   /** Find by fuzzy url/title, then verify optional exact identity before adopting the chosen tab. */
@@ -321,7 +322,7 @@ export class SessionManager {
       if (claim.tabId !== undefined && tab.id !== claim.tabId) throw new SessionError('claim_identity_mismatch', `Active tab is ${tab.id}, not ${claim.tabId}`, 'Use the current tabId or omit it when claiming the active tab.');
     } else if (claim.tabId === undefined) {
       if (claim.url === undefined && claim.title === undefined) throw new SessionError('claim_not_allowed', 'claim needs a tabId, active:true, or a url/title to find the tab', 'Use tab_claim {active:true} for the foreground tab, or list user tabs first.');
-      const candidates = (await this.listUserTabs({ query: claim.url ?? claim.title, all: true })).filter((t) => urlOk(t.url) && titleOk(t.title));
+      const candidates = (await this.userTabInventory()).filter(t => t.supported && !t.owned).map(t => t.tab).filter(t => urlOk(t.url) && titleOk(t.title));
       if (candidates.length === 0) throw new SessionError('claim_not_found', `no user tab matches ${JSON.stringify({ url: claim.url, title: claim.title })}`, 'List user tabs and claim by tabId.');
       if (candidates.length > 1) throw new SessionError('claim_ambiguous', `${candidates.length} user tabs match; claim by tabId: ${candidates.map((c) => `${c.tabId} "${c.title}" ${c.url}`).join('; ')}`, 'Pass the tabId of the intended tab.');
       tab = await chrome.tabs.get(candidates[0].tabId);

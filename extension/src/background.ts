@@ -110,7 +110,7 @@ async function handleCommand(cmd: Command): Promise<Result> {
       }
       // ── session & tab lifecycle ──
       case 'session-name': { if (!cmd.name) return { id: cmd.id, ok: false, error: 'Missing name' }; await sessions.nameSession(s, cmd.name); return { id: cmd.id, ok: true, data: { name: cmd.name } }; }
-      case 'user-tabs': return { id: cmd.id, ok: true, data: await sessions.listUserTabs({ query: cmd.query, limit: cmd.limit }) };
+      case 'user-tabs': return { id: cmd.id, ok: true, data: await sessions.listUserTabs({ query: cmd.query, limit: cmd.limit, offset: cmd.offset }) };
       case 'claim': { if (!cmd.claim) return { id: cmd.id, ok: false, error: 'Missing claim' }; const r = await sessions.claimUserTab(s, cmd.claim); return { id: cmd.id, ok: true, page: r.page, data: { url: r.tab.url, title: r.tab.title, tabId: r.tabId } }; }
       case 'close-user-tabs': { if (!cmd.tabIds?.length) return { id: cmd.id, ok: false, error: 'Missing tabIds', errorCode: 'invalid_args' }; return { id: cmd.id, ok: true, data: await sessions.closeUserTabs(cmd.tabIds) }; }
       case 'mark': { if (!cmd.page) return { id: cmd.id, ok: false, error: 'Missing page' }; const tabId = await identity.resolveTabId(cmd.page); sessions.mark(s, tabId, cmd.mark ?? null); return { id: cmd.id, ok: true, data: { mark: cmd.mark ?? null } }; }

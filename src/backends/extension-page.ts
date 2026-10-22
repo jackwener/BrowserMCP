@@ -1,3 +1,4 @@
+import { discoveryResult, type TabDiscoveryOptions, type TabDiscoveryResult } from '../shared/api-contract.js';
 /** The page transport over the extension bridge; interactions use the shared act engine. */
 import type { PageTransport } from './page-transport.js';
 import { BrowserCommandError } from '../host/bridge.js';
@@ -171,7 +172,12 @@ class ExtensionPage implements ExtensionRuntimePage {
 
   // ── browsermcp extras ──
   async nameSession(name: string): Promise<void> { await this.bridge.send('session-name', { ...this.sessionOpts(), name }); }
-  async userTabs(options: { query?: string; limit?: number } = {}): Promise<UserTabInfo[]> { const r = await this.bridge.send('user-tabs', { ...this.sessionOpts(), ...options }); return Array.isArray(r.data) ? r.data as UserTabInfo[] : []; }
+  async userTabs(options: TabDiscoveryOptions = {}): Promise<TabDiscoveryResult> {
+    const r = await this.bridge.send('user-tabs', { ...this.sessionOpts(), ...options });
+    const parsed = discoveryResult.safeParse(r.data);
+    if (!parsed.success) throw new BrowserCommandError('user-tabs returned an invalid discovery result', 'invalid_response', 'Check host/backend versions with doctor; update the extension and host together.');
+    return parsed.data;
+  }
   async claim(tab: { tabId?: number; active?: boolean; title?: string; url?: string; expectedUrl?: string; expectedTitle?: string }): Promise<{ page: string; tabId: number; url?: string; title?: string }> {
     const r = await this.bridge.send('claim', { ...this.sessionOpts(), claim: tab });
     const d = (r.data ?? {}) as { tabId?: number; url?: string; title?: string };

@@ -40,7 +40,7 @@ class Browser {
     finalize(opts?: { keep?: Array<{ tab: string | Tab; status: "handoff" | "deliverable"; }>; }): Promise<{ closed: Array<string>; kept: Array<string>; failed: Array<{ page: string; reason: string; }>; }>;
   };
   user: {
-    openTabs(options?: { query?: string; limit?: number; }): Promise<Array<UserTabInfo>>;
+    openTabs(...args: [options?: { query?: string | undefined; limit?: number | undefined; offset?: number | undefined; }]): Promise<{ scope: "unclaimed"; query: string; matching: "case-insensitive-substring"; totalVisible: number; totalInScope: number; excluded: { owned: number; unsupported: number; }; matched: number; offset: number; limit: number; hasMore: boolean; items: Array<{ tabId: number; windowId: number; active: boolean; title?: string | undefined; url?: string | undefined; groupId?: number | undefined; lastAccessed?: number | undefined; lifecycle?: "dormant" | "loading" | "ready" | undefined; availability?: "ready" | "load_required" | "host_attachment_required" | undefined; }>; nextOffset?: number | undefined; }>; // Unclaimed supported tabs in the visible scope. Query is trimmed, case-insensitive literal substring of URL OR title (no token splitting). Inspect items, matched, totalInScope, excluded and hasMore; continue with nextOffset. Each call takes a fresh snapshot.
     claimTab(tab: { tabId?: number; active?: boolean; title?: string; url?: string; expectedUrl?: string; expectedTitle?: string; }): Promise<Tab>; // Claim by foreground, id, or unique url/title lookup; expected fields verify the tab's current identity.
     closeTabs(tabIds: Array<number>): Promise<CloseUserTabsResult>; // Close user tabs by Chrome id without claiming or loading their pages.
   };
@@ -77,7 +77,7 @@ class Tab {
     call(name: string, input?: Record<string, unknown>, options?: { frame?: FrameStep | Array<FrameStep>; }): Promise<unknown>;
   };
   expect(what: Expectation, opts?: { timeoutMs?: number; }): Promise<CheckResult>; // Assert what the page must show now (polled up to timeoutMs).
-  evaluate(script: string | ((arg: any) => any), opts?: { arg?: unknown; frame?: FrameStep | Array<FrameStep>; timeoutMs?: number; }): Promise<unknown>; // Main World page code; functions receive only opts.arg, never host closures. Dispatched scripts are never replayed.
+  evaluate(script: string | ((arg: any) => any), opts?: { arg?: unknown; frame?: string | number | Array<string | number> | undefined; timeoutMs?: number | undefined; }): Promise<unknown>; // Main World page code; functions receive only opts.arg, never host closures. Dispatched scripts are never replayed.
   cdp: { // Native CDP on this Tab's shared debugger attachment. Parameters are not rewritten.
     send(method: string, params?: Record<string, unknown>, target?: { frameId: string; }): Promise<unknown>;
     watch(event: string, options?: StreamOptions): Promise<EventStream>;
@@ -167,8 +167,6 @@ interface DialogInfo { type: 'alert' | 'confirm' | 'prompt' | 'beforeunload'; me
 
 interface ConsoleEntry { seq: number; level: 'debug' | 'info' | 'log' | 'warn' | 'error'; message: string; timestamp: string; url?: string; line?: number }
 
-interface UserTabInfo { tabId: number; title?: string; url?: string; windowId: number; active: boolean; groupId?: number; lastAccessed?: number; lifecycle?: 'dormant' | 'loading' | 'ready'; availability?: 'ready' | 'load_required' | 'host_attachment_required' }
-
 interface CloseUserTabsResult {
   complete: boolean;
   closed: number[];
@@ -192,6 +190,14 @@ interface DownloadWaitResult {
   error?: string;
   elapsedMs: number;
 }
+
+type EvaluateOptions = { arg?: unknown; frame?: string | number | Array<string | number> | undefined; timeoutMs?: number | undefined; };
+
+type TabDiscoveryOptions = { query?: string | undefined; limit?: number | undefined; offset?: number | undefined; };
+
+type UserTabInfo = { tabId: number; windowId: number; active: boolean; title?: string | undefined; url?: string | undefined; groupId?: number | undefined; lastAccessed?: number | undefined; lifecycle?: "dormant" | "loading" | "ready" | undefined; availability?: "ready" | "load_required" | "host_attachment_required" | undefined; };
+
+type TabDiscoveryResult = { scope: "unclaimed"; query: string; matching: "case-insensitive-substring"; totalVisible: number; totalInScope: number; excluded: { owned: number; unsupported: number; }; matched: number; offset: number; limit: number; hasMore: boolean; items: Array<{ tabId: number; windowId: number; active: boolean; title?: string | undefined; url?: string | undefined; groupId?: number | undefined; lastAccessed?: number | undefined; lifecycle?: "dormant" | "loading" | "ready" | undefined; availability?: "ready" | "load_required" | "host_attachment_required" | undefined; }>; nextOffset?: number | undefined; };
 
 interface PageTool { name: string; description?: string; inputSchema?: unknown }
 

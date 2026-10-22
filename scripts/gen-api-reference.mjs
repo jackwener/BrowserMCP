@@ -5,7 +5,7 @@ import { writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 const root = resolve(import.meta.dirname, '..');
-const entries = ['src/api/webmcp.ts', 'src/api/streams.ts', 'src/api/api.ts', 'src/api/browser.ts', 'src/api/tab.ts', 'src/backends/extension-page.ts', 'src/backends/managed-page.ts', 'src/shared/page-contract.ts', 'src/protocol.ts', 'src/sites/define.ts', 'src/sites/drafts.ts', 'src/sites/executor.ts', 'src/recon/discover.ts', 'src/recon/analyzer.ts', 'adapter-sdk/index.d.ts'].map((f) => resolve(root, f));
+const entries = ['src/shared/api-contract.ts', 'src/api/webmcp.ts', 'src/api/streams.ts', 'src/api/api.ts', 'src/api/browser.ts', 'src/api/tab.ts', 'src/backends/extension-page.ts', 'src/backends/managed-page.ts', 'src/shared/page-contract.ts', 'src/protocol.ts', 'src/sites/define.ts', 'src/sites/drafts.ts', 'src/sites/executor.ts', 'src/recon/discover.ts', 'src/recon/analyzer.ts', 'adapter-sdk/index.d.ts'].map((f) => resolve(root, f));
 const program = ts.createProgram(entries, {
   target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.NodeNext, moduleResolution: ts.ModuleResolutionKind.NodeNext,
   strict: true, exactOptionalPropertyTypes: true, skipLibCheck: true, noEmit: true, lib: ['lib.es2022.d.ts', 'lib.dom.d.ts'],
@@ -20,7 +20,7 @@ const sigText = (sig) => {
   const params = sig.getParameters().map((p) => {
     const d = p.valueDeclaration; const optional = d && ts.isParameter(d) && (d.questionToken || d.initializer) ? '?' : '';
     const t = fmtType(checker.getTypeOfSymbolAtLocation(p, d ?? sf));
-    return `${p.getName()}${optional}: ${optional ? t.replace(/ \| undefined$/, '') : t}`;
+    return `${d && ts.isParameter(d) && d.dotDotDotToken ? "..." : ""}${p.getName()}${optional}: ${optional ? t.replace(/ \| undefined$/, '') : t}`;
   });
   return `(${params.join(', ')}): ${fmtType(sig.getReturnType())}`;
 };
@@ -48,7 +48,7 @@ function memberLines(type, indent, depth) {
 }
 const sections = [];
 const wanted = new Map([['AgentApi', 'interface'], ['Browser', 'class'], ['Tab', 'class']]);
-const aliases = ['EventStream', 'StreamReadOptions', 'StreamOptions', 'StreamEntry', 'StreamBatch', 'PageTool', 'PageToolsUpdate', 'Target', 'ActAction', 'ActOptions', 'ActionOutcome', 'ObserveOptions', 'ObserveResult', 'ObservedContent', 'ObservedFrame', 'DomSnapshot', 'DomEntry', 'FrameOwner', 'ElementDetails', 'ReadElementOptions', 'ReadOptions', 'ImageValue', 'Box', 'FindEntry', 'FindResult', 'QueryFindResult', 'ElementAtResult', 'ReadTextResult', 'DocumentReadResult', 'Expectation', 'CheckResult', 'FrameStep', 'DialogInfo', 'ConsoleEntry', 'UserTabInfo', 'CloseUserTabsResult', 'DownloadWaitResult', 'ToolDefinition', 'DraftExpectation', 'Arg', 'ArgValue', 'CommandRunResult', 'CommandRunError', 'DiscoverResult', 'EndpointCandidate', 'UrlMatch'];
+const aliases = ['EvaluateOptions', 'TabDiscoveryOptions', 'TabDiscoveryResult','EventStream', 'StreamReadOptions', 'StreamOptions', 'StreamEntry', 'StreamBatch', 'PageTool', 'PageToolsUpdate', 'Target', 'ActAction', 'ActOptions', 'ActionOutcome', 'ObserveOptions', 'ObserveResult', 'ObservedContent', 'ObservedFrame', 'DomSnapshot', 'DomEntry', 'FrameOwner', 'ElementDetails', 'ReadElementOptions', 'ReadOptions', 'ImageValue', 'Box', 'FindEntry', 'FindResult', 'QueryFindResult', 'ElementAtResult', 'ReadTextResult', 'DocumentReadResult', 'Expectation', 'CheckResult', 'FrameStep', 'DialogInfo', 'ConsoleEntry', 'UserTabInfo', 'CloseUserTabsResult', 'DownloadWaitResult', 'ToolDefinition', 'DraftExpectation', 'Arg', 'ArgValue', 'CommandRunResult', 'CommandRunError', 'DiscoverResult', 'EndpointCandidate', 'UrlMatch'];
 for (const entry of entries) { sf = program.getSourceFile(entry); ts.forEachChild(sf, (node) => {
   if ((ts.isClassDeclaration(node) || ts.isInterfaceDeclaration(node)) && node.name && wanted.has(node.name.text) && !entry.endsWith('adapter-sdk/index.d.ts')) {
     const sym = checker.getSymbolAtLocation(node.name);
@@ -57,7 +57,7 @@ for (const entry of entries) { sf = program.getSourceFile(entry); ts.forEachChil
     sections.push(`${head ? `// ${head}\n` : ''}${wanted.get(node.name.text)} ${node.name.text} {\n${memberLines(type, '  ', 0).join('\n')}\n}`);
   }
   if ((ts.isTypeAliasDeclaration(node) || ts.isInterfaceDeclaration(node)) && aliases.includes(node.name.text)) {
-    sections.push(node.getText(sf).replace(/\s*\/\*\*[^*]*\*\/\s*/g, ' ').replace(/\n\s+/g, '\n  '));
+    sections.push((ts.isTypeAliasDeclaration(node) && node.type.getText(sf).startsWith('z.infer') ? `type ${node.name.text} = ${checker.typeToString(checker.getTypeAtLocation(node), node, FLAGS | ts.TypeFormatFlags.InTypeAlias)};` : node.getText(sf)).replace(/\s*\/\*\*[^*]*\*\/\s*/g, ' ').replace(/\n\s+/g, '\n  '));
   }
 }); }
 // keep a stable order: the entry object first, then Browser, Tab, then the value types

@@ -98,7 +98,7 @@ await tab.observe();
 
 Variables, functions, classes and Tab handles persist across calls. After inspecting the result, use `await tab.act(...)` and `await tab.expect(...)` or observe again. Keep working data in variables and return only relevant evidence. `docs_get {}` provides a compact quickstart; `{name:"api-reference",member:"Tab.act"}` provides exact types. No repository documentation access is required.
 
-Use `browser.user.openTabs({query,limit})` and `browser.user.claimTab(...)` for user tabs. The lookup returns up to 20 recent matches by default. `tab.release()` leaves a tab open; `tab.close()` closes it. `session_finalize` closes agent tabs not kept and releases borrowed tabs. `js_reset` stops JavaScript and clears bindings while leaving tabs open; already dispatched operations may still complete. All API methods are awaited.
+Use `browser.user.openTabs({query,limit})` and `browser.user.claimTab(...)` for user tabs. The lookup returns a discovery envelope: read `items`, `matched`, `totalInScope`, `excluded` and `hasMore`. It returns up to 20 recent matches by default; continue with `offset: nextOffset`. `tab.release()` leaves a tab open; `tab.close()` closes it. `session_finalize` closes agent tabs not kept and releases borrowed tabs. `js_reset` stops JavaScript and clears bindings while leaving tabs open; already dispatched operations may still complete. All API methods are awaited.
 
 Inside the `js` tool, you can also call site commands directly:
 

@@ -1,3 +1,4 @@
+import { checkArity, parseInput, discoveryOptions, type TabDiscoveryOptions, type TabDiscoveryResult } from '../shared/api-contract.js';
 /**
  * Browser — the connected Chrome: tabs (new/list/get/selected/finalize), the user's own tabs (openTabs/claimTab),
  * session naming, capabilities (cdp, viewport, visibility, webmcp) and the model-facing documentation.
@@ -6,7 +7,7 @@ import type { RuntimePage } from '../backends/page-types.js';
 import { browserCommand, watch } from './streams.js';
 import type { StreamOptions, StreamReadOptions, StreamBatch } from '../protocol.js';
 import type { CloseUserTabsResult } from '../protocol.js';
-import type { ManagedRuntimePage, UserTabInfo } from '../backends/managed-page.js';
+import type { ManagedRuntimePage } from '../backends/managed-page.js';
 import { ActionError } from './errors.js';
 import { buildInstructions, readDocForContext, type DocContext } from '../docs/manifest.js';
 import { BROWSER_CAPABILITIES } from '../docs/surface.js';
@@ -100,7 +101,12 @@ export class Browser {
   };
 
   readonly user = {
-    openTabs: async (options: { query?: string; limit?: number } = {}): Promise<UserTabInfo[]> => this.ext(await this.page()).userTabs(options),
+    /** Unclaimed supported tabs in the visible scope. Query is trimmed, case-insensitive literal substring of URL OR title (no token splitting). Inspect items, matched, totalInScope, excluded and hasMore; continue with nextOffset. Each call takes a fresh snapshot. */
+    openTabs: async (...args: [options?: TabDiscoveryOptions]): Promise<TabDiscoveryResult> => {
+      checkArity('Browser.user.openTabs', args.length, 0, 1);
+      const options = parseInput('Browser.user.openTabs', discoveryOptions, args[0] === undefined ? {} : args[0]);
+      return this.ext(await this.page()).userTabs(options);
+    },
     /** Claim by foreground, id, or unique url/title lookup; expected fields verify the tab's current identity. */
     claimTab: async (tab: { tabId?: number; active?: boolean; title?: string; url?: string; expectedUrl?: string; expectedTitle?: string }): Promise<Tab> => {
       const page = this.ext(await this.page());

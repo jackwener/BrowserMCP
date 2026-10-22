@@ -26,3 +26,27 @@ Every error has `code`, `message`, optional `hint`, and any structured data spre
 | JavaScript | `js_error`, `js_timeout`, `js_cancelled`, `js_reset`, `js_busy`, `js_worker_failed`, `js_worker_exited` | ordinary exceptions preserve bindings; timeout, cancellation, reset and worker failure clear them. `js_busy`: wait for `doctor` javascript.pendingCalls to reach zero. See `repl-session` for execution and recovery semantics |
 
 Native browser APIs report `chrome_api_unavailable`, `chrome_api_error`, `unsupported_call_shape`, and `runtime_state_conflict`. Inspect `browser.chrome.describe(member)` for context/signatures. Streams report loss/reset in their results; `stream_closed` requires a new watch. `command_outcome_unknown` means dispatched page code may have run: inspect before retrying. `result_not_serializable` requires returning plain data.
+
+## Trustworthy API boundaries
+
+`invalid_args` with `dispatched:false` rejects an invocation before browser effects; fix the indicated field and retry that call. Evaluation does not guess positional arguments or discard unknown options. REPL call transport rejects lossy values rather than applying display formatting to them.
+
+`invalid_response` from tab discovery means a backend response violated the protocol, not that the browser has no tabs. Check `doctor` for host/backend versions. Protocol revision 4 requires the discovery envelope; update host and extension together.
+
+For discovery, `totalInScope:0` means no eligible unclaimed tabs in the visible scope; `totalInScope>0, matched:0` means no literal query match. `excluded` explains ownership and unsupported-page exclusions. `hasMore` distinguishes a partial result from a complete match set. Search emptiness is not an exception.
+
+Issues #18 and #19 exposed different evidence: #18's silent argument loss is reproducible. #19's literal `x.com/home` query matches `https://x.com/home` in the reported version's implementation; its reported live discrepancy is not established by that example alone. The discovery envelope and strict response validation address the confirmed ambiguity without asserting an unverified incident cause.
+
+The design borrows explicit tool contracts from OpenAI's public function-calling guidance (https://developers.openai.com/api/docs/guides/function-calling) and observe/action feedback from the publicly described ChatGPT agent (https://openai.com/index/introducing-chatgpt-agent/). These sources do not disclose ChatGPT's internal tab-search implementation. In this REPL, an MCP schema for the outer `code` string cannot validate nested JavaScript API calls; runtime contracts remain necessary.
+
+### Local client implementation evidence
+
+A read-only inspection of the locally installed ChatGPT.app ASAR on 2026-10-22 found package `openai-codex-electron` version `26.1007.30912`. In `.vite/build/main-CqEoQDOU.js` (SHA-256 `09d19386e1f23cf4ccbc950fc40d85a1e8a064a08be588b2a4be6a89f6ada9e6`), these named methods remain visible in the bundled JavaScript:
+
+- `getTabsForBrowserUse` and `serializeTab`: build inventory from host metadata and optional live runtime, expose stable provider identity and session-control status, and choose an active tab. This layer has no query argument; it does not establish how a separate search API works.
+- `requireLiveTab`: recover a missing execution resource only when a concrete tab is needed. Inventory survives WebContents destruction.
+- `requireBrowserUseTab`: enforce the session route before access.
+- `assertTabMatchesCurrentBrowserUsePage`: check page identity and WebContents identity/liveness before dispatch, including after asynchronous waits.
+- `runLoggedRequest`: attach session/request/turn context to failures and rethrow them.
+
+These are observations of the installed desktop bundle, not claims about ChatGPT's server implementation or original source. We independently implement shared discovery contracts and retain host-owned logical tabs. We do not adopt its fallback to the first tab as an indication of the user's foreground intent. No vendor code is included in this repository.

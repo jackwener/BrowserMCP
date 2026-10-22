@@ -8,12 +8,13 @@ export interface PageOptions {
   page?: string;
 }
 
-export interface UserTabInfo { tabId: number; title?: string; url?: string; windowId: number; active: boolean; groupId?: number; lastAccessed?: number; lifecycle?: 'dormant' | 'loading' | 'ready'; availability?: 'ready' | 'load_required' | 'host_attachment_required' }
+export type { UserTabInfo } from '../shared/api-contract.js';
+import type { TabDiscoveryOptions, TabDiscoveryResult } from '../shared/api-contract.js';
 
 /** Page ownership and lifecycle operations shared by browser backends. */
 export interface ManagedPageExtras {
   nameSession(name: string): Promise<void>;
-  userTabs(options?: { query?: string; limit?: number }): Promise<UserTabInfo[]>;
+  userTabs(options?: TabDiscoveryOptions): Promise<TabDiscoveryResult>;
   claim(tab: { tabId?: number; active?: boolean; title?: string; url?: string; expectedUrl?: string; expectedTitle?: string }): Promise<{ page: string; tabId: number; url?: string; title?: string }>;
   closeUserTabs(tabIds: number[]): Promise<CloseUserTabsResult>;
   mark(page: string, mark: 'deliverable' | 'handoff' | null): Promise<void>;

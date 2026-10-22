@@ -54,26 +54,57 @@ const errorData = e => ({ name: e?.name ?? 'Error', message: e?.message ?? Strin
   : undefined), data: e?.data });
 
 function encode(value, seen = new WeakSet()) {
-  if (value && handles.has(value)) return handles.get(value);
-  if (typeof value === 'function') return { $function: value.toString() };
-  if (!value || typeof value !== 'object') return value;
-  if (ArrayBuffer.isView(value) || types.isAnyArrayBuffer(value)) return value;
-  if (seen.has(value)) return '[circular]';
+  if (value && handles.has(value)) return ['remote', handles.get(value)];
+  if (typeof value === 'function') return ['function', value.toString()];
+  if (!value || typeof value !== 'object') return ['value', value];
+  if (ArrayBuffer.isView(value) || types.isAnyArrayBuffer(value)) return ['value', value];
+  if (seen.has(value)) return ['value', '[circular]'];
   seen.add(value);
   let result;
-  if (types.isDate(value)) result = value.toISOString();
-  else if (types.isMap(value)) result = [...value].map(entry => encode(entry, seen));
-  else if (types.isSet(value)) result = [...value].map(entry => encode(entry, seen));
+  if (types.isDate(value)) result = ['value', value.toISOString()];
+  else if (types.isMap(value)) result = encode([...value], seen);
+  else if (types.isSet(value)) result = encode([...value], seen);
   else if (types.isNativeError(value)) result = encode(errorData(value), seen);
-  else result = Array.isArray(value) ? value.map(v => encode(v, seen)) : Object.fromEntries(Object.entries(value).map(([k, v]) => [k, encode(v, seen)]));
+  else result = Array.isArray(value) ? ['array', value.map(v => encode(v, seen))] : ['object', Object.entries(value).map(([k, v]) => [k, encode(v, seen)])];
   seen.delete(value);
   return result;
 }
-function decode(value) {
-  if (!value || typeof value !== 'object') return value;
-  if (value.$remote !== undefined) return remote(value);
-  if (ArrayBuffer.isView(value) || value instanceof ArrayBuffer) return value;
-  return Array.isArray(value) ? value.map(decode) : Object.fromEntries(Object.entries(value).map(([k, v]) => [k, decode(v)]));
+// Calls are not presentation: preserve supported values exactly and reject lossy conversions.
+function encodeCall(value, path = 'arguments', seen = new WeakSet()) {
+  const fail = reason => { throw Object.assign(new TypeError(`${path}: ${reason}`), { code: 'invalid_args', data: { path, dispatched: false } }); };
+  if (value && handles.has(value)) return ['remote', handles.get(value)];
+  if (typeof value === 'function') return ['function', value.toString()];
+  if (value === undefined || value === null || ['string', 'boolean'].includes(typeof value)) return ['value', value];
+  if (typeof value === 'number') {
+    if (!Number.isFinite(value) || Object.is(value, -0)) fail('use finite JSON numbers; special numbers must be converted explicitly');
+    return ['value', value];
+  }
+  if (typeof value !== 'object') fail('unsupported argument type');
+  if (seen.has(value)) fail('cyclic arguments are not supported');
+  const proto = Object.getPrototypeOf(value);
+  if (!Array.isArray(value) && proto !== null && (Object.getPrototypeOf(proto) !== null || proto.constructor?.name !== 'Object')) fail('use plain objects or arrays; convert special objects explicitly');
+  seen.add(value);
+  const entries = [];
+  const keys = Reflect.ownKeys(value);
+  for (const key of keys) {
+    if (Array.isArray(value) && key === 'length') continue;
+    const d = Object.getOwnPropertyDescriptor(value, key);
+    if (typeof key !== 'string' || !d.enumerable || !('value' in d)) fail('symbol keys, accessors and hidden properties are not supported');
+    if (Array.isArray(value) && !/^(0|[1-9]\d*)$/.test(key)) fail('array properties are not supported');
+    entries.push([key, encodeCall(d.value, `${path}.${key}`, seen)]);
+  }
+  if (Array.isArray(value) && keys.length !== value.length + 1) fail('sparse arrays are not supported');
+  seen.delete(value);
+  return Array.isArray(value) ? ['array', entries.map(([, v]) => v)] : ['object', entries];
+}
+
+function decode(node) {
+  const [kind, value] = node;
+  if (kind === 'value') return value;
+  if (kind === 'remote') return remote(value);
+  if (kind === 'array') return value.map(decode);
+  if (kind === 'object') return Object.fromEntries(value.map(([k, v]) => [k, decode(v)]));
+  throw new Error('Invalid RPC result envelope');
 }
 function remote(descriptor, path = []) {
   const proxy = new Proxy(path.length || descriptor.callable ? function () {} : {}, {
@@ -94,7 +125,7 @@ function remote(descriptor, path = []) {
       const id = ++sequence;
       return track(run, new Promise((resolve, reject) => {
         pending.set(id, { resolve, reject });
-        try { parentPort.postMessage({ kind: 'call', run: run.id, id, target: descriptor.$remote, path, args: encode(args) }); }
+        try { parentPort.postMessage({ kind: 'call', run: run.id, id, target: descriptor.$remote, path, args: encodeCall(args) }); }
         catch (error) { pending.delete(id); reject(error); }
       }));
     },

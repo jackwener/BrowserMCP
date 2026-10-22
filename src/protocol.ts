@@ -57,7 +57,8 @@ export interface Command {
   /** console read: cursor paging */
   afterSequence?: number;
   limit?: number;
-  /** user-tabs: case-insensitive title or URL search */
+  /** user-tabs: case-insensitive literal title or URL substring; paginated discovery envelope. */
+  offset?: number;
   query?: string;
   levels?: string[];
   filter?: string;
@@ -200,7 +201,7 @@ export type BrowserEvent =
 
 export type HostToExt = { type: 'command'; command: Command } | { type: 'ready'; version: string };
 /** Advisory contract revision; individual capabilities and command results decide what works. */
-export const PROTOCOL_REVISION = 3;
+export const PROTOCOL_REVISION = 4;
 export type BrowserFeature = 'chrome-api' | 'streams' | 'extension-logs' | 'page-evaluate' | 'frame-evaluate' | 'cdp' | 'network' | 'frames' | 'dialogs' | 'console' | 'downloads' | 'viewport' | 'visibility' | 'webmcp';
 export type ExtToHost =
   | { type: 'hello'; browserId: string; extensionVersion: string; protocolRevision?: number; features?: BrowserFeature[] }

@@ -1,3 +1,4 @@
+import { PageFunction } from '../shared/api-contract.js';
 /** Persistent Node REPL with a per-session worker and a bridge to the existing object model. */
 import { Worker } from 'node:worker_threads';
 import { Tab } from '../api/tab.js';
@@ -85,22 +86,32 @@ export class JsSession {
   }
 
   private encode(value: any): any {
-    if (value instanceof Tab || value instanceof Browser || typeof value === 'function') return this.reference(value);
-    if (!value || typeof value !== 'object') return value;
-    if (ArrayBuffer.isView(value) || value instanceof ArrayBuffer) return value;
-    return Array.isArray(value) ? value.map(v => this.encode(v)) : Object.fromEntries(Object.entries(value).map(([k, v]) => [k, this.encode(v)]));
+    if (value instanceof Tab || value instanceof Browser || typeof value === 'function') return ['remote', this.reference(value)];
+    if (!value || typeof value !== 'object' || ArrayBuffer.isView(value) || value instanceof ArrayBuffer) return ['value', value];
+    return Array.isArray(value) ? ['array', value.map(v => this.encode(v))] : ['object', Object.entries(value).map(([k, v]) => [k, this.encode(v)])];
   }
 
-  private decode(value: any): any {
-    if (!value || typeof value !== 'object') return value;
-    if (value.$remote !== undefined) {
+  private decode(node: any): any {
+    if (node === undefined) return undefined;
+    const [kind, value] = node;
+    if (kind === 'function') return value;
+    if (kind === 'array') return value.map((v: unknown) => this.decode(v));
+    if (kind === 'object') return Object.fromEntries(value.map(([k, v]: [string, unknown]) => [k, this.decode(v)]));
+    return this.decodeCall(node);
+  }
+
+  private decodeCall(node: any): any {
+    const [kind, value] = node;
+    if (kind === 'value') return value;
+    if (kind === 'function') return new PageFunction(value);
+    if (kind === 'remote') {
       let result = this.references.get(value.$remote);
       for (const key of value.path ?? []) result = result?.[key];
       return result;
     }
-    if (value.$function !== undefined) return value.$function;
-    if (ArrayBuffer.isView(value) || value instanceof ArrayBuffer) return value;
-    return Array.isArray(value) ? value.map(v => this.decode(v)) : Object.fromEntries(Object.entries(value).map(([k, v]) => [k, this.decode(v)]));
+    if (kind === 'array') return value.map((v: unknown) => this.decodeCall(v));
+    if (kind === 'object') return Object.fromEntries(value.map(([k, v]: [string, unknown]) => [k, this.decodeCall(v)]));
+    throw new Error('Invalid RPC argument envelope');
   }
 
   private appendWrite(output: JsRunResult, entry: string): void {
@@ -112,7 +123,7 @@ export class JsSession {
 
   private startWorker(): Worker {
     if (this.worker) return this.worker;
-    const globals = Object.fromEntries(Object.entries(this.globals).map(([name, value]) => [name, name === 'sites' ? this.reference(value as object) : this.encode(value)]));
+    const globals = ['object', Object.entries(this.globals).map(([name, value]) => [name, name === 'sites' ? ['remote', this.reference(value as object)] : this.encode(value)])];
     const worker = new Worker(new URL('./js-worker.mjs', import.meta.url), { workerData: { globals }, execArgv: [], stdout: true, stderr: true });
     this.worker = worker;
     // Node modules may print outside the injected console. Never let that corrupt Native Messaging/stdio.
@@ -161,9 +172,7 @@ export class JsSession {
       let receiver: any;
       for (const key of message.path) { receiver = target; target = target?.[key]; }
       if (typeof target !== 'function') throw Object.assign(new Error(`Unknown API method ${message.path.join('.')}`), { code: 'unknown_method', hint: 'Read docs_get for the relevant API topic.' });
-      const args = this.decode(message.args);
-      // Page functions cross as source, never execute in the host or capture host closures.
-      if (message.path.at(-1) === 'evaluate' && message.args[0]?.$function) args[0] = message.args[0];
+      const args = this.decodeCall(message.args);
       const value = await Reflect.apply(target, receiver, args);
       if (worker === this.worker) worker.postMessage({ kind: 'reply', id: message.id, value: this.encode(value) });
     } catch (error) {

@@ -13,9 +13,11 @@ await tab.observe();
 Or borrow a user tab:
 ```js
 let matches = await browser.user.openTabs({query: 'example.com', limit: 20});
-matches;
+matches.items;
 ```
-Copy its numeric `tabId` into `await browser.user.claimTab({tabId: ...})`. Store the returned Tab handle, then observe it. Session handles come from `await browser.tabs.list()` and `await browser.tabs.get(id)`.
+The result reports `totalVisible`, `totalInScope`, `excluded`, `matched`, and `hasMore`. `scope:"unclaimed"` excludes actively owned and unsupported tabs. Query is a trimmed case-insensitive literal substring of URL OR title, without whitespace token splitting. For more results, pass `offset: matches.nextOffset` with the same query and limit; each call is a fresh snapshot. Zero matches is a valid result; invalid transport responses are errors.
+
+Copy an item’s numeric `tabId` into `await browser.user.claimTab({tabId: ...})`. Store the returned Tab handle, then observe it. Session handles come from `await browser.tabs.list()` and `await browser.tabs.get(id)`.
 
 After reading the observation, call `await tab.act({action:'click', target:{ref: '...'}})` using a returned ref, then `await tab.observe()` or `await tab.expect({text:'...'})` with the expected result. `await tab.read()` reads document text. Batch determined steps; return at new decision points.
 
@@ -36,3 +38,9 @@ Finish with `session_finalize`. Use `doctor` for connection/execution status and
 Reuse the same target for verification: `await tab.expect({target, value:"42"})`. Continue captured output with `tab.observe(result.next)` or `tab.read(result.next)`. Pass an `openedTabs` entry directly to `browser.tabs.get`, and the returned download object to `tab.download(result.download)`.
 
 Tab handles expose async methods: use `await tab.url()` and `await tab.title()`. Entries returned by `browser.tabs.list()` are snapshots with string `url` and `title` fields. Inspecting or converting a remote method to a string describes the method locally; it never reads the page.
+
+### Page evaluation contract
+
+Use `await tab.evaluate(value => value, {arg: data})`. The second argument is a strict options object with only `arg`, `frame`, and `timeoutMs`; extra positional arguments and unknown fields fail before dispatch. Source strings do not accept `arg`. Functions run in the page and cannot capture REPL variables.
+
+Arguments are plain JSON data: null, booleans, strings, finite numbers (excluding negative zero), dense arrays and plain objects. Root `arg: undefined` is allowed. Nested undefined, non-finite numbers, BigInt, functions, special objects, accessors, symbol keys and cycles are rejected, never silently rewritten. Convert special values explicitly. API handles can be passed to APIs that accept them; they are not page data. Errors with `dispatched:false` mean the rejected invocation had no page effects. This does not undo earlier calls in the same cell.

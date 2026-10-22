@@ -1,3 +1,4 @@
+import { PageFunction } from '../shared/api-contract.js';
 /**
  * The object model's entry: agent.browsers · sites.<site>.<command>() · recon.discover(tab) · tools.define.
  * One surface behind both the typed entry tools and the `js` session.
@@ -69,7 +70,7 @@ export function createAgentApi(rt: Runtime, sessionId: string): AgentApi {
     recon: { discover: async (tab: Tab, opts) => { const log = await tab.network.read({ limit: 2000 }); return tab.use((page) => discoverEndpoints(page, { ...opts, network: log.entries as Array<Record<string, unknown>> })); } },
     tools: {
       // In js, an explicit function can be passed directly; its source is saved as the adapter.
-      define: (def: ToolDefinition | (Omit<ToolDefinition, 'func'> & { func?: string | ((ctx: Record<string, unknown>) => unknown) })) => rt.defineTool({ ...def, func: typeof def.func === 'function' ? def.func.toString() : def.func } as ToolDefinition),
+      define: (def: ToolDefinition | (Omit<ToolDefinition, 'func'> & { func?: string | ((ctx: Record<string, unknown>) => unknown) })) => rt.defineTool({ ...def, func: typeof def.func === 'function' ? def.func.toString() : (def.func as unknown) instanceof PageFunction ? (def.func as unknown as PageFunction).source : def.func } as ToolDefinition),
       try: (draftId, args, expect) => rt.tryToolDraft(draftId, args, expect, sessionId),
       activate: (draftId) => rt.activateToolDraft(draftId),
       discard: async (draftId) => rt.discardToolDraft(draftId),

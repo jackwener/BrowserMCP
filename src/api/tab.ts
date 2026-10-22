@@ -1,3 +1,4 @@
+import { PageFunction, checkArity, parseInput, evaluateOptions, pageArgument, type EvaluateOptions } from '../shared/api-contract.js';
 import { pageTools, pageToolsUpdate, type PageTool, type PageToolsUpdate } from './webmcp.js';
 import { watch } from './streams.js';
 import type { StreamOptions, StreamReadOptions } from '../protocol.js';
@@ -427,12 +428,14 @@ export class Tab {
   }
 
   /** Main World page code; functions receive only opts.arg, never host closures. Dispatched scripts are never replayed. */
-  async evaluate(script: string | ((arg: any) => any), opts: { arg?: unknown; frame?: FrameStep | FrameStep[]; timeoutMs?: number } = {}): Promise<unknown> {
-    if (opts.timeoutMs !== undefined && (!Number.isFinite(opts.timeoutMs) || opts.timeoutMs < 1 || opts.timeoutMs > 300_000)) throw new ActionError('invalid_args', 'timeoutMs must be from 1 to 300000');
-    const source = typeof script === 'function' ? script.toString() : (script as unknown as { $function?: string })?.$function;
-    const expression = source ? `(${source})(${JSON.stringify(opts.arg) ?? 'undefined'})` : script as string;
-    if (typeof expression !== 'string') throw new ActionError('invalid_args', 'evaluate expects page source or a function');
-    return this.use(page => opts.frame !== undefined ? page.evaluateInFrame(expression, opts.frame, opts.timeoutMs) : page.evaluate(expression, { timeoutMs: opts.timeoutMs }));
+  async evaluate(script: string | ((arg: any) => any), opts: EvaluateOptions = {}): Promise<unknown> {
+    checkArity('Tab.evaluate', arguments.length, 1, 2);
+    const options = parseInput('Tab.evaluate', evaluateOptions, opts);
+    const source = typeof script === 'function' ? script.toString() : ((script as unknown) instanceof PageFunction ? (script as unknown as PageFunction).source : undefined);
+    if (!source && Object.hasOwn(options, 'arg')) throw new ActionError('invalid_args', 'Tab.evaluate: arg requires a function, not a source string.', 'Use tab.evaluate(value => ..., {arg: value}).', { dispatched: false });
+    const expression = source ? `(${source})(${pageArgument(options.arg)})` : script;
+    if (typeof expression !== 'string') throw new ActionError('invalid_args', 'evaluate expects page source or a function', undefined, { dispatched: false });
+    return this.use(page => options.frame !== undefined ? page.evaluateInFrame(expression, options.frame, options.timeoutMs) : page.evaluate(expression, { timeoutMs: options.timeoutMs }));
   }
 
   /** Native CDP on this Tab's shared debugger attachment. Parameters are not rewritten. */

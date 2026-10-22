@@ -60,3 +60,19 @@ describe('browser tab ownership', () => {
   });
 
 });
+
+it('discovers tabs with explicit scope and consistent literal URL filtering', async () => {
+  const tabs = chromeMock();
+  tabs.query.mockResolvedValue([
+    {id:3,url:'https://x.com/home',title:'Home / X',windowId:1,active:true,lastAccessed:20},
+    {id:4,url:'chrome://settings',title:'Settings',windowId:1,active:false},
+    {id:5,url:'https://example.com/',title:'Owned',windowId:1,active:false},
+  ]);
+  const manager = new SessionManager(() => {});
+  await manager.ready();
+  manager.sessions.set('occupied', {leases:new Map([[5,{state:'active'}]])});
+  const result = await manager.listUserTabs({query:' X.COM/HOME '});
+  expect(result).toMatchObject({matched:1,totalVisible:3,totalInScope:1,excluded:{owned:1,unsupported:1},items:[{tabId:3}]});
+  expect((await manager.listUserTabs()).items).toEqual(result.items);
+  expect(await manager.listUserTabs({query:'missing'})).toMatchObject({matched:0,totalInScope:1,items:[]});
+});
