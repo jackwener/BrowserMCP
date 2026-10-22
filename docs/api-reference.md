@@ -34,7 +34,7 @@ class Browser {
   };
   tabs: {
     new(url?: string): Promise<Tab>;
-    list(): Promise<Array<{ id?: string; tabId: number; pending?: true; url?: string; title?: string; active: boolean; selected: boolean; origin: "agent" | "user"; state: "active" | "handoff"; }>>;
+    list(): Promise<Array<{ id?: string; tabId: number; pending?: true; url?: string; title?: string; active: boolean; selected: boolean; lifecycle?: "dormant" | "loading" | "ready"; origin: "agent" | "user"; state: "active" | "handoff"; }>>;
     get(tab: string | { tab?: string; tabId: number; }, opts?: { timeoutMs?: number; }): Promise<Tab>;
     selected(): Promise<Tab | undefined>;
     finalize(opts?: { keep?: Array<{ tab: string | Tab; status: "handoff" | "deliverable"; }>; }): Promise<{ closed: Array<string>; kept: Array<string>; failed: Array<{ page: string; reason: string; }>; }>;
@@ -53,9 +53,12 @@ class Browser {
 }
 
 class Tab {
-  tabId?: number; // `id` is the Chrome tab id as a string; `tabId` is the numeric id when claimed from a user tab.
+  tabId?: number; // `id` is the stable backend page handle; `tabId` is the numeric backend id when claimed from a user tab.
   id: string;
   goto(url: string, opts?: { waitUntil?: "load" | "none"; settleMs?: number; }): Promise<{ url: string | null; title: string | null; }>;
+  markDeliverable(): Promise<void>; // Preserve this tab for the user when the session is finalized.
+  markHandoff(): Promise<void>; // Preserve this tab for a subsequent turn; it must be claimed again after finalization.
+  clearRetention(): Promise<void>; // Restore default cleanup: close agent tabs, release borrowed user tabs.
   url(): Promise<string | null>;
   title(): Promise<string | null>;
   back(): Promise<void>;
@@ -164,7 +167,7 @@ interface DialogInfo { type: 'alert' | 'confirm' | 'prompt' | 'beforeunload'; me
 
 interface ConsoleEntry { seq: number; level: 'debug' | 'info' | 'log' | 'warn' | 'error'; message: string; timestamp: string; url?: string; line?: number }
 
-interface UserTabInfo { tabId: number; title?: string; url?: string; windowId: number; active: boolean; groupId?: number; lastAccessed?: number }
+interface UserTabInfo { tabId: number; title?: string; url?: string; windowId: number; active: boolean; groupId?: number; lastAccessed?: number; lifecycle?: 'dormant' | 'loading' | 'ready'; availability?: 'ready' | 'load_required' | 'host_attachment_required' }
 
 interface CloseUserTabsResult {
   complete: boolean;

@@ -93,7 +93,7 @@ export interface ImageValue { __image: true; mimeType: string; base64: string }
 
 export class Tab {
   /** A Tab owns the page object bound to its identity; `bound` lets an adapter pass an existing page. */
-  /** `id` is the Chrome tab id as a string; `tabId` is the numeric id when claimed from a user tab. */
+  /** `id` is the stable backend page handle; `tabId` is the numeric backend id when claimed from a user tab. */
   readonly tabId?: number;
   constructor(private readonly initialId: string, private readonly ctx: SessionContext, private readonly bound?: RuntimePage, tabId?: number) { this.tabId = tabId; }
   get id(): string { return this.bound?.getActivePage() ?? this.initialId; }
@@ -175,6 +175,18 @@ export class Tab {
     const url = await page.getCurrentUrl().catch(() => null);
     const title = await page.evaluate<string>('document.title').catch(() => null);
     return { url, title };
+  }
+  /** Preserve this tab for the user when the session is finalized. */
+  async markDeliverable(): Promise<void> { await this.setRetention('deliverable'); }
+  /** Preserve this tab for a subsequent turn; it must be claimed again after finalization. */
+  async markHandoff(): Promise<void> { await this.setRetention('handoff'); }
+  /** Restore default cleanup: close agent tabs, release borrowed user tabs. */
+  async clearRetention(): Promise<void> { await this.setRetention(null); }
+  private async setRetention(status: 'deliverable' | 'handoff' | null): Promise<void> {
+    await this.use(async page => {
+      if (!this.ctx.rt.isManagedPage(page)) throw new ActionError('capability_unavailable', 'This backend does not support tab retention');
+      await page.mark(this.id, status);
+    });
   }
   async url(): Promise<string | null> { return this.use((p) => p.getCurrentUrl()); }
   async title(): Promise<string | null> { return this.use((p) => p.evaluate<string>('document.title')); }

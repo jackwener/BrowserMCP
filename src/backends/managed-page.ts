@@ -8,7 +8,7 @@ export interface PageOptions {
   page?: string;
 }
 
-export interface UserTabInfo { tabId: number; title?: string; url?: string; windowId: number; active: boolean; groupId?: number; lastAccessed?: number }
+export interface UserTabInfo { tabId: number; title?: string; url?: string; windowId: number; active: boolean; groupId?: number; lastAccessed?: number; lifecycle?: 'dormant' | 'loading' | 'ready'; availability?: 'ready' | 'load_required' | 'host_attachment_required' }
 
 /** Page ownership and lifecycle operations shared by browser backends. */
 export interface ManagedPageExtras {

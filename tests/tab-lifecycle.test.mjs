@@ -47,4 +47,16 @@ describe('browser tab ownership', () => {
     expect(session.leases.size).toBe(0);
     expect(await manager.resolveTab(other, '4')).toBe(4);
   });
+  it('honors handle retention and aborts malformed or foreign keep before any cleanup', async () => {
+    const tabs = chromeMock(); const manager = new SessionManager(() => {}); await manager.ready();
+    const session = manager.get('test');
+    await manager.adoptCreatedTab(session, { id: 2, windowId: 1 });
+    await manager.adoptCreatedTab(session, { id: 3, windowId: 1 });
+    manager.mark(session, 3, 'deliverable');
+    await expect(manager.finalize(session, [{ page: 'itab', status: 'deliverable' }])).rejects.toThrow();
+    await expect(manager.finalize(session, [{ page: '99', status: 'deliverable' }])).rejects.toThrow();
+    expect(tabs.remove).not.toHaveBeenCalled();
+    expect(await manager.finalize(session, [])).toEqual({ closed: ['2'], kept: ['3'], failed: [] });
+  });
+
 });

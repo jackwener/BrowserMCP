@@ -192,7 +192,7 @@ export interface Result {
 }
 
 export type BrowserEvent =
-  | { kind: 'tab_created' | 'tab_acquired' | 'tab_closed' | 'tab_released' | 'tab_navigated'; session: string; page?: string; tabId: number; url?: string; title?: string; origin?: 'agent' | 'user' }
+  | { kind: 'tab_created' | 'tab_acquired' | 'tab_closed' | 'tab_released' | 'tab_navigated' | 'tab_detached' | 'tab_attached'; session: string; page?: string; tabId: number; url?: string; title?: string; origin?: 'agent' | 'user' }
   | { kind: 'download'; state: string; filename?: string; url?: string }
   | { kind: 'dialog'; page?: string; dialogType: string; message?: string }
   | { kind: 'webmcp_changed'; page?: string }

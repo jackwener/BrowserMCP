@@ -50,10 +50,10 @@ export class Browser {
       }
       return tab;
     },
-    list: async (): Promise<Array<{ id?: string; tabId: number; pending?: true; url?: string; title?: string; active: boolean; selected: boolean; origin: 'agent' | 'user'; state: 'active' | 'handoff' }>> => {
+    list: async (): Promise<Array<{ id?: string; tabId: number; pending?: true; url?: string; title?: string; active: boolean; selected: boolean; lifecycle?: 'dormant' | 'loading' | 'ready'; origin: 'agent' | 'user'; state: 'active' | 'handoff' }>> => {
       const page = await this.page();
-      const tabs = await page.tabs() as Array<{ tabId: number; page?: string; pending?: true; url?: string; title?: string; active: boolean; selected: boolean; origin: 'agent' | 'user'; state: 'active' | 'handoff' }>;
-      return tabs.map((t) => ({ ...(t.page && { id: t.page }), tabId: t.tabId, ...(!t.page && { pending: true as const }), url: t.url, title: t.title, active: t.active, selected: t.selected, origin: t.origin, state: t.state }));
+      const tabs = await page.tabs() as Array<{ tabId: number; page?: string; pending?: true; url?: string; title?: string; active: boolean; selected: boolean; lifecycle?: 'dormant' | 'loading' | 'ready'; origin: 'agent' | 'user'; state: 'active' | 'handoff' }>;
+      return tabs.map((t) => ({ ...(t.page && { id: t.page }), tabId: t.tabId, ...(!t.page && { pending: true as const }), url: t.url, title: t.title, active: t.active, selected: t.selected, ...(t.lifecycle && { lifecycle: t.lifecycle }), origin: t.origin, state: t.state }));
     },
     get: async (tab: string | { tab?: string; tabId: number }, opts: { timeoutMs?: number } = {}): Promise<Tab> => {
       if (opts.timeoutMs !== undefined && (!Number.isFinite(opts.timeoutMs) || opts.timeoutMs < 0)) throw new ActionError('invalid_args', 'timeoutMs must be a finite non-negative number.');
@@ -71,12 +71,26 @@ export class Browser {
     },
     selected: async (): Promise<Tab | undefined> => {
       const tabs = (await this.tabs.list()).filter((tab) => tab.state === 'active' && tab.id);
-      const current = tabs.find((tab) => tab.selected) ?? tabs.find((tab) => tab.active) ?? tabs[0];
+      const current = tabs.find((tab) => tab.selected) ?? tabs.find((tab) => tab.active);
       return current?.id ? new Tab(current.id, this.ctx) : undefined;
     },
     finalize: async (opts: { keep?: Array<{ tab: string | Tab; status: 'deliverable' | 'handoff' }> } = {}): Promise<{ closed: string[]; kept: string[]; failed: Array<{ page: string; reason: string }> }> => {
       const page = await this.page();
-      const keep = (opts.keep ?? []).map((k) => ({ page: typeof k.tab === 'string' ? k.tab : k.tab.id, status: k.status }));
+      const keep = (opts.keep ?? []).map((k) => ({ page: typeof k.tab === 'string' ? k.tab : k.tab?.id, status: k.status }));
+      if (keep.length) {
+        const owned = await this.tabs.list();
+        for (const item of keep) {
+          if (!['deliverable', 'handoff'].includes(item.status)) throw new ActionError('invalid_args', 'Unknown retention status');
+          if (!owned.some(tab => tab.id === item.page)) {
+            const valid = typeof item.page === 'string' && (this.type === 'electron'
+              ? /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(item.page)
+              : /^(0|[1-9]\d*)$/.test(item.page));
+            throw new ActionError(valid ? 'page_unavailable' : 'invalid_tab_id', `Cannot retain tab ${JSON.stringify(item.page)}`,
+              'Use await tab.markDeliverable(), or pass the full tab.id (not a variable name or numeric tabId). No tabs were cleaned up.',
+              { tab: item.page, phase: 'finalize_validation', tabs: owned });
+          }
+        }
+      }
       const result = this.ctx.rt.isManagedPage(page) ? await page.finalize(keep) : (await page.closeWindow(), { closed: [], kept: keep.map((k) => k.page), failed: [] });
       for (const id of [...result.closed, ...result.kept]) this.ctx.rt.forgetPage(this.ctx.sessionId, id);
       this.ctx.state.finalized = result.failed.length === 0;

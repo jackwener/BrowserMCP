@@ -72,8 +72,8 @@ export function createMcpServer(rt: Runtime, sessionId: string, opts: { version?
   server.registerTool('doctor', { title: 'Doctor', description: 'Runtime status: browser connection, extension features and protocol warning (if versions differ), site/command counts, sessions. A protocol warning does not block browser commands.', inputSchema: {}, annotations: { readOnlyHint: true } }, async () => run(async () => ok({ ...rt.doctor(), javascript: state.js?.status() ?? { state: 'idle', generation: 0, pendingCalls: 0 } })));
 
   // ── session ──
-  server.registerTool('session_finalize', { title: 'Finalize session tabs', description: 'End-of-task cleanup. Agent-created tabs not listed in keep are closed; deliverable tabs leave the group and stay open; handoff tabs stay in the group for a later turn. Claimed user tabs are only released.',
-    inputSchema: { keep: z.array(z.object({ tab: z.string().describe('tab id'), status: z.enum(['deliverable', 'handoff']) })).default([]) },
+  server.registerTool('session_finalize', { title: 'Finalize session tabs', description: 'End-of-task cleanup. Prefer await tab.markDeliverable() in js to preserve a result. Unmarked agent-created tabs not listed in keep are closed; deliverable tabs leave the group and stay open; handoff tabs stay in the group for a later turn. Claimed user tabs are only released.',
+    inputSchema: { keep: z.array(z.object({ tab: z.string().describe('Complete tab.id returned by the API; not a REPL variable name, truncated id, or numeric tabId'), status: z.enum(['deliverable', 'handoff']) })).default([]) },
     annotations: { destructiveHint: true },
   }, async ({ keep }) => run(async () => {
     if (state.js && state.js.status().state !== 'idle') throw new ActionError('js_busy', 'JavaScript or dispatched API work is still running.', 'Wait for js to finish, or call js_reset and wait for doctor javascript.pendingCalls:0 before finalizing.');

@@ -34,3 +34,5 @@ Refs are opaque Element identities shared by ARIA, DOM and find. Copy them uncha
 Finish with `session_finalize`. Use `doctor` for connection/execution status and `js_reset` to stop JavaScript, clear bindings and close explicit subscriptions; tabs stay open. Read `repl-session` for Node declaration semantics, errors, timeout/reset and images. Request `api-reference` with `member:"Tab.act"`, `"Tab.network"`, `"Browser"` or another class/member for exact signatures; omit member for the full reference.
 
 Reuse the same target for verification: `await tab.expect({target, value:"42"})`. Continue captured output with `tab.observe(result.next)` or `tab.read(result.next)`. Pass an `openedTabs` entry directly to `browser.tabs.get`, and the returned download object to `tab.download(result.download)`.
+
+Tab handles expose async methods: use `await tab.url()` and `await tab.title()`. Entries returned by `browser.tabs.list()` are snapshots with string `url` and `title` fields. Inspecting or converting a remote method to a string describes the method locally; it never reads the page.

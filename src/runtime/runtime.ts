@@ -60,7 +60,7 @@ export interface SessionState {
 export interface DoctorReport {
   backend: Backend;
   browser: { connected: boolean; features: BrowserFeature[] };
-  extension: { connected: boolean; protocolMatches: boolean; protocolWarning: string | null; version: string | null; protocolRevision: number | null; hostProtocolRevision: number; features: BrowserFeature[] };
+  extension: { connected: boolean; protocolMatches: boolean | null; protocolWarning: string | null; version: string | null; protocolRevision: number | null; hostProtocolRevision: number; features: BrowserFeature[] };
   sites: number;
   commands: number;
   definedTools: number;
@@ -107,7 +107,7 @@ export class Runtime extends EventEmitter<RuntimeEvents> implements PageProvider
     const onEvent = (e: BrowserEvent): void => {
       if ('page' in e && e.page && 'session' in e) {
         const id = e.session.replace(/^mcp:/, ''); const state = this.sessions.get(id);
-        if (e.kind === 'tab_closed' || e.kind === 'tab_released') this.forgetPage(id, e.page);
+        if (e.kind === 'tab_closed' || e.kind === 'tab_released' || e.kind === 'tab_detached' || e.kind === 'tab_attached') this.forgetPage(id, e.page);
         if (e.kind === 'tab_navigated' && state) for (const key of state.lastObserve.keys()) if (key.startsWith(`${e.page}:`)) state.lastObserve.delete(key);
       }
       this.emit('browser-event', e);
@@ -298,7 +298,7 @@ export class Runtime extends EventEmitter<RuntimeEvents> implements PageProvider
     return {
       backend: this.backend(),
       browser: { connected: this.browserAvailable(), features: this.features() },
-      extension: { connected: Boolean(this.bridge?.connected), protocolMatches: Boolean(this.bridge?.protocolMatches), protocolWarning: this.bridge?.protocolWarning ?? null, version: this.bridge?.extensionVersion ?? null, protocolRevision: this.bridge?.protocolRevision ?? null, hostProtocolRevision: PROTOCOL_REVISION, features: this.features() },
+      extension: { connected: Boolean(this.bridge?.connected), protocolMatches: this.backend() === 'electron' ? null : Boolean(this.bridge?.protocolMatches), protocolWarning: this.bridge?.protocolWarning ?? null, version: this.bridge?.extensionVersion ?? null, protocolRevision: this.bridge?.protocolRevision ?? null, hostProtocolRevision: PROTOCOL_REVISION, features: this.features() },
       sites: list.length,
       commands: list.reduce((n, s) => n + s.commands, 0),
       definedTools: this.listTools().length,

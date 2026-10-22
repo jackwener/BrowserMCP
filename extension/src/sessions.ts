@@ -446,7 +446,11 @@ export class SessionManager {
   async finalize(s: Session, keep: Array<{ page: string; status: 'deliverable' | 'handoff' }>): Promise<{ closed: string[]; kept: string[]; failed: Array<{ page: string; reason: string }> }> {
     const closed: string[] = []; const kept: string[] = []; const failed: Array<{ page: string; reason: string }> = [];
     const keepByTab = new Map<number, 'deliverable' | 'handoff'>();
-    for (const k of keep) { try { keepByTab.set(await identity.resolveTabId(k.page), k.status); } catch { /* gone */ } }
+    for (const k of keep) {
+      const tabId = await identity.resolveTabId(k.page);
+      if (!s.leases.has(tabId)) throw new SessionError('page_not_in_session', `Cannot keep tab ${k.page}: it is not owned by this session`);
+      keepByTab.set(tabId, k.status);
+    }
     for (const lease of [...s.leases.values()]) {
       const status = keepByTab.get(lease.tabId) ?? lease.mark ?? null;
       const page = identity.pageId(lease.tabId);

@@ -79,6 +79,11 @@ function remote(descriptor, path = []) {
   const proxy = new Proxy(path.length || descriptor.callable ? function () {} : {}, {
     get(_target, key) {
       if (key === 'then') return undefined;
+      const label = path.length || descriptor.callable
+        ? `[RemoteMethod ${descriptor.summary?.type ?? 'API'}${path.length ? '.' + path.join('.') : ''}; call with await]`
+        : `[${descriptor.summary?.type ?? 'API'}${descriptor.props?.id ? ' ' + descriptor.props.id : ''}]`;
+      if (key === Symbol.toPrimitive || key === 'toString' || key === 'valueOf' || key === Symbol.for('nodejs.util.inspect.custom')) return () => label;
+      if (key === Symbol.toStringTag) return 'RemoteAPI';
       if (key === 'toJSON') return () => descriptor.summary ?? { type: 'API' };
       if (typeof key !== 'string') return undefined;
       if (!path.length && Object.hasOwn(descriptor.props ?? {}, key)) return descriptor.props[key];

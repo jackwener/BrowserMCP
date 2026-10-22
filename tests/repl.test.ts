@@ -10,6 +10,17 @@ const repl = (globals = {}) => { const s = new JsSession(globals); sessions.push
 afterEach(async () => { await Promise.all(sessions.splice(0).map(s => s.dispose())); });
 
 describe('persistent Node REPL', () => {
+  it('inspects remote methods locally without issuing calls or losing callable behavior', async () => {
+    let calls = 0;
+    const s = repl({ api: { url: async () => { calls++; return 'https://example.com/'; } } });
+    const result = await s.run('({string: String(api.url), template: `${api.url}`, explicit: api.url.toString(), primitive: api.url.valueOf(), tag: Object.prototype.toString.call(api.url)})');
+    expect(result.error).toBeUndefined();
+    expect(result.value).toMatchObject({ string: expect.stringContaining('RemoteMethod'), template: expect.stringContaining('RemoteMethod'), explicit: expect.stringContaining('RemoteMethod'), primitive: expect.stringContaining('RemoteMethod'), tag: '[object RemoteAPI]' });
+    expect(calls).toBe(0);
+    expect((await s.run('await api.url()')).value).toBe('https://example.com/');
+    expect(calls).toBe(1);
+  });
+
   it('keeps bindings across calls and remains usable after an exception', async () => {
     const s = repl();
     expect((await s.run('let n = await Promise.resolve(3); function add(x) { return n + x }; add(2)')).value).toBe(5);
