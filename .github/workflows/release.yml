@@ -40,7 +40,7 @@ jobs:
           node-version: ${{ matrix.node }}
       - run: npm ci --ignore-scripts
       - run: npm run build
-      - run: npx vitest run tests/repl.test.ts tests/ipc-session.test.ts
+      - run: npx vitest run tests/repl.test.ts tests/ipc-session.test.ts tests/api-contract.test.ts tests/tab-lifecycle.test.mjs
       - run: npm run smoke:setup
 
   release:
@@ -195,7 +195,7 @@ jobs:
         if: ${{ !inputs.skip_embedded_tests }}
         run: |
           npm run typecheck
-          npx vitest run tests/embedded-adapters.test.ts tests/embedded-registry.test.ts
+          npx vitest run tests/embedded-adapters.test.ts tests/embedded-registry.test.ts tests/electron-driver.test.ts tests/api-contract.test.ts
       - name: Build publishable package
         run: |
           npm pack --silent

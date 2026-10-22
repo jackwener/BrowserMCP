@@ -50,3 +50,5 @@ A read-only inspection of the locally installed ChatGPT.app ASAR on 2026-10-22 f
 - `runLoggedRequest`: attach session/request/turn context to failures and rethrow them.
 
 These are observations of the installed desktop bundle, not claims about ChatGPT's server implementation or original source. We independently implement shared discovery contracts and retain host-owned logical tabs. We do not adopt its fallback to the first tab as an indication of the user's foreground intent. No vendor code is included in this repository.
+
+The installed `openai-bundled/browser/26.1007.30912/scripts/browser-client.mjs` provides more direct evidence: `BrowserUser.openTabs()` accepts no query and returns `.tabs`; `PlaywrightAPI.evaluate` takes `(function, arg, options)`. Its argument serializer uses `JSON.stringify`; isolated execution confirmed `NaN` becomes `null` and `{x:undefined}` becomes `{}`. Those are reasons to enforce our own lossless contract, not copy that implementation. The positional signature explains a plausible source of API confusion, but does not establish what happened in either reporter's session.
