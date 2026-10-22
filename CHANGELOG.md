@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.0.34 — 2026-10-22
+
+Enforce strict evaluate options and lossless REPL call transport. Separate user data from internal RPC references. Return explicit tab discovery scope, counts and pagination using shared backend contracts. Reject malformed backend responses. Protocol revision 4 requires updating host and extension together; read openTabs results from items.
+
 ## 0.0.33 — 2026-10-20
 
 - refactor: standardize BrowserMCP runtime names and simplify configuration
