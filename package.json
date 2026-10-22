@@ -1,6 +1,6 @@
 {
   "name": "@jackwener/browsermcp",
-  "version": "0.0.35",
+  "version": "0.0.36-embedded.0",
   "description": "Chrome-backed MCP browser service with optional site adapters.",
   "repository": {
     "type": "git",
@@ -19,7 +19,7 @@
     "browsermcp": "dist/src/main.js"
   },
   "scripts": {
-    "build": "node scripts/clean.mjs && node scripts/extract-playwright-injected.mjs && tsc -p tsconfig.json && node scripts/gen-api-reference.mjs && node scripts/render-icons.mjs && node scripts/build-extension.mjs && node scripts/copy-assets.mjs",
+    "build": "node scripts/clean.mjs && node scripts/extract-playwright-injected.mjs && tsc -p tsconfig.json && node scripts/gen-api-reference.mjs && node scripts/render-icons.mjs && node scripts/build-extension.mjs && node scripts/copy-assets.mjs && node scripts/build-embedded.mjs",
     "build:ext": "node scripts/render-icons.mjs && node scripts/build-extension.mjs",
     "dev": "tsx src/main.ts",
     "test": "vitest run",
@@ -32,7 +32,10 @@
     "pack:store": "npm run build && node scripts/pack-extension.mjs store",
     "pack:manual": "npm run build && node scripts/pack-extension.mjs manual",
     "smoke:native": "node scripts/smoke-native-capabilities.mjs",
-    "generate:chrome": "node scripts/gen-chrome-reference.mjs"
+    "generate:chrome": "node scripts/gen-chrome-reference.mjs",
+    "build:embedded": "tsc -p tsconfig.json && node scripts/build-embedded.mjs && node scripts/copy-assets.mjs",
+    "smoke:embedded": "npm run build:embedded && node scripts/run-embedded-smoke.mjs",
+    "smoke:embedded:package": "npm run build:embedded && node scripts/smoke-embedded-package.mjs"
   },
   "files": [
     "dist/",
@@ -60,9 +63,11 @@
     "zod": "^4.6.5"
   },
   "devDependencies": {
+    "@electron/asar": "^4.3.1",
     "@resvg/resvg-js": "^2.6.2",
     "@types/chrome": "^0.3.0",
     "@types/node": "^22.20.3",
+    "electron": "^44.9.0",
     "esbuild": "^0.28.2",
     "playwright-core": "^1.63.0",
     "tsx": "^4.23.13",
@@ -73,6 +78,10 @@
     "./adapter-sdk": {
       "types": "./adapter-sdk/index.d.ts",
       "default": "./adapter-sdk/index.js"
+    },
+    "./embedded": {
+      "types": "./dist/src/embedded/index.d.ts",
+      "default": "./dist/src/embedded/index.js"
     }
   }
 }

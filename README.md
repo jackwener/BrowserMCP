@@ -143,6 +143,97 @@ Site commands execute directly without additional approval prompts. The read/wri
 | [Tab lifecycle](docs/tab-lifecycle.md) | Claiming tabs, grouping, and cleanup |
 | [Errors](docs/errors.md) | Error codes and recovery |
 
+## Embedded Electron applications
+
+Import `@jackwener/browsermcp/embedded` from Electron's main process. This entry does not run setup, register Native Messaging, discover Chrome, read global CLI configuration, or install an extension. The application supplies its writable directory, profile sessions, and page lifecycle callbacks. Adapters can still be created, verified, activated, updated, and removed through `tools`.
+
+```ts
+import { app, BrowserWindow, session } from 'electron';
+import path from 'node:path';
+import { createEmbeddedBrowser } from '@jackwener/browsermcp/embedded';
+
+await app.whenReady();
+const windows = new Map<number, BrowserWindow>();
+const profile = ({ profileId }) => session.fromPartition(`persist:${profileId}`);
+const browser = await createEmbeddedBrowser({
+  dataDir: path.join(app.getPath('userData'), 'browsermcp'),
+  execution: 'trusted-node',
+  browser: {
+    profile,
+    async createPage(scope) {
+      const window = new BrowserWindow({
+        webPreferences: {
+          session: profile(scope), contextIsolation: true,
+          sandbox: true, nodeIntegration: false,
+        },
+      });
+      const id = window.webContents.id;
+      windows.set(id, window);
+      window.once('closed', () => windows.delete(id));
+      return { contents: window.webContents, close: async () => { window.destroy(); } };
+    },
+    async activatePage(contents) { windows.get(contents.id)?.show(); },
+  },
+});
+
+// Scope comes from the application, not from agent-provided MCP arguments.
+const connection = browser.createSession({ workspaceId: 'project-a', profileId: 'personal' });
+await connection.server.connect(transport); // Any host-provided MCP SDK transport.
+// On disconnect, cleanup is automatic. Explicit close and application shutdown:
+await connection.close();
+await browser.dispose();
+```
+
+The host owns logical tabs; a tab does not need a `WebContents` until it is claimed. Register restored tabs immediately, and synchronize selection from the host UI:
+
+```ts
+const scope = { workspaceId: 'workspace', profileId: 'personal' };
+const handle = browser.registerPage({
+  scope,
+  url: restoredTab.url,
+  title: restoredTab.title,
+  load: async (signal) => {
+    // Resolve only once the restored tab has loaded; honor cancellation.
+    return hostTabs.ensureLoaded(restoredTab.id, { signal });
+  },
+  close: async () => { await hostTabs.close(restoredTab.id); },
+});
+browser.setActivePage(scope, handle); // Call on each host selection change.
+browser.updatePage(handle, { url: restoredTab.url, title: restoredTab.title });
+const unsubscribe = browser.subscribe((event) => {
+  // event.sessionId matches createSession().id, with no internal prefix.
+  // event.page.sessionId is the current owner; undefined after release.
+  hostTabs.setAgentOwner(event.page.handle, event.page.sessionId);
+});
+const snapshot = browser.getPages(scope); // Initialize/reconcile host UI.
+```
+
+`registerPage` takes a descriptor with `scope`, `url`, optional `title` / `contents` / `load(signal)`, and a required `close()` callback. For restored tabs, pass metadata and `load(signal)`; enumeration and matching do not trigger loading. A claim reserves exclusive ownership before loading, validates the resolved Electron profile, and returns only after loading succeeds. Failed loads return an unowned tab to the pool. Loading is cancelled on release, unregister, or session cleanup, and is bounded to 30 seconds. A host must honor the signal to prevent its own late side effects; BrowserMCP never attaches a result after access is revoked. WebContents destruction detaches the execution resource; the logical tab, ownership and retention remain intact. Use `attachPage(handle, contents)` to attach a replacement, or let `load(signal)` restore it on demand. `detachPage(handle)` explicitly detaches a resource. `close()` must close the logical host tab, including dormant tabs and tabs whose WebContents was replaced; bind it to the host tab identity, not an obsolete WebContents. Call `unregisterPage(handle)` when the logical host tab is removed.
+
+**Identity contract:** the returned handle and the numeric `tabId` in `getPages()` / agent tab lists belong to BrowserMCP. `tabId` is not `webContents.id`. Use the handle to map to your host tab and use the reported `tabId` for Chrome-shaped calls. Both stay stable across loading and WebContents replacement. `webContentsId` identifies only the current execution resource. This changes the implicit `webContents.id` behavior in `0.0.34-embedded.0` and the original vendored branch.
+
+`setActivePage(scope, handle | null)` is authoritative; keyboard focus is never used to infer the selected tab. Each workspace/profile has at most one active tab. `openTabs`, `claimTab({ active: true })`, owned-tab lists and `chrome.tabs.query` read the same registry state. `activatePage(contents)` implements agent-requested activation, after which the registry selection is updated. A zero-match claim reports `tab_not_found`; multiple matches report `ambiguous_tab`.
+
+Host `subscribe()` emits typed snapshots for registration, metadata/lifecycle changes, activation, acquisition, release, navigation, closure and unregister. Acquisition is idempotent for the same session. Listener exceptions cannot break ownership transitions. Subscribe before taking `getPages(scope)` when initializing UI, and unsubscribe when disposing it. MCP version defaults to the installed BrowserMCP package version; explicit `version` remains available for bundled hosts.
+
+The callbacks can manage `WebContentsView` instead of `BrowserWindow`; layout is entirely application-owned. Use `browser.registerPage({ scope, url, contents, close })` to make an existing user page available for claiming. Register only intended browser content, not application settings or privileged UI. `unregisterPage(handle)` revokes access without closing the page. User pages are released during cleanup; unkept agent pages are closed. Profile IDs must map to the intended Electron `Session`, and the backend checks this identity when registering/creating pages.
+
+The current evaluator explicitly requires **trusted Node execution**. REPL and adapter modules can access Node capabilities; neither `vm`, a Worker, nor page registration is a sandbox against malicious host code. The REPL runs in a Worker; adapter modules execute in the runtime process. This main-process entry is for applications that trust the connected agent and loaded adapter code. Browser pages should retain `sandbox: true`, `contextIsolation: true`, and `nodeIntegration: false`.
+
+Storage is confined by configuration: generated adapters are in `<dataDir>/adapters`, inactive candidates in `<dataDir>/drafts`, and a small standalone adapter SDK in `<dataDir>/node_modules`. No implicit `~/.browsermcp` or `~/.opencli-mcp` source is loaded. Optional `sources` are explicit; generated adapters override them. Adapter code is shared within the service, while execution uses the caller's authorized profile and pages. No login credentials are copied between profiles.
+
+`browser.chrome.call/describe/watch` remain available. Electron implements `tabs.query/get/create/update/remove/reload` and `cookies.getAll/get/set/remove`, plus session-scoped `tabs.onCreated/onUpdated/onRemoved/onActivated` events. Call `describe` for method availability and differences. Only registered, accessible tabs are returned; `windowId` is `-1` because window organization belongs to the host. Unsupported methods/options return `capability_unavailable`. Page-scoped CDP is available through `tab.cdp.send`; browser-wide `Target.*` and `Browser.*` commands are rejected. This is an explicit compatibility surface, not an emulation of every extension API.
+
+Package the generated `dist`, `docs`, and `adapter-sdk` resources with the npm package. When using ASAR, unpack `**/js-*.mjs` so the REPL worker and evaluator remain loadable. Keep Electron as an application dependency; it is only a development dependency here. Call `dispose()` before quitting, await it, and handle cleanup failures; it is safe to retry. The SDK does not install process exit handlers or call `process.exit()`.
+
+Validation:
+
+```bash
+npm run build:embedded        # SDK and page resources; no extension build required
+npm run smoke:embedded        # real Electron + MCP, two profiles, adapter editing, cleanup
+npm run smoke:embedded:package # installed npm package inside app.asar
+```
+
 ## Development
 
 ```bash
