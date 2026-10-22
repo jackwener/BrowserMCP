@@ -1,5 +1,31 @@
 # Changelog
 
+## 0.0.34-embedded.3 — 2026-10-22
+
+Host-owned logical tabs, lazy page registration, active-tab selection, session lifecycle events, and retention controls. Includes session-bound adapters and automatic npm publishing through GitHub Actions OIDC.
+
+## 0.0.34-embedded.2 — 2026-10-22
+
+- Preserve logical tab identity, session ownership and retention across WebContents replacement.
+- Define host-owned create/load/close callbacks and explicit attach/detach lifecycle operations.
+- Report structured host failures with recoverable tab state; protect cleanup against invalid keep entries.
+- Add handle-based deliverable/handoff retention and safe local remote-method inspection.
+- Verify background duplicate claims, host failure recovery and installed ASAR execution.
+
+## 0.0.34-embedded.1 — 2026-10-21
+
+- Model host tabs independently of WebContents, with stable logical IDs, explicit active selection, metadata updates and lazy loading.
+- Expose typed host events and snapshots with public MCP session IDs; reserve ownership during loading and roll back or cancel failed/revoked claims.
+- Unify tab state across MCP and Chrome APIs, and default MCP version to the installed package version.
+- Migration: use registerPage handles and reported tabId values; tabId no longer equals webContents.id. Synchronize host selection with setActivePage(scope, handle).
+- Share runtime isolation, storage injection, package version resolution and release infrastructure with main.
+
+## 0.0.34-embedded.0 — 2026-10-21
+
+- Add the embedded Electron SDK with host-owned storage, profiles and page lifecycle.
+- Support MCP sessions, adapter creation and updates, Chrome API compatibility and CDP in embedded Chromium.
+- Import @jackwener/browsermcp/embedded without CLI setup or a Chrome extension.
+
 ## 0.0.33 — 2026-10-20
 
 - refactor: standardize BrowserMCP runtime names and simplify configuration
