@@ -4,7 +4,7 @@
   "description": "Chrome-backed MCP browser service with optional site adapters.",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/jackwener/browsermcp.git"
+    "url": "git+https://github.com/jackwener/BrowserMCP.git"
   },
   "keywords": [
     "mcp",

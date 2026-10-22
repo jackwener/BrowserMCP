@@ -110,6 +110,7 @@ jobs:
             git push origin "$tag"
           fi
       - name: Publish to npm with trusted publishing
+        id: npm_publish
         run: |
           tarball="jackwener-browsermcp-${RELEASE_VERSION}.tgz"
           published=$(npm view "@jackwener/browsermcp@${RELEASE_VERSION}" dist.shasum --prefer-online 2>/dev/null || true)
@@ -120,6 +121,16 @@ jobs:
           else
             npm publish "./$tarball" --access public --provenance
           fi
+      - name: Verify npm availability
+        run: |
+          for attempt in {1..20}; do
+            published=$(npm view "@jackwener/browsermcp@${RELEASE_VERSION}" version --prefer-online 2>/dev/null || true)
+            channel=$(npm view '@jackwener/browsermcp@latest' version --prefer-online 2>/dev/null || true)
+            if [ "$published" = "$RELEASE_VERSION" ] && [ "$channel" = "$RELEASE_VERSION" ]; then exit 0; fi
+            sleep 15
+          done
+          echo "@jackwener/browsermcp@${RELEASE_VERSION} is not yet visible on npm" >&2
+          exit 1
       - name: Create GitHub Release
         run: |
           tag="v${RELEASE_VERSION}"
@@ -133,15 +144,22 @@ jobs:
           else
             gh release create "$tag" "$tarball" "${extension_zip[0]}" --verify-tag --title "BrowserMCP ${RELEASE_VERSION}" --notes-file "$RUNNER_TEMP/release-notes.md"
           fi
-      - name: Verify npm availability
+      - name: Explain npm authentication failures
+        if: ${{ failure() && steps.npm_publish.outcome == 'failure' }}
         run: |
-          for attempt in {1..20}; do
-            published=$(npm view "@jackwener/browsermcp@${RELEASE_VERSION}" version --prefer-online 2>/dev/null || true)
-            if [ "$published" = "$RELEASE_VERSION" ]; then exit 0; fi
-            sleep 15
-          done
-          echo "@jackwener/browsermcp@${RELEASE_VERSION} is not yet visible on npm" >&2
-          exit 1
+          cat >> "$GITHUB_STEP_SUMMARY" <<'EOF'
+          npm publication failed. Inspect the publish step for the precise error.
+          For ENEEDAUTH / E401 / E403 / E404, check npm Trusted Publisher settings:
+          - Package: @jackwener/browsermcp
+          - GitHub owner: jackwener
+          - Repository: BrowserMCP (case-sensitive)
+          - Workflow filename: release.yml
+          - Environment: blank
+          - Allowed actions: Allow npm publish (stage-only requires manual approval)
+          - A new configuration must first publish within two days.
+          Fix the trust configuration and rerun this release commit. Do not use local npm login or an NPM_TOKEN fallback.
+          See docs/releasing.md and https://docs.npmjs.com/trusted-publishers/.
+          EOF
 
   embedded-release:
     if: github.ref == 'refs/heads/codex/embedded-electron'
@@ -213,6 +231,7 @@ jobs:
             git push origin "$tag"
           fi
       - name: Publish embedded channel with trusted publishing
+        id: npm_publish
         run: |
           tarball="jackwener-browsermcp-${RELEASE_VERSION}.tgz"
           published=$(npm view "@jackwener/browsermcp@${RELEASE_VERSION}" dist.shasum --prefer-online 2>/dev/null || true)
@@ -222,6 +241,15 @@ jobs:
           else
             npm publish "./$tarball" --tag embedded --access public --provenance
           fi
+      - name: Verify npm embedded channel
+        run: |
+          for attempt in {1..20}; do
+            published=$(npm view '@jackwener/browsermcp@embedded' version --prefer-online 2>/dev/null || true)
+            if [ "$published" = "$RELEASE_VERSION" ]; then exit 0; fi
+            sleep 15
+          done
+          echo 'Embedded channel is not yet visible on npm' >&2
+          exit 1
       - name: Create GitHub prerelease
         run: |
           tag="v${RELEASE_VERSION}"
@@ -233,12 +261,19 @@ jobs:
           else
             gh release create "$tag" "$tarball" --verify-tag --prerelease --title "BrowserMCP ${RELEASE_VERSION}" --notes-file "$RUNNER_TEMP/release-notes.md"
           fi
-      - name: Verify npm embedded channel
+      - name: Explain npm authentication failures
+        if: ${{ failure() && steps.npm_publish.outcome == 'failure' }}
         run: |
-          for attempt in {1..20}; do
-            published=$(npm view '@jackwener/browsermcp@embedded' version --prefer-online 2>/dev/null || true)
-            if [ "$published" = "$RELEASE_VERSION" ]; then exit 0; fi
-            sleep 15
-          done
-          echo 'Embedded channel is not yet visible on npm' >&2
-          exit 1
+          cat >> "$GITHUB_STEP_SUMMARY" <<'EOF'
+          npm publication failed. Inspect the publish step for the precise error.
+          For ENEEDAUTH / E401 / E403 / E404, check npm Trusted Publisher settings:
+          - Package: @jackwener/browsermcp
+          - GitHub owner: jackwener
+          - Repository: BrowserMCP (case-sensitive)
+          - Workflow filename: release.yml
+          - Environment: blank
+          - Allowed actions: Allow npm publish (stage-only requires manual approval)
+          - A new configuration must first publish within two days.
+          Fix the trust configuration and rerun this release commit. Do not use local npm login or an NPM_TOKEN fallback.
+          See docs/releasing.md and https://docs.npmjs.com/trusted-publishers/.
+          EOF
