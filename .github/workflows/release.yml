@@ -11,8 +11,8 @@ on:
         description: Optional release notes; otherwise use commit subjects since the last tag
         required: false
         type: string
-      skip_embedded_tests:
-        description: Skip Electron tests when publishing an already validated embedded build
+      skip_tests:
+        description: Skip test suites and smoke checks for this release; package build remains required
         required: false
         default: false
         type: boolean
@@ -27,7 +27,7 @@ concurrency:
 
 jobs:
   validate:
-    if: github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/main' && !inputs.skip_tests
     runs-on: ubuntu-latest
     timeout-minutes: 15
     strategy:
@@ -45,7 +45,7 @@ jobs:
 
   release:
     needs: validate
-    if: github.ref == 'refs/heads/main'
+    if: ${{ always() && github.ref == 'refs/heads/main' && (needs.validate.result == 'success' || (inputs.skip_tests && needs.validate.result == 'skipped')) }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     env:
@@ -70,6 +70,7 @@ jobs:
           RELEASE_NOTES: ${{ inputs.notes }}
         run: node scripts/prepare-release.mjs
       - name: Basic checks
+        if: ${{ !inputs.skip_tests }}
         run: |
           npm run typecheck
           npx vitest run tests/stdio-late-host.test.ts
@@ -84,6 +85,7 @@ jobs:
           npm install --prefix "$RUNNER_TEMP/package-smoke" --ignore-scripts --no-audit --no-fund "./jackwener-browsermcp-${RELEASE_VERSION}.tgz"
           (cd "$RUNNER_TEMP/package-smoke" && node --input-type=module -e 'const sdk = await import("@jackwener/browsermcp/adapter-sdk"); const adapter = await import("./node_modules/@jackwener/browsermcp/adapters/reddit/search.js"); if (typeof sdk.defineAdapter !== "function" || typeof adapter.default.run !== "function") process.exit(1)')
       - name: Check host setup and MCP connection
+        if: ${{ !inputs.skip_tests }}
         run: npm run smoke:setup
       - name: Commit and tag checked release
         run: |
@@ -163,7 +165,7 @@ jobs:
 
   embedded-release:
     if: github.ref == 'refs/heads/codex/embedded-electron'
-    runs-on: ${{ inputs.skip_embedded_tests && 'ubuntu-latest' || 'macos-latest' }}
+    runs-on: ${{ inputs.skip_tests && 'ubuntu-latest' || 'macos-latest' }}
     timeout-minutes: 30
     env:
       RELEASE_VERSION: ${{ inputs.version }}
@@ -185,14 +187,14 @@ jobs:
       - name: Install dependencies
         run: npm ci --ignore-scripts
       - name: Install Electron for smoke tests
-        if: ${{ !inputs.skip_embedded_tests }}
+        if: ${{ !inputs.skip_tests }}
         run: node node_modules/electron/install.js
       - name: Prepare version and changelog
         env:
           RELEASE_NOTES: ${{ inputs.notes }}
         run: node scripts/prepare-release.mjs
       - name: Check types and adapter isolation
-        if: ${{ !inputs.skip_embedded_tests }}
+        if: ${{ !inputs.skip_tests }}
         run: |
           npm run typecheck
           npx vitest run tests/embedded-adapters.test.ts tests/embedded-registry.test.ts tests/electron-driver.test.ts tests/api-contract.test.ts
@@ -201,7 +203,7 @@ jobs:
           npm pack --silent
           test -f "jackwener-browsermcp-${RELEASE_VERSION}.tgz"
       - name: Validate real Electron and installed package in app.asar
-        if: ${{ !inputs.skip_embedded_tests }}
+        if: ${{ !inputs.skip_tests }}
         run: |
           node scripts/run-embedded-smoke.mjs
           node scripts/smoke-embedded-package.mjs
