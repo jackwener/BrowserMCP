@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.0.35 — 2026-10-28
+
+Add shared typed browser commands and session helpers, including navigate_tab and close_tab. Reuse existing tabs and preserve handoff handles. Protocol revision 5 requires extension 0.0.27 and a matching host.
+
 ## 0.0.34 — 2026-10-22
 
 Enforce strict evaluate options and lossless REPL call transport. Separate user data from internal RPC references. Return explicit tab discovery scope, counts and pagination using shared backend contracts. Reject malformed backend responses. Protocol revision 4 requires updating host and extension together; read openTabs results from items.
