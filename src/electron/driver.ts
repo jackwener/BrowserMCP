@@ -7,25 +7,36 @@ import { ActionError } from '../api/errors.js';
 
 type Evaluation = { result: { value?: unknown; objectId?: string }; exceptionDetails?: { text?: string; exception?: { description?: string } } };
 
-/** CDP stays on the application's registered target; no remote-debugging port is opened. */
+/**
+ * CDP stays on the application's registered target; no remote-debugging port is opened.
+ *
+ * The Runtime domain is never enabled (rebrowser-patches', Patchright's): with it on, a page can
+ * tell a debugger is attached (console.debug of an Error whose `stack` getter runs when the
+ * inspector serializes it — the most common CDP check). Nothing here needs its events: the
+ * engine runs in an isolated world made with Page.createIsolatedWorld (its context id comes back
+ * with it, invalidated by Page navigation events and recreated once on a stale-context error),
+ * the top frame's main world is Runtime.evaluate's default context, and a child frame's main
+ * world is reached through its own target session or, same-process, through its document: read
+ * in the engine's world, resolved again by node in the page's own world, and the expression
+ * called on that object (rebrowser-patches' default lookup: nothing added to the page).
+ */
 export class ElectronDriver {
   private attached = false;
   private contexts = new Map<string, number>();
   private targets = new Map<string, string>();
   private disposed = false;
-  private readonly mainContexts = new Map<string, number>();
   private readonly network = new Map<string, Record<string, unknown>>();
   private readonly bodies = new Set<Promise<void>>();
   private capturePattern = '';
   private initialization?: Promise<void>;
   dialogInfo: DialogInfo | null = null;
   private readonly onMessage = (_event: unknown, method: string, params: any, sessionId?: string) => {
-    if (method === 'Runtime.executionContextsCleared') { this.contexts.clear(); this.mainContexts.clear(); }
-    if (method === 'Page.frameNavigated') this.contexts.clear();
-    if (method === 'Runtime.executionContextCreated' && params.context.auxData?.isDefault) this.mainContexts.set(params.context.auxData.frameId, params.context.id);
+    // A new document (or a frame gone) takes its isolated worlds with it.
+    if (method === 'Page.frameNavigated' || method === 'Page.frameDetached') this.contexts.clear();
     if (method === 'Target.attachedToTarget') {
       this.targets.set(params.targetInfo.targetId, params.sessionId);
-      void this.send('Runtime.enable', {}, params.sessionId).catch(() => {});
+      // Its Page events say when its documents change; Runtime stays off there too.
+      void this.send('Page.enable', {}, params.sessionId).catch(() => {});
       void this.send('Runtime.runIfWaitingForDebugger', {}, params.sessionId).catch(() => {});
     }
     if (method === 'Target.detachedFromTarget') { for (const [id, session] of this.targets) if (session === params.sessionId) this.targets.delete(id); this.contexts.clear(); }
@@ -85,7 +96,6 @@ export class ElectronDriver {
     debuggerApi.on('detach', this.onDetach);
     try {
       await this.send('Page.enable');
-      await this.send('Runtime.enable');
       await this.send('Network.enable');
       await this.send('Target.setAutoAttach', { autoAttach: true, waitForDebuggerOnStart: false, flatten: true });
     } catch (error) { this.dispose(); throw error; }
@@ -115,7 +125,19 @@ export class ElectronDriver {
     return executionContextId;
   }
   async callIn(frameId: string, fn: string, args?: unknown, timeoutMs?: number): Promise<unknown> {
-    return unwrapPageResult(await this.evaluate(pageCallJs(fn, args), await this.engineContext(frameId), frameId, timeoutMs));
+    return unwrapPageResult(await this.inEngine(frameId, context => this.evaluate(pageCallJs(fn, args), context, frameId, timeoutMs)));
+  }
+  /**
+   * Run in the frame's engine world; a world gone with its document since (no Runtime events
+   * to say so: a navigation the Page events haven't reported yet) is made again, once.
+   */
+  private async inEngine<T>(frameId: string, run: (context: number) => Promise<T>): Promise<T> {
+    try { return await run(await this.engineContext(frameId)); }
+    catch (error) {
+      if (!isStaleContext(error)) throw error;
+      this.contexts.delete(frameId);
+      return run(await this.engineContext(frameId));
+    }
   }
   async route(frame?: FrameStep | FrameStep[], scroll = false): Promise<{ frameId: string; offset: { x: number; y: number } }> {
     let frameId = await this.rootFrame();
@@ -123,7 +145,7 @@ export class ElectronDriver {
     for (const step of frameSteps(frame)) {
       const probe = await this.callIn(frameId, 'frameProbe', { step, scroll }) as { found: boolean; x: number; y: number };
       if (!probe.found) throw new ActionError('frame_not_found', `No iframe matches ${JSON.stringify(step)}`);
-      const objectId = await this.evaluate(`globalThis.${PAGE_GLOBAL}.frameElement()`, await this.engineContext(frameId), frameId, 5000, false);
+      const objectId = await this.inEngine(frameId, context => this.evaluate(`globalThis.${PAGE_GLOBAL}.frameElement()`, context, frameId, 5000, false));
       if (typeof objectId !== 'string') throw new ActionError('frame_unreachable', 'Frame owner disappeared');
       const parentSession = this.sessionFor(frameId);
       try {
@@ -140,13 +162,36 @@ export class ElectronDriver {
   async pageCall(fn: string, args?: unknown, timeoutMs?: number, frame?: FrameStep | FrameStep[]): Promise<unknown> {
     return this.callIn((await this.route(frame)).frameId, fn, args, timeoutMs);
   }
-  async evaluateMain(expression: string, frame?: FrameStep | FrameStep[], timeoutMs?: number): Promise<unknown> {
+  /**
+   * The page's own world (its globals): the top frame's is Runtime.evaluate's default; a frame
+   * in a process of its own, its session's default. A same-process child frame's has no id
+   * without Runtime's events, so it is reached through an object living in it: the frame's
+   * document, read in the engine's world, resolved by node in the page's world (DOM.resolveNode
+   * resolves there by default), and the expression run with Runtime.callFunctionOn on it.
+   */
+  async evaluateMain(expression: string, frame?: FrameStep | FrameStep[], timeoutMs = 15000): Promise<unknown> {
     if (!frameSteps(frame).length) return this.evaluate(expression, undefined, undefined, timeoutMs);
     const { frameId } = await this.route(frame);
-    await this.send('Runtime.enable', {}, this.sessionFor(frameId));
-    const contextId = this.mainContexts.get(frameId);
-    if (contextId === undefined) throw new ActionError('frame_unreachable', 'Frame main world is not ready');
-    return this.evaluate(expression, contextId, frameId, timeoutMs);
+    const session = this.sessionFor(frameId);
+    if (session) return this.evaluate(expression, undefined, frameId, timeoutMs);
+    const isolated = await this.inEngine(frameId, context => this.evaluate('document', context, frameId, 5000, false));
+    if (typeof isolated !== 'string') throw new ActionError('frame_unreachable', 'Frame document is not ready');
+    let main: string | undefined;
+    try {
+      const { node } = await this.send('DOM.describeNode', { objectId: isolated });
+      main = (await this.send('DOM.resolveNode', { backendNodeId: node.backendNodeId })).object?.objectId;
+      if (!main) throw new ActionError('frame_unreachable', 'Frame main world is not ready');
+      const result: Evaluation = await this.send('Runtime.callFunctionOn', {
+        objectId: main,
+        functionDeclaration: `function () { return (0, eval)(${JSON.stringify(expression)}); }`,
+        awaitPromise: true, returnByValue: true, userGesture: true,
+      }, undefined, timeoutMs);
+      if (result.exceptionDetails) throw new ActionError('page_error', result.exceptionDetails.exception?.description ?? result.exceptionDetails.text ?? 'Page evaluation failed');
+      return result.result.value;
+    } finally {
+      await this.send('Runtime.releaseObject', { objectId: isolated }).catch(() => {});
+      if (main) await this.send('Runtime.releaseObject', { objectId: main }).catch(() => {});
+    }
   }
   async startCapture(pattern = ''): Promise<void> { await this.ready(); this.capturePattern = pattern; }
   async readCapture(): Promise<unknown[]> {
@@ -167,7 +212,7 @@ export class ElectronDriver {
       cdp: (method, params) => this.send(method, params),
       pointOffset: offset,
       setFiles: async files => {
-        const objectId = await this.evaluate(`globalThis.${PAGE_GLOBAL}.actionTarget()`, await this.engineContext(frameId), frameId, 5000, false);
+        const objectId = await this.inEngine(frameId, context => this.evaluate(`globalThis.${PAGE_GLOBAL}.actionTarget()`, context, frameId, 5000, false));
         try { await this.send('DOM.setFileInputFiles', { objectId, files }, this.sessionFor(frameId)); }
         finally { await this.send('Runtime.releaseObject', { objectId }, this.sessionFor(frameId)).catch(() => {}); }
       },
@@ -189,4 +234,9 @@ export class ElectronDriver {
     if (detach && this.attached && !this.contents.isDestroyed() && this.debuggerApi.isAttached()) this.debuggerApi.detach();
     this.attached = false; this.contexts.clear(); this.targets.clear();
   }
+}
+
+/** A context id that no longer names a context (its document went). */
+function isStaleContext(error: unknown): boolean {
+  return /Cannot find context with specified id|Execution context was destroyed|Cannot find default execution context/i.test(String((error as Error)?.message ?? error));
 }
