@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.0.36 — 2026-10-28
+
+Make existing site adapters discoverable at agent initialization: show loaded sites and command counts, document direct sites_search to site_run invocation without enabling, and clarify application-owned adapter storage.
+
 ## 0.0.35 — 2026-10-28
 
 Add shared typed browser commands and session helpers, including navigate_tab and close_tab. Reuse existing tabs and preserve handoff handles. Protocol revision 5 requires extension 0.0.27 and a matching host.
