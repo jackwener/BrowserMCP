@@ -65,6 +65,10 @@ export function observationPage(capture: ObserveResult, cursor?: string): Observ
       if (state && end < length) {
         const newline = state.lastIndexOf('\n', end - 1);
         if (newline >= offset) end = newline + 1;
+        // Prefer complete semantic items; split an oversized item only when necessary.
+        const boundaries = [...state.slice(offset, end).matchAll(/^\s*- (?:article|listitem)\b/gm)];
+        const boundary = boundaries.at(-1)?.index;
+        if (boundary !== undefined && boundary > (end - offset) / 2) end = offset + boundary;
         // Never split a UTF-16 surrogate pair.
         if (end > offset && /[\uD800-\uDBFF]/.test(state[end - 1])) end--;
       }

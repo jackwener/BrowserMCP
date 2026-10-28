@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import type { Browser } from './browser.js';
 import { ActionError, errorEnvelope } from './errors.js';
-import { ACTION_RULES, targetShape } from './action-input.js';
+import { ACTION_RULES, targetShape, expectationShape } from './action-input.js';
 import { parseInput } from '../shared/api-contract.js';
 import type { ActOptions } from './tab.js';
 
@@ -78,8 +78,8 @@ export function createBrowserCommands(browser: Browser) {
       return { tabId: tab.id };
     }),
     open_tab: command('Explicitly create a new tab. Prefer navigate_tab to reuse an existing tab.', { url: z.string().optional() }, false, async ({ url }) => ({ tabId: (await browser.tabs.new(url)).id })),
-    navigate_tab: command('Navigate the specified session tab in place. Never creates a tab, including on failure. Reuse its tabId for subsequent operations.', {
-      tabId, url: z.string().min(1), waitUntil: z.enum(['load', 'none']).default('load'), settleMs: z.number().int().min(0).max(10000).optional(),
+    navigate_tab: command('Navigate the specified session tab in place. Never creates a tab, including on failure. Reuse its tabId for subsequent operations. For SPA readiness, pass ready (the same conditions as tab.expect) and timeoutMs; DOM settling alone does not guarantee loaded content.', {
+      tabId, ready: expectationShape.optional(), timeoutMs: z.number().int().nonnegative().optional(), url: z.string().min(1), waitUntil: z.enum(['load', 'none']).default('load'), settleMs: z.number().int().min(0).max(10000).optional(),
     }, false, async ({ tabId, url, ...options }) => ({ tabId, ...await (await browser.tabs.get(tabId)).goto(url, options) })),
     close_tab: command('Close exactly one session-owned tab. For a user tab, claim it first. Closing is different from releasing control.', { tabId }, false, async ({ tabId }) => {
       await (await browser.tabs.get(tabId)).close(); return { tabId, closed: true };

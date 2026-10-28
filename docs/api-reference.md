@@ -9,11 +9,11 @@ interface AgentApi {
     tabs_list(input: { query?: string | undefined; scope?: "unclaimed" | "all" | "session" | undefined; limit?: number | undefined; cursor?: string | undefined; }): Promise<{ snapshot: string; scope: "unclaimed" | "all" | "session"; excluded: string; nextCursor?: string; items: Array<Row>; total: number; complete: boolean; }>;
     claim_tab(input: { backendId?: number | undefined; active?: true | undefined; url?: string | undefined; title?: string | undefined; expectedUrl?: string | undefined; expectedTitle?: string | undefined; }): Promise<{ tabId: string; }>;
     open_tab(input: { url?: string | undefined; }): Promise<{ tabId: string; }>;
-    navigate_tab(input: { tabId: string; url: string; waitUntil?: "load" | "none" | undefined; settleMs?: number | undefined; }): Promise<{ url: string | null; title: string | null; tabId: string; }>;
+    navigate_tab(input: { tabId: string; url: string; ready?: { target?: { ref?: string | number | undefined; selector?: string | undefined; within?: string | undefined; nth?: number | undefined; role?: string | undefined; name?: string | undefined; label?: string | undefined; text?: string | undefined; testid?: string | undefined; x?: number | undefined; y?: number | undefined; frame?: string | number | Array<string | number> | undefined; } | undefined; text?: string | undefined; notText?: string | undefined; url?: string | undefined; title?: string | undefined; visible?: boolean | undefined; value?: string | undefined; checked?: boolean | undefined; selected?: Array<string> | undefined; enabled?: boolean | undefined; } | undefined; timeoutMs?: number | undefined; waitUntil?: "load" | "none" | undefined; settleMs?: number | undefined; }): Promise<{ url: string | null; title: string | null; tabId: string; }>;
     close_tab(input: { tabId: string; }): Promise<{ tabId: string; closed: boolean; }>;
     tabs_close(input: { tabIds: Array<string>; }): Promise<{ complete: boolean; results: Array<{ tabId: string; closed: boolean; } | { ok: false; error: Record<string, unknown>; tabId: string; closed: boolean; }>; }>;
     release_tab(input: { tabId: string; }): Promise<{ tabId: string; released: boolean; }>;
-    tab_observe(input: { tabId: string; options?: { cursor?: string | undefined; mode?: "state" | "screenshot" | "both" | undefined; format?: "aria" | "dom" | undefined; target?: { ref?: string | number | undefined; selector?: string | undefined; within?: string | undefined; nth?: number | undefined; role?: string | undefined; name?: string | undefined; label?: string | undefined; text?: string | undefined; testid?: string | undefined; x?: number | undefined; y?: number | undefined; frame?: string | number | Array<string | number> | undefined; } | undefined; viewport?: boolean | undefined; includeFrames?: boolean | undefined; fullPage?: boolean | undefined; limit?: number | undefined; start?: number | undefined; } | undefined; }): Promise<{ complete?: boolean; webmcp?: PageToolsUpdate; nextCursor?: string; next?: { cursor: string; }; url: string | null; title: string | null; snapshotId?: string; image?: ImageValue; frames?: Array<ObservedFrame>; framesComplete?: boolean; metadataTruncated?: boolean; stateContinued?: boolean; stateContinues?: boolean; state?: string; dom?: DomSnapshot; warnings?: Array<string>; diff?: boolean; changed?: { added: number; removed: number; changed?: number; }; tabId: string; }>;
+    tab_observe(input: { tabId: string; options?: { cursor?: string | undefined; mode?: "state" | "screenshot" | "both" | undefined; format?: "aria" | "dom" | undefined; target?: { ref?: string | number | undefined; selector?: string | undefined; within?: string | undefined; nth?: number | undefined; role?: string | undefined; name?: string | undefined; label?: string | undefined; text?: string | undefined; testid?: string | undefined; x?: number | undefined; y?: number | undefined; frame?: string | number | Array<string | number> | undefined; } | undefined; viewport?: boolean | undefined; includeFrames?: boolean | undefined; fullPage?: boolean | undefined; limit?: number | undefined; start?: number | undefined; } | undefined; }): Promise<{ scope?: "target" | "viewport" | "document"; complete?: boolean; webmcp?: PageToolsUpdate; nextCursor?: string; next?: { cursor: string; }; url: string | null; title: string | null; snapshotId?: string; image?: ImageValue; frames?: Array<ObservedFrame>; framesComplete?: boolean; metadataTruncated?: boolean; stateContinued?: boolean; stateContinues?: boolean; state?: string; dom?: DomSnapshot; warnings?: Array<string>; diff?: boolean; changed?: { added: number; removed: number; changed?: number; }; tabId: string; }>;
     tab_act(input: { tabId: string; action: { [x: string]: unknown; }; }): Promise<{ action: ActAction; delivery: "applied" | "received" | "dispatched"; controlState: "verified" | "unverified"; network?: { afterSequence: number; cursor: number; }; matches_n?: number; navigated?: boolean; url?: string; title?: string; timedOut?: boolean; ref?: string; filled?: boolean; verified?: boolean; actual?: string; checked?: boolean; changed?: boolean; selected?: Array<string>; files?: number; openedTabs?: Array<{ tab?: string; tabId: number; url?: string; title?: string; pending?: true; }>; download?: { tab: string; afterSequence: number; started: Array<{ seq: number; guid?: string; url: string; suggestedFilename: string; }>; }; method?: "dom"; tabId: string; }>;
   };
   agent: { browsers: { getDefault(): Promise<Browser>; }; browser: Browser; documentation: { get(name: string): Promise<string | null>; }; };
@@ -67,7 +67,7 @@ class Browser {
 class Tab {
   tabId?: number; // `id` is the stable backend page handle; `tabId` is the numeric backend id when claimed from a user tab.
   id: string;
-  goto(url: string, opts?: { waitUntil?: "load" | "none"; settleMs?: number; }): Promise<{ url: string | null; title: string | null; }>;
+  goto(url: string, opts?: { waitUntil?: "load" | "none"; settleMs?: number; ready?: Expectation; timeoutMs?: number; }): Promise<{ url: string | null; title: string | null; }>;
   markDeliverable(): Promise<void>; // Preserve this tab for the user when the session is finalized.
   markHandoff(): Promise<void>; // Preserve this tab for a subsequent turn; the same session handle remains usable after finalization.
   clearRetention(): Promise<void>; // Restore default cleanup: close agent tabs, release borrowed user tabs.
@@ -76,7 +76,7 @@ class Tab {
   back(): Promise<void>;
   forward(): Promise<void>;
   reload(): Promise<void>;
-  close(): Promise<void>; // Close this tab, whether it was opened or claimed by this session.
+  close(): Promise<{ tabId: string; closed: true; }>; // Close this tab, whether it was opened or claimed by this session.
   release(): Promise<void>; // Keep this tab open and give up this session's control of it.
   observe(opts?: ObserveOptions): Promise<ObserveResult>; // ARIA overview by default; format:'dom' reveals visible controls and live attributes. Observed refs automatically route to their frame.
   screenshot(opts?: { fullPage?: boolean; annotate?: boolean; format?: "png" | "jpeg"; quality?: number; }): Promise<ImageValue>;
@@ -222,7 +222,7 @@ interface ObservedContent { metadataTruncated?: boolean; stateContinued?: boolea
 
 interface ObservedFrame extends ObservedContent { frame: FrameStep[]; owner: FrameOwner; unavailable?: string }
 
-interface ObserveResult extends ObservedContent { complete?: boolean; webmcp?: PageToolsUpdate; nextCursor?: string; next?: { cursor: string };
+interface ObserveResult extends ObservedContent { scope?: 'viewport' | 'document' | 'target'; complete?: boolean; webmcp?: PageToolsUpdate; nextCursor?: string; next?: { cursor: string };
   url: string | null; title: string | null; snapshotId?: string; image?: ImageValue; frames?: ObservedFrame[]; framesComplete?: boolean;
 }
 

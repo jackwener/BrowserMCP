@@ -1,3 +1,6 @@
+import { compactErrorData } from '../api/errors.js';
+import { readDoc } from '../docs/manifest.js';
+import { selectApiReference } from '../docs/surface.js';
 import { PageFunction } from '../shared/api-contract.js';
 /** Persistent Node REPL with a per-session worker and a bridge to the existing object model. */
 import { Worker } from 'node:worker_threads';
@@ -171,13 +174,30 @@ export class JsSession {
       let target = this.references.get(message.target);
       let receiver: any;
       for (const key of message.path) { receiver = target; target = target?.[key]; }
-      if (typeof target !== 'function') throw Object.assign(new Error(`Unknown API method ${message.path.join('.')}`), { code: 'unknown_method', hint: 'Read docs_get for the relevant API topic.' });
+      if (typeof target !== 'function') {
+        const root = this.references.get(message.target);
+        const className = root instanceof Tab ? 'Tab' : root instanceof Browser ? 'Browser' : undefined;
+        const path = message.path as string[];
+        const member = className ? [className, ...path.slice(0, -1)].join('.') : '';
+        const reference = member ? selectApiReference(readDoc('api-reference') ?? '', member) : null;
+        const depth = path.length > 1 ? 4 : 2;
+        const signatures = reference?.split('\n').filter(line => new RegExp(`^ {${depth}}[a-zA-Z]\\w*\\(`).test(line)) ?? [];
+        const query = path.at(-1)?.toLowerCase() ?? '';
+        const preferred = query === 'open' ? 'goto' : query === 'current' ? 'selected' : query;
+        signatures.sort((a, b) => Number(b.trimStart().startsWith(preferred)) - Number(a.trimStart().startsWith(preferred)));
+        const methods = signatures.slice(0, 6).map(line => line.trim().slice(0, 280));
+        throw Object.assign(new Error(`Unknown API method ${path.join('.')}`), {
+          code: 'unknown_method',
+          hint: methods.length ? `Use a method signature from methods for ${member}.${query === 'current' ? ' selected() only searches session-owned tabs; claim the user’s foreground tab with browser.user.claimTab({active:true}).' : ''}` : 'Read docs_get api-reference for the relevant API object.',
+          data: { dispatched: false, ...(methods.length ? { methods } : {}) },
+        });
+      }
       const args = this.decodeCall(message.args);
       const value = await Reflect.apply(target, receiver, args);
       if (worker === this.worker) worker.postMessage({ kind: 'reply', id: message.id, value: this.encode(value) });
     } catch (error) {
       const e = error as (Error & { code?: string; hint?: string; data?: unknown }) | null | undefined;
-      if (worker === this.worker) worker.postMessage({ kind: 'reply', id: message.id, error: { name: e?.name ?? 'Error', message: e?.message ?? String(error), code: e?.code, hint: e?.hint, data: e?.data } });
+      if (worker === this.worker) worker.postMessage({ kind: 'reply', id: message.id, error: { name: e?.name ?? 'Error', message: e?.message ?? String(error), code: e?.code, hint: e?.hint, data: e?.data && typeof e.data === 'object' ? compactErrorData(e.data as Record<string, unknown>) : undefined } });
     } finally {
       this.pendingCalls--;
       if (!this.pendingCalls) { for (const resolve of this.drainWaiters) resolve(); this.drainWaiters.clear(); }

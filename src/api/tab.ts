@@ -53,7 +53,7 @@ export interface ObserveOptions {
   frame?: FrameStep | FrameStep[];
   /** Return a diff only against this exact snapshot id; otherwise return full state. ARIA only. */
   since?: string;
-  /** ARIA defaults to the whole document; DOM defaults to the viewport. */
+  /** Default true: current viewport. Pass false for the entire rendered document. */
   viewport?: boolean;
   /** Open a branch in the selected frame. */
   ref?: string;
@@ -71,6 +71,8 @@ export interface ObserveOptions {
 export interface ObservedContent { /** Long URL/title/frame metadata was abbreviated; page evidence uses cursor pagination. */ metadataTruncated?: boolean; /** A single oversized text line can span pages. Concatenate these fragments before interpreting it. */ stateContinued?: boolean; stateContinues?: boolean; state?: string; dom?: DomSnapshot; warnings?: string[]; diff?: boolean; changed?: { added: number; removed: number; changed?: number } }
 export interface ObservedFrame extends ObservedContent { frame: FrameStep[]; owner: FrameOwner; unavailable?: string }
 export interface ObserveResult extends ObservedContent {
+  /** Scope of this capture, not a claim that an infinite feed is exhausted. */
+  scope?: 'viewport' | 'document' | 'target';
   /** Whether this is the final output page, not a claim that all dynamic page content was captured. */
   complete?: boolean;
   /** Page-provided tool catalog changes in the observed root frame; schemas are fetched explicitly. */
@@ -138,10 +140,22 @@ export class Tab {
     return frame?.length ? { ...target, frame } : target;
   }
 
-  async goto(url: string, opts: { waitUntil?: 'load' | 'none'; settleMs?: number } = {}): Promise<{ url: string | null; title: string | null }> {
+  async goto(url: string, opts: { waitUntil?: 'load' | 'none'; settleMs?: number; ready?: Expectation; timeoutMs?: number } = {}): Promise<{ url: string | null; title: string | null }> {
     if (!/^(https?:\/\/|data:text\/html)/i.test(url)) throw new ActionError('invalid_url', 'Only http(s) (or data:text/html) URLs can be opened', 'Pass an absolute http:// or https:// URL');
+    if (opts.ready) checkExpect(opts.ready);
+    if (opts.timeoutMs !== undefined && (!Number.isFinite(opts.timeoutMs) || opts.timeoutMs < 0)) throw new ActionError('invalid_args', 'timeoutMs must be a finite non-negative number.');
     return this.use(async (page) => {
       await page.goto(url, opts);
+      if (opts.ready) {
+        const timeoutMs = opts.timeoutMs ?? 15000;
+        try { await page.expect(opts.ready, { timeoutMs }); }
+        catch (error) {
+          const e = error as { code?: string; message?: string; hint?: string; extra?: Record<string, unknown>; data?: Record<string, unknown> };
+          throw new ActionError(e.code ?? 'expectation_failed', e.message ?? 'Navigation readiness condition was not met.',
+            'Navigation was dispatched. Inspect the current page or wait for the condition again; do not navigate again blindly.',
+            { ...e.extra, ...e.data, phase: 'readiness', timeoutMs, tabId: this.id });
+        }
+      }
       await this.harvest(page);
       return this.info(page);
     });
@@ -195,7 +209,7 @@ export class Tab {
   async forward(): Promise<void> { await this.use((p) => p.history('forward')); }
   async reload(): Promise<void> { await this.use((p) => p.history('reload')); }
   /** Close this tab, whether it was opened or claimed by this session. */
-  async close(): Promise<void> { await this.use((p) => p.closeTab(this.id)); this.closed = true; this.ctx.rt.forgetPage(this.ctx.sessionId, this.id); }
+  async close(): Promise<{ tabId: string; closed: true }> { await this.use((p) => p.closeTab(this.id)); this.closed = true; this.ctx.rt.forgetPage(this.ctx.sessionId, this.id); return { tabId: this.id, closed: true }; }
   /** Keep this tab open and give up this session's control of it. */
   async release(): Promise<void> { await this.use((p) => p.releaseTab(this.id)); this.closed = true; this.ctx.rt.forgetPage(this.ctx.sessionId, this.id); }
 
@@ -221,7 +235,8 @@ export class Tab {
         const selector = opts.target ? targetToSelector(opts.target) : null;
         if (opts.target && !selector) throw new ActionError('invalid_target', 'Observation scope needs a ref or locator.', 'Use find({x,y}) first for a screenshot coordinate.');
         const base = frameSteps(opts.target?.frame ?? opts.frame);
-        const viewport = opts.ref || opts.target ? false : opts.viewport ?? (opts.format === 'dom');
+        const viewport = opts.ref || opts.target ? false : opts.viewport ?? true;
+        out.scope = opts.ref || opts.target ? 'target' : viewport ? 'viewport' : 'document';
         const render = (capture: FrameObservation, frame: FrameStep[], ref?: string): ObservedContent => {
           this.rememberRefs(capture.dom ? capture.dom.entries.map(entry => entry.ref) : (capture.state ?? '').split('\n').flatMap(line => { const match = ARIA_REF_LINE.exec(line); return match ? [match[2]] : []; }), frame);
           if (capture.dom) return { dom: { ...capture.dom, ...(capture.dom.nextStart !== undefined && { next: { format: 'dom' as const, ...(frame.length === base.length && opts.target ? {target:opts.target} : {frame}), start:capture.dom.nextStart, limit:opts.limit, viewport:!!viewport, includeFrames:false as const } }) } };
@@ -435,7 +450,16 @@ export class Tab {
     if (!source && Object.hasOwn(options, 'arg')) throw new ActionError('invalid_args', 'Tab.evaluate: arg requires a function, not a source string.', 'Use tab.evaluate(value => ..., {arg: value}).', { dispatched: false });
     const expression = source ? `(${source})(${pageArgument(options.arg)})` : script;
     if (typeof expression !== 'string') throw new ActionError('invalid_args', 'evaluate expects page source or a function', undefined, { dispatched: false });
-    return this.use(page => options.frame !== undefined ? page.evaluateInFrame(expression, options.frame, options.timeoutMs) : page.evaluate(expression, { timeoutMs: options.timeoutMs }));
+    const timeoutMs = options.timeoutMs ?? 10000;
+    return this.use(async page => {
+      try { return await (options.frame !== undefined ? page.evaluateInFrame(expression, options.frame, timeoutMs) : page.evaluate(expression, { timeoutMs })); }
+      catch (error) {
+        if ((error as { code?: string }).code !== 'command_outcome_unknown') throw error;
+        throw new ActionError('command_outcome_unknown', `evaluate did not return a confirmed result (timeout budget ${timeoutMs} ms).`,
+          'Page code may still be running. Inspect page state before retrying; timeout does not cancel JavaScript.',
+          { operation: 'evaluate', tabId: this.id, timeoutMs, dispatched: true, outcome: 'unknown' });
+      }
+    });
   }
 
   /** Native CDP on this Tab's shared debugger attachment. Parameters are not rewritten. */

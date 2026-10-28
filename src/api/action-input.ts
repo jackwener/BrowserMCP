@@ -44,7 +44,7 @@ const actionShape = z.object({
   files: z.array(z.string().min(1)).optional(), direction: z.enum(['up', 'down', 'left', 'right']).optional(), amount: z.number().optional(),
   timeoutMs: z.number().int().nonnegative().optional(), settleMs: z.number().int().min(0).max(10_000).optional(), method: z.enum(['cdp', 'dom']).optional(),
 }).strict();
-const expectationShape = z.object({ target: targetShape.optional(), text: z.string().min(1).optional(), notText: z.string().min(1).optional(), url: z.string().min(1).optional(), title: z.string().min(1).optional(), visible: z.boolean().optional(), value: z.string().optional(), checked: z.boolean().optional(), selected: z.array(z.string()).optional(), enabled: z.boolean().optional() }).strict();
+export const expectationShape = z.object({ target: targetShape.optional(), text: z.string().min(1).optional(), notText: z.string().min(1).optional(), url: z.string().min(1).optional(), title: z.string().min(1).optional(), visible: z.boolean().optional(), value: z.string().optional(), checked: z.boolean().optional(), selected: z.array(z.string()).optional(), enabled: z.boolean().optional() }).strict();
 
 function validate(shape: z.ZodType, value: unknown): void {
   const result = shape.safeParse(value);

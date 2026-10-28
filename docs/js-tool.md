@@ -21,7 +21,7 @@ The result reports `totalVisible`, `totalInScope`, `excluded`, `matched`, and `h
 
 Copy an item’s numeric `tabId` into `await browser.user.claimTab({tabId: ...})`. Store the returned Tab handle, then observe it. Session handles come from `await browser.tabs.list()` and `await browser.tabs.get(id)`.
 
-After reading the observation, call `await tab.act({action:'click', target:{ref: '...'}})` using a returned ref, then `await tab.observe()` or `await tab.expect({text:'...'})` with the expected result. `await tab.read()` reads document text. Batch determined steps; return at new decision points.
+After reading the observation, call `await tab.act({action:'click', target:{ref: '...'}})` using a returned ref, then `await tab.observe()` or `await tab.expect({text:'...'})` with the expected result. `await tab.read()` returns an object, not a string: read `result.text`, and pass `result.next` to `tab.read` to continue. Use `read({target:{role:"main"}})` or a specific article to exclude sidebars. Batch determined steps; return at new decision points.
 
 When ARIA lacks detail, `await tab.observe({format:'dom'})` returns visible controls with live attributes and the same actionable refs. `await tab.read({target:{ref:'...'}})` reads full text/attributes without scrolling. DOM previews flag `truncated`; pass `dom.next` directly to `tab.observe` to continue the live control list. Child refs automatically retain their observed frame route. Explicit semantic queries and whole-document reads accept the returned `frame` path. A screenshot remains the evidence for canvas, layout and colors.
 
@@ -46,3 +46,13 @@ Tab handles expose async methods: use `await tab.url()` and `await tab.title()`.
 Use `await tab.evaluate(value => value, {arg: data})`. The second argument is a strict options object with only `arg`, `frame`, and `timeoutMs`; extra positional arguments and unknown fields fail before dispatch. Source strings do not accept `arg`. Functions run in the page and cannot capture REPL variables.
 
 Arguments are plain JSON data: null, booleans, strings, finite numbers (excluding negative zero), dense arrays and plain objects. Root `arg: undefined` is allowed. Nested undefined, non-finite numbers, BigInt, functions, special objects, accessors, symbol keys and cycles are rejected, never silently rewritten. Convert special values explicitly. API handles can be passed to APIs that accept them; they are not page data. Errors with `dispatched:false` mean the rejected invocation had no page effects. This does not undo earlier calls in the same cell.
+
+### Readiness and bounded page work
+
+`observe()` defaults to the viewport; `observe({viewport:false})` covers the rendered document. It does not scroll to load an entire feed. Empty wrappers and pointer annotations are omitted; unique labels and control states remain.
+
+Use `await tab.goto(url, {ready:{target:{role:'main'}, text:'Expected content'}, timeoutMs:15000})` or `await tab.expect(condition, {timeoutMs:15000})` after an action. Targets must be unambiguous. DOM settling is not a content-ready guarantee.
+
+`evaluate` defaults to 10000 ms. Pass `{timeoutMs:30000}` for known longer work. A timeout does not cancel page JavaScript and is never automatically retried. For feeds, collect and deduplicate in page-local state in short batches, return counts/progress each batch, and fetch final rows once. Page `window` state survives calls in the same document, but navigation/reload clears it. No generic API can infer how far arbitrary JavaScript got after a timeout.
+
+The MCP REPL provides `browser`, `sites`, `tools`, `recon`, `helper` and `nodeRepl`; `describeTool` is not a global here. `helper` exposes the same typed browser commands as MCP. Use `docs_get` for signatures and return types. `tab.close()` returns `{tabId,closed:true}`; optional chaining without a result is not evidence of closure. Releasing a user tab relinquishes control; it does not undo navigation, scrolling or edits.
