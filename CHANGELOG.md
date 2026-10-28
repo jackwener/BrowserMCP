@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.0.37 — 2026-10-28
+
+Improve Agent Experience across browser backends: compact viewport observations with explicit scope and semantic pagination; navigation readiness conditions shared with expect; explicit evaluation timeout outcomes and bounded error details; API signatures in unknown-method recovery; clear reading continuation and close receipts.
+
 ## 0.0.36 — 2026-10-28
 
 Make existing site adapters discoverable at agent initialization: show loaded sites and command counts, document direct sites_search to site_run invocation without enabling, and clarify application-owned adapter storage.
