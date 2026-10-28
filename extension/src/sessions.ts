@@ -46,7 +46,7 @@ const RELEASED_KEY = 'browsermcp_released_v2';
 export class SessionManager {
   readonly sessions = new Map<string, Session>();
   private readonly childObservers = new Map<number, Set<(child: Promise<ChildTab | null>) => void>>();
-  /** Tabs finalize handed back to the user (kept, released, handoff). Commands to them are refused until a claim; a stale Tab handle cannot re-adopt one. */
+  /** Tabs finalize handed back to the user (released). Commands to them are refused until a claim; a stale Tab handle cannot re-adopt one. */
   private readonly released = new Set<number>();
   private cursorSeq = 0;
   private restored: Promise<void> | null = null;
@@ -135,7 +135,7 @@ export class SessionManager {
   private scheduleIdle(s: Session): void {
     if (s.idleTimer) clearTimeout(s.idleTimer);
     const remaining = Math.max(0, IDLE_MS[s.surface] - (Date.now() - s.lastActivity));
-    s.idleTimer = setTimeout(() => { void this.finalize(s, []).catch(() => {}); }, remaining);
+    s.idleTimer = setTimeout(() => { void this.finalize(s, [], true).catch(() => {}); }, remaining);
   }
   ownerOf(tabId: number): Session | null { for (const s of this.sessions.values()) if (s.leases.has(tabId)) return s; return null; }
 
@@ -298,7 +298,7 @@ export class SessionManager {
   async userTabInventory(): Promise<TabInventoryEntry[]> {
     const tabs = await chrome.tabs.query({ windowType: 'normal' });
     return tabs.filter(t => t.id !== undefined).map(t => ({
-      supported: isHttp(t.url), owned: (this.ownerOf(t.id!)?.leases.get(t.id!)?.state ?? 'none') === 'active',
+      supported: isHttp(t.url), owned: Boolean(this.ownerOf(t.id!)),
       tab: { tabId: t.id!, title: t.title, url: t.url, windowId: t.windowId, active: Boolean(t.active), groupId: t.groupId > 0 ? t.groupId : undefined, lastAccessed: t.lastAccessed },
     }));
   }
@@ -335,8 +335,7 @@ export class SessionManager {
     if (!isHttp(tab.url)) throw new SessionError('claim_not_allowed', 'Only http(s) tabs can be claimed');
     const owner = this.ownerOf(tabId);
     const prior = owner?.leases.get(tabId);
-    if (owner && owner !== s && prior?.state !== 'handoff') throw new SessionError('already_claimed', `Tab ${tabId} belongs to session ${owner.key}`);
-    if (owner && owner !== s) { owner.leases.delete(tabId); if (owner.preferredTabId === tabId) owner.preferredTabId = null; } // a handoff tab moves to whoever claims it
+    if (owner && owner !== s) throw new SessionError('already_claimed', `Tab ${tabId} belongs to session ${owner.key}`);
     s.windowId = s.windowId ?? tab.windowId;
     this.released.delete(tabId); // a claim is the one way a released tab comes back
     // Reclaiming an existing lease preserves ownership and native mute state.
@@ -353,10 +352,10 @@ export class SessionManager {
   async closeUserTabs(tabIds: number[]): Promise<CloseUserTabsResult> {
     const unique = [...new Set(tabIds)];
     const eligible = new Set((await chrome.tabs.query({ windowType: 'normal' }))
-      .filter((tab) => tab.id !== undefined && (this.ownerOf(tab.id)?.leases.get(tab.id)?.state ?? 'none') !== 'active')
+      .filter((tab) => tab.id !== undefined && !this.ownerOf(tab.id))
       .map((tab) => tab.id!));
     const outcomes = await Promise.all(unique.map(async (tabId) => {
-      if (!eligible.has(tabId) || this.ownerOf(tabId)?.leases.get(tabId)?.state === 'active') return { tabId, reason: 'Tab is gone or controlled by a session' };
+      if (!eligible.has(tabId) || this.ownerOf(tabId)) return { tabId, reason: 'Tab is gone or controlled by a session' };
       try { await chrome.tabs.remove(tabId); return { tabId, closed: true as const }; }
       catch (error) { return { tabId, reason: String(error) }; }
     }));
@@ -372,7 +371,7 @@ export class SessionManager {
       let tabId: number;
       try { tabId = await identity.resolveTabId(page); } catch { throw new SessionError('stale_page', `stale page identity ${page}`, 'That tab no longer exists; open or claim a fresh tab.'); }
       const lease = s.leases.get(tabId);
-      if (lease?.state === 'handoff' || (!lease && this.released.has(tabId))) throw new SessionError('page_released', `page ${page} was handed back to the user by finalize`, 'finalize ends the session\'s control of its tabs; claim the tab again (browser.user.claimTab) or open a new one.');
+      if (!lease && this.released.has(tabId)) throw new SessionError('page_released', `page ${page} was handed back to the user by finalize`, 'finalize ends the session\'s control of its tabs; claim the tab again (browser.user.claimTab) or open a new one.');
       if (!lease) {
         const owner = this.ownerOf(tabId);
         if (owner && owner !== s) throw new SessionError('page_not_in_session', `page ${page} belongs to session ${owner.key}`);
@@ -444,8 +443,8 @@ export class SessionManager {
     void this.persist();
   }
 
-  async finalize(s: Session, keep: Array<{ page: string; status: 'deliverable' | 'handoff' }>): Promise<{ closed: string[]; kept: string[]; failed: Array<{ page: string; reason: string }> }> {
-    const closed: string[] = []; const kept: string[] = []; const failed: Array<{ page: string; reason: string }> = [];
+  async finalize(s: Session, keep: Array<{ page: string; status: 'deliverable' | 'handoff' }>, closing = false): Promise<{ closed: string[]; released: string[]; retained: string[]; failed: Array<{ page: string; reason: string }> }> {
+    const closed: string[] = []; const released: string[] = []; const retained: string[] = []; const failed: Array<{ page: string; reason: string }> = [];
     const keepByTab = new Map<number, 'deliverable' | 'handoff'>();
     for (const k of keep) {
       const tabId = await identity.resolveTabId(k.page);
@@ -455,17 +454,16 @@ export class SessionManager {
     for (const lease of [...s.leases.values()]) {
       const status = keepByTab.get(lease.tabId) ?? lease.mark ?? null;
       const page = identity.pageId(lease.tabId);
-      if (status === 'handoff') {
+      if (status === 'handoff' && !closing) {
         await executor.detach(lease.tabId).catch(() => {});
         await this.hideCursor(lease.tabId);
-        this.released.add(lease.tabId);
         lease.state = 'handoff'; lease.mark = 'handoff';
-        kept.push(page); continue;
+        retained.push(page); continue;
       }
-      const op = status === 'deliverable' || lease.origin === 'user' ? 'release' : 'close';
+      const op = status === 'deliverable' || status === 'handoff' || lease.origin === 'user' ? 'release' : 'close';
       try {
         await this.endTab(s, lease.tabId, op);
-        if (op === 'close') closed.push(page); else kept.push(page);
+        if (op === 'close') closed.push(page); else released.push(page);
       } catch (error) {
         failed.push({ page, reason: error instanceof Error ? error.message : String(error) });
       }
@@ -473,8 +471,8 @@ export class SessionManager {
     s.preferredTabId = null;
     if (s.leases.size === 0) { s.groupId = null; if (s.idleTimer) clearTimeout(s.idleTimer); this.sessions.delete(s.key); }
     await this.persist();
-    if (failed.length === 0) this.emit({ kind: 'session_released', session: s.key, reason: 'finalize' });
-    return { closed, kept, failed };
+    if (s.leases.size === 0 && failed.length === 0) this.emit({ kind: 'session_released', session: s.key, reason: 'finalize' });
+    return { closed, released, retained, failed };
   }
 
   async setVisibility(s: Session, visible: boolean): Promise<void> {

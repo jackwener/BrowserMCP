@@ -33,7 +33,7 @@ export interface ActToolInput {
 }
 
 const frame = z.union([z.string(), z.number().int()]);
-const targetShape = z.object({
+export const targetShape = z.object({
   ref: z.union([z.string(), z.number().int()]).optional(),
   selector: z.string().optional(), within: z.string().optional(), nth: z.number().int().optional(),
   role: z.string().optional(), name: z.string().optional(), label: z.string().optional(), text: z.string().optional(), testid: z.string().optional(),

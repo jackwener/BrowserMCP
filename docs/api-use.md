@@ -73,4 +73,4 @@ Use `browser.chrome.describe(member)` and `browser.chrome.call(method,args)` for
 
 For reusable adapters, inspect UI behavior and captured network evidence (`network.list` → `network.detail`), then `recon.discover(tab)` when needed. Verify candidate endpoints through the logged-in page before implementing an adapter. One-off UI tasks do not require endpoint reverse engineering.
 
-Finish with `session_finalize`, preserving only deliverable/handoff tabs. Return requested screenshots inline. Avoid re-verifying a fact once an authoritative signal already establishes it.
+Finish with `session_finish`, preserving only deliverable/handoff tabs. Return requested screenshots inline. Avoid re-verifying a fact once an authoritative signal already establishes it.

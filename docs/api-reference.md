@@ -4,6 +4,18 @@ In `js` the globals are `browser`, `agent`, `sites`, `recon`, `tools`, `session`
 
 ```ts
 interface AgentApi {
+  helper: {
+    session_finish(input: { keep?: Array<{ tab: string; status: "deliverable" | "handoff"; }> | undefined; }): Promise<{ closed: Array<string>; released: Array<string>; retained: Array<string>; failed: Array<{ page: string; reason: string; }>; }>;
+    tabs_list(input: { query?: string | undefined; scope?: "unclaimed" | "all" | "session" | undefined; limit?: number | undefined; cursor?: string | undefined; }): Promise<{ snapshot: string; scope: "unclaimed" | "all" | "session"; excluded: string; nextCursor?: string; items: Array<Row>; total: number; complete: boolean; }>;
+    claim_tab(input: { backendId?: number | undefined; active?: true | undefined; url?: string | undefined; title?: string | undefined; expectedUrl?: string | undefined; expectedTitle?: string | undefined; }): Promise<{ tabId: string; }>;
+    open_tab(input: { url?: string | undefined; }): Promise<{ tabId: string; }>;
+    navigate_tab(input: { tabId: string; url: string; waitUntil?: "load" | "none" | undefined; settleMs?: number | undefined; }): Promise<{ url: string | null; title: string | null; tabId: string; }>;
+    close_tab(input: { tabId: string; }): Promise<{ tabId: string; closed: boolean; }>;
+    tabs_close(input: { tabIds: Array<string>; }): Promise<{ complete: boolean; results: Array<{ tabId: string; closed: boolean; } | { ok: false; error: Record<string, unknown>; tabId: string; closed: boolean; }>; }>;
+    release_tab(input: { tabId: string; }): Promise<{ tabId: string; released: boolean; }>;
+    tab_observe(input: { tabId: string; options?: { cursor?: string | undefined; mode?: "state" | "screenshot" | "both" | undefined; format?: "aria" | "dom" | undefined; target?: { ref?: string | number | undefined; selector?: string | undefined; within?: string | undefined; nth?: number | undefined; role?: string | undefined; name?: string | undefined; label?: string | undefined; text?: string | undefined; testid?: string | undefined; x?: number | undefined; y?: number | undefined; frame?: string | number | Array<string | number> | undefined; } | undefined; viewport?: boolean | undefined; includeFrames?: boolean | undefined; fullPage?: boolean | undefined; limit?: number | undefined; start?: number | undefined; } | undefined; }): Promise<{ complete?: boolean; webmcp?: PageToolsUpdate; nextCursor?: string; next?: { cursor: string; }; url: string | null; title: string | null; snapshotId?: string; image?: ImageValue; frames?: Array<ObservedFrame>; framesComplete?: boolean; metadataTruncated?: boolean; stateContinued?: boolean; stateContinues?: boolean; state?: string; dom?: DomSnapshot; warnings?: Array<string>; diff?: boolean; changed?: { added: number; removed: number; changed?: number; }; tabId: string; }>;
+    tab_act(input: { tabId: string; action: { [x: string]: unknown; }; }): Promise<{ action: ActAction; delivery: "applied" | "received" | "dispatched"; controlState: "verified" | "unverified"; network?: { afterSequence: number; cursor: number; }; matches_n?: number; navigated?: boolean; url?: string; title?: string; timedOut?: boolean; ref?: string; filled?: boolean; verified?: boolean; actual?: string; checked?: boolean; changed?: boolean; selected?: Array<string>; files?: number; openedTabs?: Array<{ tab?: string; tabId: number; url?: string; title?: string; pending?: true; }>; download?: { tab: string; afterSequence: number; started: Array<{ seq: number; guid?: string; url: string; suggestedFilename: string; }>; }; method?: "dom"; tabId: string; }>;
+  };
   agent: { browsers: { getDefault(): Promise<Browser>; }; browser: Browser; documentation: { get(name: string): Promise<string | null>; }; };
   sites: Record<string, unknown> & { search(q: string, limit?: number): Promise<unknown>; list(): Promise<unknown>; enable(site: string, opts?: { write?: boolean; }): Promise<{ site: string; tools: Array<string>; }>; disable(site: string): Promise<boolean>; run(site: string, name: string, args?: Record<string, unknown>): Promise<unknown>; };
   recon: {
@@ -37,7 +49,7 @@ class Browser {
     list(): Promise<Array<{ id?: string; tabId: number; pending?: true; url?: string; title?: string; active: boolean; selected: boolean; lifecycle?: "dormant" | "loading" | "ready"; origin: "agent" | "user"; state: "active" | "handoff"; }>>;
     get(tab: string | { tab?: string; tabId: number; }, opts?: { timeoutMs?: number; }): Promise<Tab>;
     selected(): Promise<Tab | undefined>;
-    finalize(opts?: { keep?: Array<{ tab: string | Tab; status: "handoff" | "deliverable"; }>; }): Promise<{ closed: Array<string>; kept: Array<string>; failed: Array<{ page: string; reason: string; }>; }>;
+    finalize(opts?: { keep?: Array<{ tab: string | Tab; status: "deliverable" | "handoff"; }>; }): Promise<{ closed: Array<string>; released: Array<string>; retained: Array<string>; failed: Array<{ page: string; reason: string; }>; }>;
   };
   user: {
     openTabs(...args: [options?: { query?: string | undefined; limit?: number | undefined; offset?: number | undefined; }]): Promise<{ scope: "unclaimed"; query: string; matching: "case-insensitive-substring"; totalVisible: number; totalInScope: number; excluded: { owned: number; unsupported: number; }; matched: number; offset: number; limit: number; hasMore: boolean; items: Array<{ tabId: number; windowId: number; active: boolean; title?: string | undefined; url?: string | undefined; groupId?: number | undefined; lastAccessed?: number | undefined; lifecycle?: "dormant" | "loading" | "ready" | undefined; availability?: "ready" | "load_required" | "host_attachment_required" | undefined; }>; nextOffset?: number | undefined; }>; // Unclaimed supported tabs in the visible scope. Query is trimmed, case-insensitive literal substring of URL OR title (no token splitting). Inspect items, matched, totalInScope, excluded and hasMore; continue with nextOffset. Each call takes a fresh snapshot.
@@ -57,7 +69,7 @@ class Tab {
   id: string;
   goto(url: string, opts?: { waitUntil?: "load" | "none"; settleMs?: number; }): Promise<{ url: string | null; title: string | null; }>;
   markDeliverable(): Promise<void>; // Preserve this tab for the user when the session is finalized.
-  markHandoff(): Promise<void>; // Preserve this tab for a subsequent turn; it must be claimed again after finalization.
+  markHandoff(): Promise<void>; // Preserve this tab for a subsequent turn; the same session handle remains usable after finalization.
   clearRetention(): Promise<void>; // Restore default cleanup: close agent tabs, release borrowed user tabs.
   url(): Promise<string | null>;
   title(): Promise<string | null>;

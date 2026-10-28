@@ -135,7 +135,7 @@ class ExtensionPage implements ExtensionRuntimePage {
     return Array.isArray(r.data) ? r.data : [];
   }
   async closeWindow(): Promise<void> {
-    try { await this.bridge.send('session-finalize', { ...this.sessionOpts(), keep: [] }); } catch { /* ignore */ }
+    try { await this.bridge.send('session-finalize', { ...this.sessionOpts(), keep: [], closing: true }); } catch { /* ignore */ }
     if (this.bound) this.closed = true; else this._page = undefined;
     this._lastUrl = null;
   }
@@ -196,10 +196,15 @@ class ExtensionPage implements ExtensionRuntimePage {
     return result;
   }
   async mark(page: string, mark: 'deliverable' | 'handoff' | null): Promise<void> { await this.bridge.send('mark', { ...this.sessionOpts(), page, mark }); }
-  async finalize(keep: Array<{ page: string; status: 'deliverable' | 'handoff' }>): Promise<{ closed: string[]; kept: string[]; failed: Array<{ page: string; reason: string }> }> {
-    const r = await this.bridge.send('session-finalize', { ...this.sessionOpts(), keep });
-    if (this.bound) this.closed = true; else this._page = undefined;
-    return (r.data ?? { closed: [], kept: [], failed: [] }) as { closed: string[]; kept: string[]; failed: Array<{ page: string; reason: string }> };
+  async finalize(keep: Array<{ page: string; status: 'deliverable' | 'handoff' }>, options?: { closing?: boolean }): Promise<{ closed: string[]; released: string[]; retained: string[]; failed: Array<{ page: string; reason: string }> }> {
+    const r = await this.bridge.send('session-finalize', { ...this.sessionOpts(), keep, closing: options?.closing });
+    const result = r.data as { closed: string[]; released: string[]; retained: string[]; failed: Array<{ page: string; reason: string }> };
+    if (!result || ![result.closed, result.released, result.retained].every(ids => Array.isArray(ids) && ids.every(id => typeof id === 'string'))
+      || !Array.isArray(result.failed) || result.failed.some(f => typeof f?.page !== 'string' || typeof f.reason !== 'string')) {
+      throw new BrowserCommandError('session-finalize returned an invalid outcome; cleanup may have occurred', 'invalid_response');
+    }
+    if (this.bound && this._page && [...result.closed, ...result.released].includes(this._page)) this.closed = true;
+    return result;
   }
   async cursor(x: number, y: number, opts: { waitForArrival?: boolean } = {}): Promise<void> {
     try { await this.send('cursor', { x, y, waitForArrival: opts.waitForArrival ?? true, timeoutMs: 1500 }); } catch (err) {

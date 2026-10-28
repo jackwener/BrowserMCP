@@ -15,8 +15,8 @@ Every error has `code`, `message`, optional `hint`, and any structured data spre
 | network evidence | `network_entry_not_found`, `capability_unavailable` | call `tab.network.list()` for a current `seq`; inspect `doctor` for extension features |
 | document reading | `stale_read` | the saved text capture was replaced or the page navigated; call `tab.read` without `readId` to start a new capture |
 | claiming tabs | `claim_not_found`, `claim_ambiguous` (+candidates), `claim_identity_mismatch`, `claim_not_allowed`, `already_claimed` | call `browser.user.openTabs()` and claim by `tabId` |
-| ending tabs | `tab_close_failed`, `tab_release_failed` | Chrome refused to close or release the tab; its lease remains active, so retry `tab.close`, `tab.release`, or `session_finalize` |
-| host unavailable | `host_unavailable` | Start Chrome and retry. A protocol revision difference is reported by `doctor` as a warning; available browser operations still run |
+| ending tabs | `tab_close_failed`, `tab_release_failed` | Chrome refused to close or release the tab; its lease remains active, so retry `tab.close`, `tab.release`, or `session_finish` |
+| host unavailable | `host_unavailable` | Start Chrome and retry. Inspect `doctor` for connection state. A `protocol_mismatch` requires matching host and extension revisions before browser commands run |
 | browser selection | `browser_selection_required` | Multiple hosts are connected; use `browsermcp doctor --json` and select `browserId` in config |
 | session restart | `session_restarted` | The call was not executed. Recreate REPL bindings and Tab handles, then inspect current state before continuing |
 | unsupported extension action | `unknown_action`, `capability_unavailable` | The connected extension lacks this specific operation. Inspect `doctor` for its advertised features and protocol warning; update the extension if needed |

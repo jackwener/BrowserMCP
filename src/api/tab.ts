@@ -179,7 +179,7 @@ export class Tab {
   }
   /** Preserve this tab for the user when the session is finalized. */
   async markDeliverable(): Promise<void> { await this.setRetention('deliverable'); }
-  /** Preserve this tab for a subsequent turn; it must be claimed again after finalization. */
+  /** Preserve this tab for a subsequent turn; the same session handle remains usable after finalization. */
   async markHandoff(): Promise<void> { await this.setRetention('handoff'); }
   /** Restore default cleanup: close agent tabs, release borrowed user tabs. */
   async clearRetention(): Promise<void> { await this.setRetention(null); }

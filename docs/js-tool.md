@@ -1,3 +1,5 @@
+Common operations also have typed MCP tools and equivalent `helper` methods. Discover with `tabs_list`, claim existing tabs with `claim_tab`, and reuse them with `navigate_tab`. `close_tab` closes an explicit session tab. Use `open_tab` only for a genuinely separate page. All helper calls use the current session; no imports or setup are needed.
+
 ## Browser REPL quickstart
 
 `js` runs a persistent Node REPL with top-level `await`. End with an expression to return its value; do not use top-level `return` (it is only valid inside functions). Pre-bound `browser`, `sites`, `tools`, `recon`, `agent`, `session`, `nodeRepl`; no imports or bootstrap. Await API methods. Each call drains already-dispatched API work before returning; an ordinary error preserves bindings. Variables, functions and classes survive calls. Prefer `let` for working bindings; reuse bindings across calls; redeclaration is also supported.
@@ -33,7 +35,7 @@ shot;
 
 Refs are opaque Element identities shared by ARIA, DOM and find. Copy them unchanged; routing to their observed frame is automatic. They remain valid while the same Element lives in that document; after replacement or navigation, `stale_ref` means observe again. A semantic locator can find a replacement Element; an old ref does not.
 
-Finish with `session_finalize`. Use `doctor` for connection/execution status and `js_reset` to stop JavaScript, clear bindings and close explicit subscriptions; tabs stay open. Read `repl-session` for Node declaration semantics, errors, timeout/reset and images. Request `api-reference` with `member:"Tab.act"`, `"Tab.network"`, `"Browser"` or another class/member for exact signatures; omit member for the full reference.
+Finish with `session_finish`. Use `doctor` for connection/execution status and `js_reset` to stop JavaScript, clear bindings and close explicit subscriptions; tabs stay open. Read `repl-session` for Node declaration semantics, errors, timeout/reset and images. Request `api-reference` with `member:"Tab.act"`, `"Tab.network"`, `"Browser"` or another class/member for exact signatures; omit member for the full reference.
 
 Reuse the same target for verification: `await tab.expect({target, value:"42"})`. Continue captured output with `tab.observe(result.next)` or `tab.read(result.next)`. Pass an `openedTabs` entry directly to `browser.tabs.get`, and the returned download object to `tab.download(result.download)`.
 

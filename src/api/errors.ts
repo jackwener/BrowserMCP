@@ -4,7 +4,7 @@ export class ActionError extends Error {
     super(message);
     this.name = 'ActionError';
   }
-  toJSON(): Record<string, unknown> { return { code: this.code, message: this.message, ...(this.hint && { hint: this.hint }), ...this.data }; }
+  toJSON(): Record<string, unknown> { return { ...this.data, code: this.code, message: this.message, ...(this.hint && { hint: this.hint }) }; }
 }
 
 export function errorEnvelope(err: unknown): { ok: false; error: Record<string, unknown> } {
@@ -14,5 +14,5 @@ export function errorEnvelope(err: unknown): { ok: false; error: Record<string, 
   const e = (err ?? {}) as { code?: string; message?: string; hint?: string; name?: string; data?: unknown };
   const data = e.data && typeof e.data === 'object' && !Array.isArray(e.data) ? e.data as Record<string, unknown> : {};
   const raw = e.code ?? (e.name === 'BrowserCommandError' ? 'browser_command_failed' : 'error');
-  return { ok: false, error: { code: raw, message: e.message ?? String(err), ...(e.hint && { hint: e.hint }), ...data } };
+  return { ok: false, error: { ...data, code: raw, message: e.message ?? String(err), ...(e.hint && { hint: e.hint }) } };
 }

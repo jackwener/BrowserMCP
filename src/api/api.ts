@@ -1,3 +1,4 @@
+import { createBrowserCommands, browserHelper, type BrowserHelper, type BrowserCommands } from './commands.js';
 import { PageFunction } from '../shared/api-contract.js';
 /**
  * The object model's entry: agent.browsers · sites.<site>.<command>() · recon.discover(tab) · tools.define.
@@ -15,6 +16,7 @@ import { Browser } from './browser.js';
 import type { SessionContext } from './context.js';
 
 export interface AgentApi {
+  helper: BrowserHelper;
   agent: { browsers: { getDefault(): Promise<Browser> }; browser: Browser; documentation: { get(name: string): Promise<string | null> } };
   sites: Record<string, unknown> & { search(q: string, limit?: number): Promise<unknown>; list(): Promise<unknown>; enable(site: string, opts?: { write?: boolean }): Promise<{ site: string; tools: string[] }>; disable(site: string): Promise<boolean>; run(site: string, name: string, args?: Record<string, unknown>): Promise<unknown> };
   recon: { discover(tab: Tab, opts?: Parameters<typeof discoverEndpoints>[1]): Promise<DiscoverResult> };
@@ -22,7 +24,7 @@ export interface AgentApi {
   session: { id: string };
 }
 
-export function createAgentApi(rt: Runtime, sessionId: string): AgentApi {
+export function createAgentApi(rt: Runtime, sessionId: string): AgentApi & { commands: BrowserCommands } {
   const state = rt.session(sessionId);
   const ctx: SessionContext = { rt, sessionId, state };
   // One user, one Chrome — there is no browser fleet to route among; getDefault is the single accessor.
@@ -58,12 +60,15 @@ export function createAgentApi(rt: Runtime, sessionId: string): AgentApi {
     has(target, prop) { return typeof prop === 'string' && (prop in target || rt.registry.has(prop)); },
   });
 
+  const browser = new Browser(rt.backend() === 'electron' ? 'embedded' : 'chrome', rt.backend() === 'electron' ? 'electron' : 'extension', ctx);
+  const commands = createBrowserCommands(browser);
   return {
+    helper: browserHelper(commands), commands,
     agent: {
       browsers: { getDefault },
       // The single default browser, eagerly available (one user, one Chrome) so `browser.tabs/user/...` works in js
       // without a bootstrap line; ops throw browser_unavailable at call time when Chrome isn't connected.
-      browser: new Browser(rt.backend() === 'electron' ? 'embedded' : 'chrome', rt.backend() === 'electron' ? 'electron' : 'extension', ctx),
+      browser,
       documentation: { get: async (name: string) => readDocForContext(name, { backend: rt.backend(), capabilities: rt.features() }) },
     },
     sites,

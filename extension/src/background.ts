@@ -114,7 +114,7 @@ async function handleCommand(cmd: Command): Promise<Result> {
       case 'claim': { if (!cmd.claim) return { id: cmd.id, ok: false, error: 'Missing claim' }; const r = await sessions.claimUserTab(s, cmd.claim); return { id: cmd.id, ok: true, page: r.page, data: { url: r.tab.url, title: r.tab.title, tabId: r.tabId } }; }
       case 'close-user-tabs': { if (!cmd.tabIds?.length) return { id: cmd.id, ok: false, error: 'Missing tabIds', errorCode: 'invalid_args' }; return { id: cmd.id, ok: true, data: await sessions.closeUserTabs(cmd.tabIds) }; }
       case 'mark': { if (!cmd.page) return { id: cmd.id, ok: false, error: 'Missing page' }; const tabId = await identity.resolveTabId(cmd.page); sessions.mark(s, tabId, cmd.mark ?? null); return { id: cmd.id, ok: true, data: { mark: cmd.mark ?? null } }; }
-      case 'session-finalize': closeSessionStreams(s.key); return { id: cmd.id, ok: true, data: await sessions.finalize(s, cmd.keep ?? []) };
+      case 'session-finalize': closeSessionStreams(s.key); return { id: cmd.id, ok: true, data: await sessions.finalize(s, cmd.keep ?? [], cmd.closing) };
       // ── human visibility ──
       case 'cursor': { if (typeof cmd.x !== 'number' || typeof cmd.y !== 'number') return { id: cmd.id, ok: false, error: 'Missing x/y' }; const tabId = await sessions.resolveTab(s, cmd.page); const arrived = await sessions.cursor(s, tabId, cmd.x, cmd.y, cmd.waitForArrival !== false, cmd.timeoutMs ?? 1200); return pageScoped(cmd.id, tabId, { arrived }); }
       case 'dialog': {

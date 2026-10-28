@@ -57,7 +57,7 @@ export function pageArgument(value: unknown): string {
 
 export const discoveryOptions = z.strictObject({
   query: z.string().optional(),
-  limit: z.number().int().min(1).max(100).optional(),
+  limit: z.number().int().min(1).max(10000).optional(),
   offset: z.number().int().nonnegative().optional(),
 });
 export type TabDiscoveryOptions = z.infer<typeof discoveryOptions>;
@@ -73,7 +73,7 @@ export const discoveryResult = z.strictObject({
   scope: z.literal('unclaimed'), query: z.string(), matching: z.literal('case-insensitive-substring'),
   totalVisible: z.number().int().nonnegative(), totalInScope: z.number().int().nonnegative(),
   excluded: z.strictObject({ owned: z.number().int().nonnegative(), unsupported: z.number().int().nonnegative() }),
-  matched: z.number().int().nonnegative(), offset: z.number().int().nonnegative(), limit: z.number().int().min(1).max(100),
+  matched: z.number().int().nonnegative(), offset: z.number().int().nonnegative(), limit: z.number().int().min(1).max(10000),
   hasMore: z.boolean(), nextOffset: z.number().int().nonnegative().optional(), items: z.array(userTabInfo),
 }).superRefine((r, ctx) => {
   const count = Math.min(r.limit, Math.max(0, r.matched - r.offset));

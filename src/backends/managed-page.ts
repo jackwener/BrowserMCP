@@ -18,7 +18,7 @@ export interface ManagedPageExtras {
   claim(tab: { tabId?: number; active?: boolean; title?: string; url?: string; expectedUrl?: string; expectedTitle?: string }): Promise<{ page: string; tabId: number; url?: string; title?: string }>;
   closeUserTabs(tabIds: number[]): Promise<CloseUserTabsResult>;
   mark(page: string, mark: 'deliverable' | 'handoff' | null): Promise<void>;
-  finalize(keep: Array<{ page: string; status: 'deliverable' | 'handoff' }>): Promise<{ closed: string[]; kept: string[]; failed: Array<{ page: string; reason: string }> }>;
+  finalize(keep: Array<{ page: string; status: 'deliverable' | 'handoff' }>, options?: { closing?: boolean }): Promise<{ closed: string[]; released: string[]; retained: string[]; failed: Array<{ page: string; reason: string }> }>;
   cursor(x: number, y: number, opts?: { waitForArrival?: boolean }): Promise<void>;
   setVisibility(visible: boolean): Promise<void>;
   getVisibility(): Promise<boolean>;

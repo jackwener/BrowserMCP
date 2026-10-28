@@ -33,7 +33,7 @@ export class ExtensionBridge extends EventEmitter<BridgeEvents> {
   get protocolMatches(): boolean { return this.connected && this.protocolRevision === PROTOCOL_REVISION; }
   get protocolWarning(): string | null {
     if (!this.connected || this.protocolMatches) return null;
-    return `Extension protocol ${this.protocolRevision ?? 'unknown'} differs from host protocol ${PROTOCOL_REVISION}. Browser commands remain available; update the host or extension if an operation fails.`;
+    return `Extension protocol ${this.protocolRevision ?? 'unknown'} differs from host protocol ${PROTOCOL_REVISION}. Browser commands are blocked; update the host and extension together.`;
   }
 
   /** Set by the host so the extension learns its running version (informational). */
@@ -92,6 +92,7 @@ export class ExtensionBridge extends EventEmitter<BridgeEvents> {
 
   /** Send a command; resolves with `data`, throws BrowserCommandError on `ok:false`. */
   async send(action: Action, params: Omit<Command, 'id' | 'action'> = {}, opts: { timeoutMs?: number } = {}): Promise<{ data: unknown; page?: string }> {
+    if (action !== 'ping' && this.connected && !this.protocolMatches) throw new BrowserCommandError(this.protocolWarning!, 'protocol_mismatch', 'Update the host and extension together. This command was not dispatched.');
     const timeoutMs = opts.timeoutMs ?? (params.timeoutMs ?? 60_000) + 5_000;
     const id = randomUUID();
     const command: Command = { id, action, ...params, deadlineAt: Date.now() + timeoutMs };

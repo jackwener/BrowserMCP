@@ -87,7 +87,7 @@ For integrations and custom workflows, the main tools are:
 | Discover and run site commands | `sites_search`, `site_run` |
 | Learn the API | `docs_get` (quickstart, topics, or an exact API member) |
 | Diagnose connection and execution | `doctor` |
-| Finish a browser session | `session_finalize` |
+| Finish a browser session | `session_finish` |
 
 The browser workflow is **observe → act → verify → finalize**, expressed in `js` using the same object model as adapters:
 
@@ -98,7 +98,7 @@ await tab.observe();
 
 Variables, functions, classes and Tab handles persist across calls. After inspecting the result, use `await tab.act(...)` and `await tab.expect(...)` or observe again. Keep working data in variables and return only relevant evidence. `docs_get {}` provides a compact quickstart; `{name:"api-reference",member:"Tab.act"}` provides exact types. No repository documentation access is required.
 
-Use `browser.user.openTabs({query,limit})` and `browser.user.claimTab(...)` for user tabs. The lookup returns a discovery envelope: read `items`, `matched`, `totalInScope`, `excluded` and `hasMore`. It returns up to 20 recent matches by default; continue with `offset: nextOffset`. `tab.release()` leaves a tab open; `tab.close()` closes it. `session_finalize` closes agent tabs not kept and releases borrowed tabs. `js_reset` stops JavaScript and clears bindings while leaving tabs open; already dispatched operations may still complete. All API methods are awaited.
+Use `browser.user.openTabs({query,limit})` and `browser.user.claimTab(...)` for user tabs. The lookup returns a discovery envelope: read `items`, `matched`, `totalInScope`, `excluded` and `hasMore`. It returns up to 20 recent matches by default; continue with `offset: nextOffset`. `tab.release()` leaves a tab open; `tab.close()` closes it. `session_finish` closes agent tabs not kept and releases borrowed tabs. `js_reset` stops JavaScript and clears bindings while leaving tabs open; already dispatched operations may still complete. All API methods are awaited.
 
 Inside the `js` tool, you can also call site commands directly:
 
@@ -176,3 +176,9 @@ Found a bug or have a feature request? [Open an issue](https://github.com/jackwe
 The REPL also exposes `browser.chrome.call(method, argsArray)` for native Chrome APIs, `tab.cdp.send(method, params)` for an explicit Tab, and writable Main World `tab.evaluate(script, {arg, timeoutMs})`. Use `browser.chrome.describe("tabs.query")` for on-demand signatures and runtime availability. Chrome/CDP events and page/extension logs support bounded subscriptions with explicit loss/reset information. Read `docs_get {name:"capabilities/chrome"}` inside MCP for examples and lifecycle rules, or [the native capabilities guide](docs/capabilities/chrome.md).
 
 For development, `npm run smoke:native` runs the new flows in a disposable Chromium profile after a build. Set `BROWSERMCP_SMOKE_CHROME` to a Chromium executable when it is not available in the local Playwright cache. It does not modify the everyday browser profile or native-host registration.
+
+### Common browser tools
+
+Use `tabs_list` → `claim_tab` to reuse an existing page, then `navigate_tab`, `tab_observe` and `tab_act`. Only `open_tab` creates a new page. `close_tab`/`tabs_close` close explicit session tabs; `release_tab` leaves a tab open. `session_finish` reports closed, released, retained and failed tabs separately. Handoff tabs remain usable in the same session.
+
+The persistent `js` workspace exposes the same commands through `helper`, including `helper.navigate_tab({tabId,url})` and `helper.close_tab({tabId})`. Chrome APIs, CDP and Adapter authoring remain available through the existing object API.

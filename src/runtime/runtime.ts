@@ -281,7 +281,7 @@ export class Runtime extends EventEmitter<RuntimeEvents> implements PageProvider
     const page = s.browserPage;
     if (page && opts.finalize !== false && !s.finalized) {
       try {
-        if (this.isManagedPage(page)) await page.finalize([]);
+        if (this.isManagedPage(page)) await page.finalize([], { closing: true });
         else await page.closeWindow();
       } catch (err) { this.emit('log', `finalize on close failed: ${(err as Error).message}`); }
     }

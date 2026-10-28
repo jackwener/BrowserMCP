@@ -67,18 +67,20 @@ export function createMcpServer(rt: Runtime, sessionId: string, opts: { version?
       return ok(r.rows !== undefined ? { rows: r.rows, ...(r.nextCursor && { nextCursor: r.nextCursor }) } : { value: r.value });
     } finally { if (beat) clearInterval(beat); }
   };
+  for (const [name, command] of Object.entries(api.commands)) {
+    server.registerTool(name, {
+      description: command.description, inputSchema: command.inputSchema,
+      annotations: { readOnlyHint: command.readOnly, destructiveHint: !command.readOnly, openWorldHint: true },
+    }, async (input: unknown) => run(async () => {
+      if (state.js && state.js.status().state !== 'idle') throw new ActionError('js_busy', 'JavaScript or dispatched API work is still running.', 'Wait for js to finish before using a typed browser command.');
+      const value = await command.call(input);
+      const { image, ...result } = value as typeof value & { image?: { mimeType: string; base64: string } };
+      return ok(result, image ? [image] : []);
+    }));
+  }
   // ── entry surface: REPL, site commands, discovery and lifecycle ──
   // ── diagnostics & discovery ──
-  server.registerTool('doctor', { title: 'Doctor', description: 'Runtime status: browser connection, extension features and protocol warning (if versions differ), site/command counts, sessions. A protocol warning does not block browser commands.', inputSchema: {}, annotations: { readOnlyHint: true } }, async () => run(async () => ok({ ...rt.doctor(), javascript: state.js?.status() ?? { state: 'idle', generation: 0, pendingCalls: 0 } })));
-
-  // ── session ──
-  server.registerTool('session_finalize', { title: 'Finalize session tabs', description: 'End-of-task cleanup. Prefer await tab.markDeliverable() in js to preserve a result. Unmarked agent-created tabs not listed in keep are closed; deliverable tabs leave the group and stay open; handoff tabs stay in the group for a later turn. Claimed user tabs are only released.',
-    inputSchema: { keep: z.array(z.object({ tab: z.string().describe('Complete tab.id returned by the API; not a REPL variable name, truncated id, or numeric tabId'), status: z.enum(['deliverable', 'handoff']) })).default([]) },
-    annotations: { destructiveHint: true },
-  }, async ({ keep }) => run(async () => {
-    if (state.js && state.js.status().state !== 'idle') throw new ActionError('js_busy', 'JavaScript or dispatched API work is still running.', 'Wait for js to finish, or call js_reset and wait for doctor javascript.pendingCalls:0 before finalizing.');
-    return ok(await (await api.agent.browsers.getDefault()).tabs.finalize({ keep }));
-  }));
+  server.registerTool('doctor', { title: 'Doctor', description: 'Runtime status: browser connection, extension features and protocol warning (if versions differ), site/command counts, sessions. A protocol mismatch blocks browser commands until the host and extension are updated.', inputSchema: {}, annotations: { readOnlyHint: true } }, async () => run(async () => ok({ ...rt.doctor(), javascript: state.js?.status() ?? { state: 'idle', generation: 0, pendingCalls: 0 } })));
 
   // ── sites ──
   server.registerTool('sites_search', { title: 'Find site capabilities', description: 'No query: list available sites with sample commands. With a task, site, or domain as query: find matching commands. Results include args[{name,type,required,help,default,choices}] for site_run. Do not invent parameters.', inputSchema: { query: z.string().optional().describe('task, site, or domain; omit to browse available sites'), limit: z.number().int().min(1).max(100).default(20) }, annotations: { readOnlyHint: true } }, async ({ query, limit }) => run(async () => query?.trim() ? ok({ results: await api.sites.search(query, limit) }) : ok({ sites: rt.registry.sites().slice(0, limit) })));
@@ -95,9 +97,9 @@ export function createMcpServer(rt: Runtime, sessionId: string, opts: { version?
   }));
 
   // ── code mode ──
-  const jsGlobals = { agent: api.agent, browser: api.agent.browser, sites: api.sites, recon: api.recon, tools: api.tools, session: api.session };
+  const jsGlobals = { helper: api.helper, agent: api.agent, browser: api.agent.browser, sites: api.sites, recon: api.recon, tools: api.tools, session: api.session };
   server.registerTool('js', {
-    title: 'Browser JavaScript REPL', description: 'Primary browser workspace. Persistent Node REPL: variables, functions, classes and top-level await; use let for reusable bindings. Pre-bound browser, sites, tools, recon. Start: let tab = await browser.tabs.new("https://example.com"); await tab.observe(). observe returns a compact action map, not HTML; follow nextCursor with tab.observe({cursor}) for remaining captured pages, or scope with {target:{selector:"#main"}}. Read document text with tab.read(). Reuse tab across calls; await tab.act({action:"click", target:{ref:"..."}}) with an observed ref, then observe. Batch determined steps and return at new decision points. Await API calls; dispatched API work is drained before returning. Ordinary errors preserve bindings. Last expression is returned; do not use top-level return. nodeRepl.write(value) adds output. Page JS uses tab.evaluate. docs_get with no arguments returns quickstart/topics; api-reference with member:"Tab.act" gives exact types.',
+    title: 'Browser JavaScript REPL', description: 'Primary browser workspace. Persistent Node REPL: variables, functions, classes and top-level await; use let for reusable bindings. Pre-bound browser, sites, tools, recon. Discover and claim an existing tab first; use helper.navigate_tab({tabId, url}) to reuse it. Only open_tab or browser.tabs.new explicitly creates a tab. helper exposes the same typed commands as MCP, including close_tab. observe returns a compact action map, not HTML; follow nextCursor with tab.observe({cursor}) for remaining captured pages, or scope with {target:{selector:"#main"}}. Read document text with tab.read(). Reuse tab across calls; await tab.act({action:"click", target:{ref:"..."}}) with an observed ref, then observe. Batch determined steps and return at new decision points. Await API calls; dispatched API work is drained before returning. Ordinary errors preserve bindings. Last expression is returned; do not use top-level return. nodeRepl.write(value) adds output. Page JS uses tab.evaluate. docs_get with no arguments returns quickstart/topics; api-reference with member:"Tab.act" gives exact types.',
     inputSchema: { code: z.string(), timeoutMs: z.number().int().min(1).max(1_800_000).default(300_000), maxChars: z.number().int().min(1000).max(120_000).default(12_000).describe('result text budget; retain large data in a variable and return only relevant parts') },
     annotations: { openWorldHint: true, destructiveHint: true },
   }, async ({ code, timeoutMs, maxChars }, extra) => run(async () => {
@@ -188,7 +190,7 @@ export function createMcpServer(rt: Runtime, sessionId: string, opts: { version?
   server.registerResource('site', new ResourceTemplate('browsermcp://sites/{site}', { list: undefined }), { title: 'Site commands', mimeType: 'application/json' }, async (uri, { site }) => ({ contents: [{ uri: uri.href, mimeType: 'application/json', text: JSON.stringify((await rt.registry.commands(String(site))).map((c) => ({ name: c.name, description: c.description, access: c.access, domain: c.domain, args: c.args, result: c.result })), null, 2) }] }));
 
   // ── prompts ──
-  server.registerPrompt('browse', { title: 'Browse a site for a goal', description: 'Use the browser service to observe, act, verify, and finalize.', argsSchema: { goal: z.string(), url: z.string().optional() } }, ({ goal, url }) => ({ messages: [{ role: 'user', content: { type: 'text', text: `Goal: ${goal}${url ? `\nStart at: ${url}` : ''}\n\n1. Read docs_get for the quickstart. Use js with browser.tabs.new or browser.user.claimTab, then tab.observe → tab.act → tab.expect as needed.\n2. If a verified site adapter fits this task, you may use site_run instead of repeating the workflow.\n3. Finish with session_finalize, keeping only deliverable/handoff tabs.` } }] }));
+  server.registerPrompt('browse', { title: 'Browse a site for a goal', description: 'Use the browser service to observe, act, verify, and finalize.', argsSchema: { goal: z.string(), url: z.string().optional() } }, ({ goal, url }) => ({ messages: [{ role: 'user', content: { type: 'text', text: `Goal: ${goal}${url ? `\nStart at: ${url}` : ''}\n\n1. Read docs_get for the quickstart. Use js with browser.tabs.new or browser.user.claimTab, then tab.observe → tab.act → tab.expect as needed.\n2. If a verified site adapter fits this task, you may use site_run instead of repeating the workflow.\n3. Finish with session_finish, keeping only deliverable/handoff tabs.` } }] }));
   server.registerPrompt('write-tool', { title: 'Turn a flow into a tool', description: 'Explore and verify an API, then define an explicit adapter.', argsSchema: { site: z.string(), goal: z.string() } }, ({ site, goal }) => ({ messages: [{ role: 'user', content: { type: 'text', text: `Create a reusable ${site} adapter for: ${goal}\n\n1. Open the site and perform the flow once. Use tab.network.list/detail in js and recon.discover(tab) to identify candidate endpoints.\n2. Verify the chosen endpoint through the logged-in page, including authentication, arguments, pagination, and errors.\n3. Read docs_get {name:"define-tools"}, use js to define a draft with tools.define, verify it with tools.try using sample args and an output assertion, then publish with tools.activate.` } }] }));
 
   return {

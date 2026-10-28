@@ -75,7 +75,7 @@ export class Browser {
       const current = tabs.find((tab) => tab.selected) ?? tabs.find((tab) => tab.active);
       return current?.id ? new Tab(current.id, this.ctx) : undefined;
     },
-    finalize: async (opts: { keep?: Array<{ tab: string | Tab; status: 'deliverable' | 'handoff' }> } = {}): Promise<{ closed: string[]; kept: string[]; failed: Array<{ page: string; reason: string }> }> => {
+    finalize: async (opts: { keep?: Array<{ tab: string | Tab; status: 'deliverable' | 'handoff' }> } = {}): Promise<{ closed: string[]; released: string[]; retained: string[]; failed: Array<{ page: string; reason: string }> }> => {
       const page = await this.page();
       const keep = (opts.keep ?? []).map((k) => ({ page: typeof k.tab === 'string' ? k.tab : k.tab?.id, status: k.status }));
       if (keep.length) {
@@ -92,9 +92,9 @@ export class Browser {
           }
         }
       }
-      const result = this.ctx.rt.isManagedPage(page) ? await page.finalize(keep) : (await page.closeWindow(), { closed: [], kept: keep.map((k) => k.page), failed: [] });
-      for (const id of [...result.closed, ...result.kept]) this.ctx.rt.forgetPage(this.ctx.sessionId, id);
-      this.ctx.state.finalized = result.failed.length === 0;
+      const result = this.ctx.rt.isManagedPage(page) ? await page.finalize(keep) : (await page.closeWindow(), { closed: [], released: keep.map((k) => k.page), retained: [], failed: [] });
+      for (const id of [...result.closed, ...result.released]) this.ctx.rt.forgetPage(this.ctx.sessionId, id);
+      this.ctx.state.finalized = result.failed.length === 0 && result.retained.length === 0;
       if (this.ctx.state.finalized) { this.ctx.state.pages.clear(); this.ctx.state.tabLocks.clear(); }
       return result;
     },

@@ -84,6 +84,7 @@ export interface Command {
   tabIds?: number[];
   /** mark / finalize */
   mark?: 'deliverable' | 'handoff' | null;
+  closing?: boolean;
   keep?: Array<{ page: string; status: 'deliverable' | 'handoff' }>;
   /** cursor */
   x?: number;
@@ -201,7 +202,7 @@ export type BrowserEvent =
 
 export type HostToExt = { type: 'command'; command: Command } | { type: 'ready'; version: string };
 /** Advisory contract revision; individual capabilities and command results decide what works. */
-export const PROTOCOL_REVISION = 4;
+export const PROTOCOL_REVISION = 5;
 export type BrowserFeature = 'chrome-api' | 'streams' | 'extension-logs' | 'page-evaluate' | 'frame-evaluate' | 'cdp' | 'network' | 'frames' | 'dialogs' | 'console' | 'downloads' | 'viewport' | 'visibility' | 'webmcp';
 export type ExtToHost =
   | { type: 'hello'; browserId: string; extensionVersion: string; protocolRevision?: number; features?: BrowserFeature[] }
