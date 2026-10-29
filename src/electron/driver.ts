@@ -5,6 +5,14 @@ import { installEngineJs, pageCallJs, unwrapPageResult, PAGE_GLOBAL, frameSteps,
 import type { ActSpec, FrameStep, DialogInfo } from '../protocol.js';
 import { ActionError } from '../api/errors.js';
 
+/**
+ * Runtime.enable without console reporting: Kaze's Electron (OpenBrowser's V8 patch) then never
+ * serializes the page's console arguments, so no getter of the page's runs — the classic way a
+ * page tells a debugger is attached. Execution contexts and evaluation work as before; a stock
+ * engine ignores the two options.
+ */
+const QUIET_RUNTIME = { reportConsoleMessages: false, serializeConsoleObjects: false };
+
 type Evaluation = { result: { value?: unknown; objectId?: string }; exceptionDetails?: { text?: string; exception?: { description?: string } } };
 
 /** CDP stays on the application's registered target; no remote-debugging port is opened. */
@@ -25,7 +33,7 @@ export class ElectronDriver {
     if (method === 'Runtime.executionContextCreated' && params.context.auxData?.isDefault) this.mainContexts.set(params.context.auxData.frameId, params.context.id);
     if (method === 'Target.attachedToTarget') {
       this.targets.set(params.targetInfo.targetId, params.sessionId);
-      void this.send('Runtime.enable', {}, params.sessionId).catch(() => {});
+      void this.send('Runtime.enable', QUIET_RUNTIME, params.sessionId).catch(() => {});
       void this.send('Runtime.runIfWaitingForDebugger', {}, params.sessionId).catch(() => {});
     }
     if (method === 'Target.detachedFromTarget') { for (const [id, session] of this.targets) if (session === params.sessionId) this.targets.delete(id); this.contexts.clear(); }
@@ -85,7 +93,7 @@ export class ElectronDriver {
     debuggerApi.on('detach', this.onDetach);
     try {
       await this.send('Page.enable');
-      await this.send('Runtime.enable');
+      await this.send('Runtime.enable', QUIET_RUNTIME);
       await this.send('Network.enable');
       await this.send('Target.setAutoAttach', { autoAttach: true, waitForDebuggerOnStart: false, flatten: true });
     } catch (error) { this.dispose(); throw error; }
@@ -143,7 +151,7 @@ export class ElectronDriver {
   async evaluateMain(expression: string, frame?: FrameStep | FrameStep[], timeoutMs?: number): Promise<unknown> {
     if (!frameSteps(frame).length) return this.evaluate(expression, undefined, undefined, timeoutMs);
     const { frameId } = await this.route(frame);
-    await this.send('Runtime.enable', {}, this.sessionFor(frameId));
+    await this.send('Runtime.enable', QUIET_RUNTIME, this.sessionFor(frameId));
     const contextId = this.mainContexts.get(frameId);
     if (contextId === undefined) throw new ActionError('frame_unreachable', 'Frame main world is not ready');
     return this.evaluate(expression, contextId, frameId, timeoutMs);
