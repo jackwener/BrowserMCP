@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.0.38 — 2026-11-09
+
+Index built-in adapters from a build-generated manifest without importing command modules at startup or during search. Load a command module on execution. Validate manifest metadata and preserve live indexing for writable user adapters. Build, targeted checks, real Electron and installed ASAR verification completed before release.
+
 ## 0.0.37 — 2026-10-28
 
 Improve Agent Experience across browser backends: compact viewport observations with explicit scope and semantic pagination; navigation readiness conditions shared with expect; explicit evaluation timeout outcomes and bounded error details; API signatures in unknown-method recovery; clear reading continuation and close receipts.
