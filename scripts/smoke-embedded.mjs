@@ -82,6 +82,9 @@ try {
   assert.equal(await a.js('await tab.evaluate(n => {globalThis.contractEffects++; return n}, {arg:5})'), 5);
   assert.equal(await a.js('await tab.evaluate(() => globalThis.contractEffects)'), 1);
   assert.deepEqual(await a.js('await tab.evaluate(x=>x,{arg:{$remote:1,$function:"data"}})'), {$remote:1,$function:'data'});
+  // Built-in adapters: search reads the packaged manifest; a run imports the command module (here inside app.asar when packaged).
+  assert.deepEqual((await a.js('(await sites.search("bilibili hot", 1)).map(r => `${r.site}/${r.name}`)')), ['bilibili/hot']);
+  assert.equal(await a.js('try { await sites.run("bilibili", "hot", {limit: "many"}) } catch (e) { e.code }'), 'invalid_args');
   console.log('smoke: adapters and profiles verified');
   const userContents = await createPage({ workspaceId: 'workspace', profileId: 'alpha' });
   await userContents.loadURL(url);

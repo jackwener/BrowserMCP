@@ -1,6 +1,6 @@
 {
   "name": "@jackwener/browsermcp",
-  "version": "0.0.38-embedded.2",
+  "version": "0.0.38-embedded.3",
   "description": "Chrome-backed MCP browser service with optional site adapters.",
   "repository": {
     "type": "git",
@@ -19,8 +19,9 @@
     "browsermcp": "dist/src/main.js"
   },
   "scripts": {
-    "build": "node scripts/clean.mjs && node scripts/extract-playwright-injected.mjs && tsc -p tsconfig.json && node scripts/gen-api-reference.mjs && node scripts/render-icons.mjs && node scripts/build-extension.mjs && node scripts/copy-assets.mjs && node scripts/build-embedded.mjs",
+    "build": "node scripts/clean.mjs && node scripts/extract-playwright-injected.mjs && tsc -p tsconfig.json && node scripts/gen-adapter-manifest.mjs && node scripts/gen-api-reference.mjs && node scripts/render-icons.mjs && node scripts/build-extension.mjs && node scripts/copy-assets.mjs && node scripts/build-embedded.mjs",
     "build:ext": "node scripts/render-icons.mjs && node scripts/build-extension.mjs",
+    "gen:adapters": "tsc -p tsconfig.json && node scripts/gen-adapter-manifest.mjs",
     "dev": "tsx src/main.ts",
     "test": "vitest run",
     "typecheck": "tsc -p tsconfig.tests.json && tsc -p extension/tsconfig.json",
@@ -33,7 +34,7 @@
     "pack:manual": "npm run build && node scripts/pack-extension.mjs manual",
     "smoke:native": "node scripts/smoke-native-capabilities.mjs",
     "generate:chrome": "node scripts/gen-chrome-reference.mjs",
-    "build:embedded": "tsc -p tsconfig.json && node scripts/build-embedded.mjs && node scripts/copy-assets.mjs",
+    "build:embedded": "tsc -p tsconfig.json && node scripts/gen-adapter-manifest.mjs && node scripts/build-embedded.mjs && node scripts/copy-assets.mjs",
     "smoke:embedded": "npm run build:embedded && node scripts/run-embedded-smoke.mjs",
     "smoke:embedded:package": "npm run build:embedded && node scripts/smoke-embedded-package.mjs"
   },

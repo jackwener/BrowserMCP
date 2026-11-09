@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.0.38-embedded.3 — 2026-11-09
+
+Site adapters load on demand. A build-generated `adapters/manifest.json` describes every built-in command (description, access, domain, result, argument schema, aliases), so startup, listing, `sites_search`, `sites.search` and site tool schemas no longer import adapter modules; `site_run` / `sites.run` imports the one command's module on first use. Embedded start: 170 fewer modules loaded, adapter indexing 135 → 7 ms. User and application adapters are indexed as before.
+
 ## 0.0.38-embedded.0 — 2026-10-28
 
 Includes stable 0.0.37 Agent Experience improvements: compact viewport observations and semantic pagination, navigation readiness via expect, explicit evaluate timeout outcomes, bounded error details, API signatures for recovery, and close receipts. Retains built-in adapter defaults and application-owned custom adapters.
