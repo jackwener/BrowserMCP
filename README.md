@@ -182,3 +182,5 @@ For development, `npm run smoke:native` runs the new flows in a disposable Chrom
 Use `tabs_list` → `claim_tab` to reuse an existing page, then `navigate_tab`, `tab_observe` and `tab_act`. Only `open_tab` creates a new page. `close_tab`/`tabs_close` close explicit session tabs; `release_tab` leaves a tab open. `session_finish` reports closed, released, retained and failed tabs separately. Handoff tabs remain usable in the same session.
 
 The persistent `js` workspace exposes the same commands through `helper`, including `helper.navigate_tab({tabId,url})` and `helper.close_tab({tabId})`. Chrome APIs, CDP and Adapter authoring remain available through the existing object API.
+
+Built-in Adapter metadata is generated into `adapters/manifest.json`. Startup and search read this catalog; command modules load when executed. After changing built-in adapters, run `npm run gen:adapters` and commit the generated manifest (the build regenerates it too). Writable user adapters continue to be indexed from their modules.

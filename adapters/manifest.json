@@ -1,0 +1,3476 @@
+{
+  "format": 1,
+  "sites": {
+    "bilibili": {
+      "comment": {
+        "description": "Post a comment or reply on a Bilibili video. Any @username in the message is resolved to a real mention. Accepts a BV id, URL, or b23.tv link.",
+        "access": "write",
+        "domain": "bilibili.com",
+        "args": [
+          {
+            "name": "bvid",
+            "type": "string",
+            "required": true,
+            "help": "BV id, video URL, or b23.tv short link"
+          },
+          {
+            "name": "message",
+            "type": "string",
+            "required": true,
+            "help": "Comment text; @username in it is turned into a real mention"
+          },
+          {
+            "name": "parent",
+            "type": "int",
+            "help": "Root rpid to reply under (omit for a top-level comment)"
+          }
+        ]
+      },
+      "comments": {
+        "description": "Comments on a Bilibili video. With parent set, fetches the replies nested under that comment instead of top-level comments.",
+        "access": "read",
+        "domain": "bilibili.com",
+        "args": [
+          {
+            "name": "bvid",
+            "type": "string",
+            "required": true,
+            "help": "BV id, video URL, or b23.tv short link"
+          },
+          {
+            "name": "parent",
+            "type": "int",
+            "help": "rpid of a comment — fetch replies under it instead of top-level comments"
+          },
+          {
+            "name": "limit",
+            "type": "int",
+            "default": 20,
+            "help": "How many comments to return (max 50)"
+          }
+        ]
+      },
+      "download": {
+        "description": "Get the direct media stream URLs for a Bilibili video (video + audio DASH streams, or a progressive URL). Returns URLs only; does not download files. Accepts a BV id, URL, or b23.tv link.",
+        "access": "read",
+        "domain": "bilibili.com",
+        "args": [
+          {
+            "name": "bvid",
+            "type": "string",
+            "required": true,
+            "help": "BV id, video URL, or b23.tv short link"
+          },
+          {
+            "name": "quality",
+            "type": "string",
+            "default": "best",
+            "choices": [
+              "best",
+              "1080p",
+              "720p",
+              "480p"
+            ],
+            "help": "Preferred max quality"
+          },
+          {
+            "name": "force",
+            "type": "boolean",
+            "default": false,
+            "help": "Skip the paid-content pre-check (use if already purchased/charged/subscribed)"
+          },
+          {
+            "name": "page",
+            "type": "int",
+            "help": "Multi-part (分P) selection, 1-based. Defaults to P1."
+          }
+        ]
+      },
+      "dynamic": {
+        "description": "Your Bilibili following dynamic feed (关注动态), most recent first (requires login).",
+        "access": "read",
+        "domain": "bilibili.com",
+        "args": [
+          {
+            "name": "limit",
+            "type": "int",
+            "default": 15,
+            "help": "How many dynamics to return"
+          }
+        ]
+      },
+      "favorite": {
+        "description": "List videos in one of your Bilibili favorites folders (defaults to the first folder; requires login).",
+        "access": "read",
+        "domain": "bilibili.com",
+        "args": [
+          {
+            "name": "fid",
+            "type": "int",
+            "help": "Favorites folder id (media_id); defaults to your first folder"
+          },
+          {
+            "name": "limit",
+            "type": "int",
+            "default": 20,
+            "help": "How many items to return"
+          },
+          {
+            "name": "page",
+            "type": "int",
+            "default": 1,
+            "help": "Page number"
+          }
+        ]
+      },
+      "feed-detail": {
+        "description": "Full detail of a single Bilibili dynamic by its id (from a feed url), including charge-exclusive content.",
+        "access": "read",
+        "domain": "bilibili.com",
+        "args": [
+          {
+            "name": "id",
+            "type": "string",
+            "required": true,
+            "help": "Dynamic id (the number in a t.bilibili.com/<id> url)"
+          }
+        ]
+      },
+      "feed": {
+        "description": "Bilibili dynamic timeline. With no uid: your following timeline; with a uid/username: that user's posts (requires login).",
+        "access": "read",
+        "domain": "bilibili.com",
+        "args": [
+          {
+            "name": "uid",
+            "type": "string",
+            "help": "User uid or username; omit for your following timeline"
+          },
+          {
+            "name": "limit",
+            "type": "int",
+            "default": 20,
+            "help": "Max results to return"
+          },
+          {
+            "name": "type",
+            "type": "string",
+            "default": "all",
+            "help": "Filter: all, video, article, draw, text"
+          },
+          {
+            "name": "pages",
+            "type": "int",
+            "default": 1,
+            "help": "Number of pages to fetch (each ~20 items)"
+          }
+        ]
+      },
+      "follow": {
+        "description": "Follow a Bilibili user. Accepts a uid, username, or space.bilibili.com profile URL (requires login).",
+        "access": "write",
+        "domain": "bilibili.com",
+        "args": [
+          {
+            "name": "target",
+            "type": "string",
+            "required": true,
+            "help": "Target uid, username, or space.bilibili.com URL"
+          }
+        ]
+      },
+      "following": {
+        "description": "List who a Bilibili user follows (defaults to yourself; accepts a uid or username).",
+        "access": "read",
+        "domain": "bilibili.com",
+        "args": [
+          {
+            "name": "uid",
+            "type": "string",
+            "help": "Target user uid or username (defaults to the logged-in user)"
+          },
+          {
+            "name": "page",
+            "type": "int",
+            "default": 1,
+            "help": "Page number"
+          },
+          {
+            "name": "limit",
+            "type": "int",
+            "default": 50,
+            "help": "How many per page (max 50)"
+          }
+        ]
+      },
+      "history": {
+        "description": "Your Bilibili watch history, most recent first (requires login).",
+        "access": "read",
+        "domain": "bilibili.com",
+        "args": [
+          {
+            "name": "limit",
+            "type": "int",
+            "default": 20,
+            "help": "How many history items to return"
+          },
+          {
+            "name": "cursor",
+            "type": "string",
+            "help": "nextCursor from a previous call (view_at seconds), to page further back"
+          }
+        ]
+      },
+      "hot": {
+        "description": "Trending videos on Bilibili right now (热门).",
+        "access": "read",
+        "domain": "bilibili.com",
+        "args": [
+          {
+            "name": "limit",
+            "type": "int",
+            "default": 20,
+            "help": "How many videos to return"
+          }
+        ]
+      },
+      "me": {
+        "description": "Your own Bilibili profile: name, level, coins, followers, following (requires login).",
+        "access": "read",
+        "domain": "bilibili.com",
+        "args": []
+      },
+      "popular": {
+        "description": "Popular videos on Bilibili right now.",
+        "access": "read",
+        "domain": "bilibili.com",
+        "args": [
+          {
+            "name": "limit",
+            "type": "int",
+            "default": 20,
+            "help": "How many videos to return (max ~50)"
+          },
+          {
+            "name": "page",
+            "type": "int",
+            "default": 1,
+            "help": "Page number, to see more"
+          }
+        ]
+      },
+      "ranking": {
+        "description": "Bilibili all-category ranking board (排行榜).",
+        "access": "read",
+        "domain": "bilibili.com",
+        "args": [
+          {
+            "name": "limit",
+            "type": "int",
+            "default": 20,
+            "help": "How many videos to return"
+          }
+        ]
+      },
+      "search": {
+        "description": "Search Bilibili for videos or users by keyword.",
+        "access": "read",
+        "domain": "bilibili.com",
+        "args": [
+          {
+            "name": "query",
+            "type": "string",
+            "required": true,
+            "help": "Search keyword"
+          },
+          {
+            "name": "type",
+            "type": "string",
+            "default": "video",
+            "choices": [
+              "video",
+              "user"
+            ],
+            "help": "What to search for"
+          },
+          {
+            "name": "page",
+            "type": "int",
+            "default": 1,
+            "help": "Result page number"
+          },
+          {
+            "name": "limit",
+            "type": "int",
+            "default": 20,
+            "help": "How many results to return"
+          }
+        ]
+      },
+      "subtitle": {
+        "description": "Fetch the subtitle track of a Bilibili video as timed cues. Accepts a BV id, URL, or b23.tv link.",
+        "access": "read",
+        "domain": "bilibili.com",
+        "args": [
+          {
+            "name": "bvid",
+            "type": "string",
+            "required": true,
+            "help": "BV id, video URL, or b23.tv short link"
+          },
+          {
+            "name": "lang",
+            "type": "string",
+            "help": "Subtitle language code (e.g. zh-CN, en-US, ai-zh). Defaults to the first available."
+          },
+          {
+            "name": "page",
+            "type": "int",
+            "help": "Multi-part (分P) selection, 1-based. Defaults to P1."
+          }
+        ]
+      },
+      "summary": {
+        "description": "The official AI-generated summary (AI总结) of a Bilibili video, with a timestamped outline. Accepts a BV id, URL, or b23.tv link.",
+        "access": "read",
+        "domain": "bilibili.com",
+        "args": [
+          {
+            "name": "bvid",
+            "type": "string",
+            "required": true,
+            "help": "BV id, video URL, or b23.tv short link"
+          }
+        ]
+      },
+      "unfollow": {
+        "description": "Unfollow a Bilibili user. Accepts a uid, username, or space.bilibili.com profile URL (requires login).",
+        "access": "write",
+        "domain": "bilibili.com",
+        "args": [
+          {
+            "name": "target",
+            "type": "string",
+            "required": true,
+            "help": "Target uid, username, or space.bilibili.com URL"
+          }
+        ]
+      },
+      "user-videos": {
+        "description": "List a Bilibili user's uploaded videos (投稿). Accepts a uid or username.",
+        "access": "read",
+        "domain": "bilibili.com",
+        "args": [
+          {
+            "name": "uid",
+            "type": "string",
+            "required": true,
+            "help": "User uid or username"
+          },
+          {
+            "name": "limit",
+            "type": "int",
+            "default": 20,
+            "help": "How many videos to return"
+          },
+          {
+            "name": "order",
+            "type": "string",
+            "default": "pubdate",
+            "choices": [
+              "pubdate",
+              "click",
+              "stow"
+            ],
+            "help": "Sort by publish date, plays, or favorites"
+          },
+          {
+            "name": "page",
+            "type": "int",
+            "default": 1,
+            "help": "Page number"
+          }
+        ]
+      },
+      "video": {
+        "description": "Metadata for a Bilibili video: title, author, duration, stats, payment gating. Accepts a BV id, video URL, or b23.tv short link.",
+        "access": "read",
+        "domain": "bilibili.com",
+        "args": [
+          {
+            "name": "bvid",
+            "type": "string",
+            "required": true,
+            "help": "BV id, video URL, or b23.tv short link"
+          },
+          {
+            "name": "page",
+            "type": "int",
+            "help": "Multi-part (分P) selection, 1-based. Returns that part's title/cid/duration. Omit for the whole video (P1)."
+          }
+        ]
+      }
+    },
+    "discord": {
+      "channels": {
+        "description": "List Discord server channels or direct-message channels through the API.",
+        "access": "read",
+        "domain": "discord.com",
+        "result": {
+          "kind": "rows",
+          "description": "Channels"
+        },
+        "args": [
+          {
+            "name": "guild",
+            "type": "string",
+            "help": "Server ID or name; defaults to the current server"
+          }
+        ]
+      },
+      "delete": {
+        "description": "Delete one of your Discord messages through the channel messages API.",
+        "access": "write",
+        "domain": "discord.com",
+        "result": {
+          "kind": "value",
+          "description": "Deleted message ID"
+        },
+        "args": [
+          {
+            "name": "message_id",
+            "type": "string",
+            "required": true,
+            "help": "Discord message ID"
+          },
+          {
+            "name": "guild",
+            "type": "string",
+            "help": "Server ID or name"
+          },
+          {
+            "name": "channel",
+            "type": "string",
+            "help": "Channel ID or name; defaults to current channel"
+          },
+          {
+            "name": "url",
+            "type": "string",
+            "help": "Discord channel URL"
+          }
+        ]
+      },
+      "goto": {
+        "description": "Open a Discord channel by ID, name, or URL.",
+        "access": "read",
+        "domain": "discord.com",
+        "result": {
+          "kind": "value",
+          "description": "Opened Discord route"
+        },
+        "args": [
+          {
+            "name": "guild",
+            "type": "string",
+            "help": "Server ID or name"
+          },
+          {
+            "name": "channel",
+            "type": "string",
+            "help": "Channel ID or name"
+          },
+          {
+            "name": "url",
+            "type": "string",
+            "help": "Discord channel URL"
+          }
+        ]
+      },
+      "members": {
+        "description": "Search Discord server members through the members search API.",
+        "access": "read",
+        "domain": "discord.com",
+        "result": {
+          "kind": "rows",
+          "description": "Matching members"
+        },
+        "args": [
+          {
+            "name": "guild",
+            "type": "string",
+            "help": "Server ID or name; defaults to current server"
+          },
+          {
+            "name": "query",
+            "type": "string",
+            "required": true,
+            "help": "Username prefix"
+          },
+          {
+            "name": "limit",
+            "type": "int",
+            "default": 20,
+            "min": 1,
+            "max": 100
+          }
+        ]
+      },
+      "read": {
+        "description": "Read recent Discord messages from a channel through the messages API.",
+        "access": "read",
+        "domain": "discord.com",
+        "result": {
+          "kind": "rows",
+          "description": "Messages",
+          "paginated": true
+        },
+        "args": [
+          {
+            "name": "guild",
+            "type": "string",
+            "help": "Server ID or name"
+          },
+          {
+            "name": "channel",
+            "type": "string",
+            "help": "Channel ID or name; defaults to current channel"
+          },
+          {
+            "name": "url",
+            "type": "string",
+            "help": "Discord channel URL"
+          },
+          {
+            "name": "limit",
+            "type": "int",
+            "default": 20,
+            "min": 1,
+            "max": 100
+          },
+          {
+            "name": "cursor",
+            "type": "string",
+            "help": "nextCursor from a previous page"
+          }
+        ]
+      },
+      "search": {
+        "description": "Search Discord server messages through the guild search API.",
+        "access": "read",
+        "domain": "discord.com",
+        "result": {
+          "kind": "rows",
+          "description": "Matching messages",
+          "paginated": true
+        },
+        "args": [
+          {
+            "name": "query",
+            "type": "string",
+            "required": true,
+            "help": "Text to search"
+          },
+          {
+            "name": "guild",
+            "type": "string",
+            "help": "Server ID or name; defaults to current server"
+          },
+          {
+            "name": "channel",
+            "type": "string",
+            "help": "Optional channel ID or name"
+          },
+          {
+            "name": "offset",
+            "type": "int",
+            "default": 0,
+            "min": 0,
+            "help": "Result offset from a previous call"
+          }
+        ]
+      },
+      "send": {
+        "description": "Send a Discord message through the channel messages API.",
+        "access": "write",
+        "domain": "discord.com",
+        "result": {
+          "kind": "value",
+          "description": "Created message"
+        },
+        "args": [
+          {
+            "name": "text",
+            "type": "string",
+            "required": true,
+            "maxLength": 2000,
+            "help": "Message content"
+          },
+          {
+            "name": "guild",
+            "type": "string",
+            "help": "Server ID or name"
+          },
+          {
+            "name": "channel",
+            "type": "string",
+            "help": "Channel ID or name; defaults to current channel"
+          },
+          {
+            "name": "url",
+            "type": "string",
+            "help": "Discord channel URL"
+          }
+        ]
+      },
+      "servers": {
+        "description": "List Discord servers through the authenticated guilds API.",
+        "access": "read",
+        "domain": "discord.com",
+        "result": {
+          "kind": "rows",
+          "description": "Servers"
+        },
+        "args": []
+      },
+      "status": {
+        "description": "Check the signed-in Discord account through the users API.",
+        "access": "read",
+        "domain": "discord.com",
+        "result": {
+          "kind": "value",
+          "description": "Discord account status"
+        },
+        "args": []
+      },
+      "thread-read": {
+        "description": "Read Discord thread messages through the messages API.",
+        "access": "read",
+        "domain": "discord.com",
+        "result": {
+          "kind": "rows",
+          "description": "Thread messages",
+          "paginated": true
+        },
+        "args": [
+          {
+            "name": "thread",
+            "type": "string",
+            "required": true,
+            "help": "Thread ID or Discord thread URL"
+          },
+          {
+            "name": "limit",
+            "type": "int",
+            "default": 20,
+            "min": 1,
+            "max": 100
+          },
+          {
+            "name": "cursor",
+            "type": "string",
+            "help": "nextCursor from a previous page"
+          }
+        ]
+      },
+      "threads": {
+        "description": "List active and archived Discord forum threads through the API.",
+        "access": "read",
+        "domain": "discord.com",
+        "result": {
+          "kind": "rows",
+          "description": "Forum threads",
+          "paginated": true
+        },
+        "args": [
+          {
+            "name": "guild",
+            "type": "string",
+            "help": "Server ID or name"
+          },
+          {
+            "name": "channel",
+            "type": "string",
+            "help": "Forum channel ID or name; defaults to current channel"
+          },
+          {
+            "name": "url",
+            "type": "string",
+            "help": "Discord forum channel URL"
+          },
+          {
+            "name": "limit",
+            "type": "int",
+            "default": 30,
+            "min": 1,
+            "max": 100
+          },
+          {
+            "name": "before",
+            "type": "string",
+            "help": "ISO timestamp cursor from a previous call"
+          }
+        ]
+      }
+    },
+    "facebook": {
+      "add-friend": {
+        "description": "Send a Facebook friend request through the friending GraphQL API.",
+        "access": "write",
+        "domain": "facebook.com",
+        "result": {
+          "kind": "value",
+          "description": "Friend request status"
+        },
+        "args": [
+          {
+            "name": "user",
+            "type": "string",
+            "required": true,
+            "help": "Facebook user ID, username, or profile URL"
+          }
+        ]
+      },
+      "cancel-friend-request": {
+        "description": "Cancel a pending Facebook friend request through the friending GraphQL API.",
+        "access": "write",
+        "domain": "facebook.com",
+        "result": {
+          "kind": "value",
+          "description": "Friend request status"
+        },
+        "args": [
+          {
+            "name": "user",
+            "type": "string",
+            "required": true,
+            "help": "Facebook user ID, username, or profile URL"
+          }
+        ]
+      },
+      "events": {
+        "description": "Discover Facebook events through its logged-in GraphQL API.",
+        "access": "read",
+        "domain": "facebook.com",
+        "result": {
+          "kind": "rows",
+          "description": "Events",
+          "paginated": true
+        },
+        "args": [
+          {
+            "name": "limit",
+            "type": "int",
+            "default": 9,
+            "min": 1,
+            "max": 20
+          },
+          {
+            "name": "cursor",
+            "type": "string",
+            "help": "Cursor from a previous page"
+          }
+        ]
+      },
+      "feed": {
+        "description": "Read Facebook news feed posts through its GraphQL API.",
+        "access": "read",
+        "domain": "facebook.com",
+        "result": {
+          "kind": "rows",
+          "description": "News feed posts",
+          "paginated": true
+        },
+        "args": [
+          {
+            "name": "limit",
+            "type": "int",
+            "default": 10,
+            "min": 1,
+            "max": 50
+          },
+          {
+            "name": "cursor",
+            "type": "string",
+            "help": "nextCursor from a previous page"
+          }
+        ]
+      },
+      "friends": {
+        "description": "Get Facebook friend suggestions through its GraphQL API.",
+        "access": "read",
+        "domain": "facebook.com",
+        "result": {
+          "kind": "rows",
+          "description": "Friend suggestions",
+          "paginated": true
+        },
+        "args": [
+          {
+            "name": "limit",
+            "type": "int",
+            "default": 10,
+            "min": 1,
+            "max": 20
+          },
+          {
+            "name": "cursor",
+            "type": "string",
+            "help": "nextCursor from a previous page"
+          }
+        ]
+      },
+      "groups": {
+        "description": "List joined and managed Facebook groups through its GraphQL API.",
+        "access": "read",
+        "domain": "facebook.com",
+        "result": {
+          "kind": "rows",
+          "description": "Groups"
+        },
+        "args": [
+          {
+            "name": "limit",
+            "type": "int",
+            "default": 20,
+            "min": 1,
+            "max": 50
+          },
+          {
+            "name": "kind",
+            "type": "string",
+            "default": "all",
+            "choices": [
+              "all",
+              "member",
+              "managed"
+            ]
+          }
+        ]
+      },
+      "join-group": {
+        "description": "Join a Facebook group through GroupCometJoinForumMutation and verify membership state through GraphQL.",
+        "access": "write",
+        "domain": "facebook.com",
+        "result": {
+          "kind": "rows",
+          "description": "Group membership outcome"
+        },
+        "args": [
+          {
+            "name": "group",
+            "type": "string",
+            "required": true,
+            "positional": true
+          }
+        ]
+      },
+      "marketplace-inbox": {
+        "description": "List Facebook Marketplace buyer and seller conversations through inbox GraphQL APIs.",
+        "access": "read",
+        "domain": "facebook.com",
+        "result": {
+          "kind": "rows",
+          "description": "Marketplace conversations"
+        },
+        "args": [
+          {
+            "name": "limit",
+            "type": "int",
+            "default": 20,
+            "min": 1,
+            "max": 100
+          },
+          {
+            "name": "role",
+            "type": "string",
+            "default": "both",
+            "help": "buyer, seller, or both"
+          },
+          {
+            "name": "cursor",
+            "type": "string",
+            "help": "Pagination cursor from a previous result"
+          }
+        ]
+      },
+      "marketplace-listings": {
+        "description": "List your Facebook Marketplace active and inactive seller listings through GraphQL.",
+        "access": "read",
+        "domain": "facebook.com",
+        "result": {
+          "kind": "rows",
+          "description": "Marketplace seller listings"
+        },
+        "args": [
+          {
+            "name": "limit",
+            "type": "int",
+            "default": 20,
+            "min": 1,
+            "max": 100
+          },
+          {
+            "name": "cursor",
+            "type": "string",
+            "help": "Pagination cursor from a previous result"
+          }
+        ]
+      },
+      "memories": {
+        "description": "Read Facebook On This Day memories through CometMemoriesFeedQuery.",
+        "access": "read",
+        "domain": "facebook.com",
+        "result": {
+          "kind": "rows",
+          "description": "Memories",
+          "paginated": true
+        },
+        "args": [
+          {
+            "name": "limit",
+            "type": "int",
+            "default": 10,
+            "min": 1,
+            "max": 50
+          },
+          {
+            "name": "cursor",
+            "type": "string",
+            "help": "nextCursor from a previous page"
+          }
+        ]
+      },
+      "notifications": {
+        "description": "Read Facebook notifications through its logged-in GraphQL API.",
+        "access": "read",
+        "domain": "facebook.com",
+        "result": {
+          "kind": "rows",
+          "description": "Notifications",
+          "paginated": true
+        },
+        "args": [
+          {
+            "name": "limit",
+            "type": "int",
+            "default": 15,
+            "min": 1,
+            "max": 100
+          },
+          {
+            "name": "cursor",
+            "type": "string",
+            "help": "nextCursor from a previous page"
+          }
+        ]
+      },
+      "posts": {
+        "description": "Search Facebook posts through its logged-in streaming GraphQL API.",
+        "access": "read",
+        "domain": "facebook.com",
+        "result": {
+          "kind": "rows",
+          "description": "Matching posts",
+          "paginated": true
+        },
+        "args": [
+          {
+            "name": "query",
+            "type": "string",
+            "required": true,
+            "help": "Post keywords"
+          },
+          {
+            "name": "limit",
+            "type": "int",
+            "default": 10,
+            "min": 1,
+            "max": 20,
+            "help": "Requested API page size; Facebook may return additional posts"
+          },
+          {
+            "name": "cursor",
+            "type": "string",
+            "maxLength": 10000,
+            "help": "nextCursor from a previous call"
+          }
+        ]
+      },
+      "profile": {
+        "description": "Read a Facebook user profile through ProfileCometHeaderQuery.",
+        "access": "read",
+        "domain": "facebook.com",
+        "result": {
+          "kind": "rows",
+          "description": "Facebook profile"
+        },
+        "args": [
+          {
+            "name": "username",
+            "type": "string",
+            "required": true,
+            "positional": true
+          }
+        ]
+      },
+      "search": {
+        "description": "Search Facebook people, groups, and pages through its logged-in GraphQL API.",
+        "access": "read",
+        "domain": "facebook.com",
+        "result": {
+          "kind": "rows",
+          "description": "Profiles with Facebook IDs and URLs",
+          "paginated": true
+        },
+        "args": [
+          {
+            "name": "query",
+            "type": "string",
+            "required": true,
+            "help": "Name or keywords"
+          },
+          {
+            "name": "type",
+            "type": "string",
+            "default": "people",
+            "choices": [
+              "people",
+              "groups",
+              "pages"
+            ],
+            "help": "Search category"
+          },
+          {
+            "name": "limit",
+            "type": "int",
+            "default": 10,
+            "min": 1,
+            "max": 20,
+            "help": "Requested API page size; Facebook may return additional profiles"
+          },
+          {
+            "name": "cursor",
+            "type": "string",
+            "maxLength": 10000,
+            "help": "nextCursor from a previous call"
+          }
+        ]
+      }
+    },
+    "gmail": {
+      "attachments": {
+        "description": "List attachment metadata for a Gmail thread through the fetch-data JSON API.",
+        "access": "read",
+        "domain": "mail.google.com",
+        "result": {
+          "kind": "rows",
+          "description": "Attachment metadata"
+        },
+        "args": [
+          {
+            "name": "thread",
+            "type": "string",
+            "required": true,
+            "help": "thread-f ID from search, legacy hex ID, or Gmail URL"
+          },
+          {
+            "name": "account",
+            "type": "int",
+            "default": 0,
+            "min": 0,
+            "max": 20
+          }
+        ]
+      },
+      "create-draft": {
+        "description": "Save a plain-text Gmail draft through the sync JSON API.",
+        "access": "write",
+        "domain": "mail.google.com",
+        "result": {
+          "kind": "value",
+          "description": "Saved Gmail draft"
+        },
+        "args": [
+          {
+            "name": "to",
+            "type": "string",
+            "required": true,
+            "help": "One or more comma-separated email addresses"
+          },
+          {
+            "name": "subject",
+            "type": "string",
+            "required": true,
+            "maxLength": 998
+          },
+          {
+            "name": "body",
+            "type": "string",
+            "required": true,
+            "maxLength": 200000
+          },
+          {
+            "name": "from",
+            "type": "string",
+            "required": true,
+            "help": "Sender address for the selected Gmail account"
+          },
+          {
+            "name": "account",
+            "type": "int",
+            "default": 0,
+            "min": 0,
+            "max": 20
+          }
+        ]
+      },
+      "delete": {
+        "description": "Move a Gmail thread or message to Trash, or permanently delete it, through the sync JSON API.",
+        "access": "write",
+        "domain": "mail.google.com",
+        "result": {
+          "kind": "value",
+          "description": "Confirmed Gmail deletion"
+        },
+        "args": [
+          {
+            "name": "thread",
+            "type": "string",
+            "required": true,
+            "help": "thread ID from Gmail search"
+          },
+          {
+            "name": "message",
+            "type": "string",
+            "help": "Optional message ID; defaults to every message in the thread"
+          },
+          {
+            "name": "permanent",
+            "type": "boolean",
+            "default": false,
+            "help": "Also permanently delete from Trash"
+          },
+          {
+            "name": "account",
+            "type": "int",
+            "default": 0,
+            "min": 0,
+            "max": 20
+          }
+        ]
+      },
+      "drafts": {
+        "description": "List Gmail drafts threads through the batch-view JSON API.",
+        "access": "read",
+        "domain": "mail.google.com",
+        "result": {
+          "kind": "rows",
+          "description": "drafts threads"
+        },
+        "args": [
+          {
+            "name": "limit",
+            "type": "int",
+            "default": 20,
+            "min": 1,
+            "max": 50,
+            "help": "Maximum threads from the first API page"
+          },
+          {
+            "name": "account",
+            "type": "int",
+            "default": 0,
+            "min": 0,
+            "max": 20,
+            "help": "Gmail account index"
+          }
+        ]
+      },
+      "forward": {
+        "description": "Forward the text of a Gmail message through the draft-create and send sync JSON APIs. Attachments are listed but not copied.",
+        "access": "write",
+        "domain": "mail.google.com",
+        "result": {
+          "kind": "value",
+          "description": "Confirmed Gmail forward"
+        },
+        "args": [
+          {
+            "name": "thread",
+            "type": "string",
+            "required": true,
+            "help": "thread ID from Gmail search"
+          },
+          {
+            "name": "message",
+            "type": "string",
+            "help": "Message ID to forward; defaults to the latest message"
+          },
+          {
+            "name": "from",
+            "type": "string",
+            "required": true,
+            "help": "Sender address for the selected Gmail account"
+          },
+          {
+            "name": "to",
+            "type": "string",
+            "required": true,
+            "help": "Forward recipient"
+          },
+          {
+            "name": "note",
+            "type": "string",
+            "maxLength": 20000,
+            "help": "Optional note before the forwarded text"
+          },
+          {
+            "name": "account",
+            "type": "int",
+            "default": 0,
+            "min": 0,
+            "max": 20
+          }
+        ]
+      },
+      "important": {
+        "description": "List Gmail important threads through the batch-view JSON API.",
+        "access": "read",
+        "domain": "mail.google.com",
+        "result": {
+          "kind": "rows",
+          "description": "important threads"
+        },
+        "args": [
+          {
+            "name": "limit",
+            "type": "int",
+            "default": 20,
+            "min": 1,
+            "max": 50,
+            "help": "Maximum threads from the first API page"
+          },
+          {
+            "name": "account",
+            "type": "int",
+            "default": 0,
+            "min": 0,
+            "max": 20,
+            "help": "Gmail account index"
+          }
+        ]
+      },
+      "inbox": {
+        "description": "List Gmail inbox threads through the batch-view JSON API.",
+        "access": "read",
+        "domain": "mail.google.com",
+        "result": {
+          "kind": "rows",
+          "description": "inbox threads"
+        },
+        "args": [
+          {
+            "name": "limit",
+            "type": "int",
+            "default": 20,
+            "min": 1,
+            "max": 50,
+            "help": "Maximum threads from the first API page"
+          },
+          {
+            "name": "account",
+            "type": "int",
+            "default": 0,
+            "min": 0,
+            "max": 20,
+            "help": "Gmail account index"
+          }
+        ]
+      },
+      "labels": {
+        "description": "List Gmail system and user labels with counts through Gmail sync and bootstrap data.",
+        "access": "read",
+        "domain": "mail.google.com",
+        "result": {
+          "kind": "rows",
+          "description": "Gmail labels"
+        },
+        "args": [
+          {
+            "name": "account",
+            "type": "int",
+            "default": 0,
+            "min": 0,
+            "max": 20,
+            "help": "Gmail account index"
+          }
+        ]
+      },
+      "modify": {
+        "description": "Change Gmail message state through the sync JSON API: read, unread, star, unstar, archive, inbox, trash, restore, spam, not_spam, add_label, or remove_label.",
+        "access": "write",
+        "domain": "mail.google.com",
+        "result": {
+          "kind": "value",
+          "description": "Confirmed Gmail sync operation"
+        },
+        "args": [
+          {
+            "name": "thread",
+            "type": "string",
+            "required": true,
+            "help": "thread ID from Gmail search"
+          },
+          {
+            "name": "action",
+            "type": "string",
+            "required": true,
+            "choices": [
+              "read",
+              "unread",
+              "star",
+              "unstar",
+              "archive",
+              "inbox",
+              "trash",
+              "restore",
+              "spam",
+              "not_spam",
+              "add_label",
+              "remove_label"
+            ]
+          },
+          {
+            "name": "message",
+            "type": "string",
+            "help": "Optional message ID; defaults to every message in the thread"
+          },
+          {
+            "name": "label_id",
+            "type": "string",
+            "help": "User label ID (^x_...) for add_label or remove_label"
+          },
+          {
+            "name": "account",
+            "type": "int",
+            "default": 0,
+            "min": 0,
+            "max": 20
+          }
+        ]
+      },
+      "reply": {
+        "description": "Reply to a Gmail thread through the draft-create and send sync JSON APIs.",
+        "access": "write",
+        "domain": "mail.google.com",
+        "result": {
+          "kind": "value",
+          "description": "Confirmed Gmail reply"
+        },
+        "args": [
+          {
+            "name": "thread",
+            "type": "string",
+            "required": true,
+            "help": "thread ID from Gmail search"
+          },
+          {
+            "name": "from",
+            "type": "string",
+            "required": true,
+            "help": "Sender address for the selected Gmail account"
+          },
+          {
+            "name": "body",
+            "type": "string",
+            "required": true,
+            "maxLength": 200000
+          },
+          {
+            "name": "to",
+            "type": "string",
+            "help": "Override reply recipient; defaults to the latest message sender"
+          },
+          {
+            "name": "account",
+            "type": "int",
+            "default": 0,
+            "min": 0,
+            "max": 20
+          }
+        ]
+      },
+      "search": {
+        "description": "Search Gmail threads through Gmail’s batch-view JSON API.",
+        "access": "read",
+        "domain": "mail.google.com",
+        "result": {
+          "kind": "rows",
+          "description": "Matching threads"
+        },
+        "args": [
+          {
+            "name": "query",
+            "type": "string",
+            "required": true,
+            "help": "Gmail search syntax, such as from:example.com is:unread"
+          },
+          {
+            "name": "limit",
+            "type": "int",
+            "default": 20,
+            "min": 1,
+            "max": 50,
+            "help": "Maximum threads from the first API page"
+          },
+          {
+            "name": "account",
+            "type": "int",
+            "default": 0,
+            "min": 0,
+            "max": 20,
+            "help": "Gmail account index"
+          }
+        ]
+      },
+      "send": {
+        "description": "Send a plain-text Gmail message through the draft-create and send sync JSON APIs.",
+        "access": "write",
+        "domain": "mail.google.com",
+        "result": {
+          "kind": "value",
+          "description": "Confirmed Gmail send"
+        },
+        "args": [
+          {
+            "name": "to",
+            "type": "string",
+            "required": true,
+            "help": "One or more comma-separated email addresses"
+          },
+          {
+            "name": "subject",
+            "type": "string",
+            "required": true,
+            "maxLength": 998
+          },
+          {
+            "name": "body",
+            "type": "string",
+            "required": true,
+            "maxLength": 200000
+          },
+          {
+            "name": "from",
+            "type": "string",
+            "required": true,
+            "help": "Sender address for the selected Gmail account"
+          },
+          {
+            "name": "account",
+            "type": "int",
+            "default": 0,
+            "min": 0,
+            "max": 20
+          }
+        ]
+      },
+      "sent": {
+        "description": "List Gmail sent threads through the batch-view JSON API.",
+        "access": "read",
+        "domain": "mail.google.com",
+        "result": {
+          "kind": "rows",
+          "description": "sent threads"
+        },
+        "args": [
+          {
+            "name": "limit",
+            "type": "int",
+            "default": 20,
+            "min": 1,
+            "max": 50,
+            "help": "Maximum threads from the first API page"
+          },
+          {
+            "name": "account",
+            "type": "int",
+            "default": 0,
+            "min": 0,
+            "max": 20,
+            "help": "Gmail account index"
+          }
+        ]
+      },
+      "snoozed": {
+        "description": "List Gmail snoozed threads through the batch-view JSON API.",
+        "access": "read",
+        "domain": "mail.google.com",
+        "result": {
+          "kind": "rows",
+          "description": "snoozed threads"
+        },
+        "args": [
+          {
+            "name": "limit",
+            "type": "int",
+            "default": 20,
+            "min": 1,
+            "max": 50,
+            "help": "Maximum threads from the first API page"
+          },
+          {
+            "name": "account",
+            "type": "int",
+            "default": 0,
+            "min": 0,
+            "max": 20,
+            "help": "Gmail account index"
+          }
+        ]
+      },
+      "spam": {
+        "description": "List Gmail spam threads through the batch-view JSON API.",
+        "access": "read",
+        "domain": "mail.google.com",
+        "result": {
+          "kind": "rows",
+          "description": "spam threads"
+        },
+        "args": [
+          {
+            "name": "limit",
+            "type": "int",
+            "default": 20,
+            "min": 1,
+            "max": 50,
+            "help": "Maximum threads from the first API page"
+          },
+          {
+            "name": "account",
+            "type": "int",
+            "default": 0,
+            "min": 0,
+            "max": 20,
+            "help": "Gmail account index"
+          }
+        ]
+      },
+      "starred": {
+        "description": "List Gmail starred threads through the batch-view JSON API.",
+        "access": "read",
+        "domain": "mail.google.com",
+        "result": {
+          "kind": "rows",
+          "description": "starred threads"
+        },
+        "args": [
+          {
+            "name": "limit",
+            "type": "int",
+            "default": 20,
+            "min": 1,
+            "max": 50,
+            "help": "Maximum threads from the first API page"
+          },
+          {
+            "name": "account",
+            "type": "int",
+            "default": 0,
+            "min": 0,
+            "max": 20,
+            "help": "Gmail account index"
+          }
+        ]
+      },
+      "thread": {
+        "description": "Read all messages in one Gmail thread through the fetch-data JSON API.",
+        "access": "read",
+        "domain": "mail.google.com",
+        "result": {
+          "kind": "rows",
+          "description": "Messages in a Gmail thread"
+        },
+        "args": [
+          {
+            "name": "thread",
+            "type": "string",
+            "required": true,
+            "help": "thread-f ID from search, legacy hex ID, or Gmail URL"
+          },
+          {
+            "name": "account",
+            "type": "int",
+            "default": 0,
+            "min": 0,
+            "max": 20
+          }
+        ]
+      },
+      "trash": {
+        "description": "List Gmail trash threads through the batch-view JSON API.",
+        "access": "read",
+        "domain": "mail.google.com",
+        "result": {
+          "kind": "rows",
+          "description": "trash threads"
+        },
+        "args": [
+          {
+            "name": "limit",
+            "type": "int",
+            "default": 20,
+            "min": 1,
+            "max": 50,
+            "help": "Maximum threads from the first API page"
+          },
+          {
+            "name": "account",
+            "type": "int",
+            "default": 0,
+            "min": 0,
+            "max": 20,
+            "help": "Gmail account index"
+          }
+        ]
+      },
+      "unread": {
+        "description": "List Gmail unread threads through the batch-view JSON API.",
+        "access": "read",
+        "domain": "mail.google.com",
+        "result": {
+          "kind": "rows",
+          "description": "unread threads"
+        },
+        "args": [
+          {
+            "name": "limit",
+            "type": "int",
+            "default": 20,
+            "min": 1,
+            "max": 50,
+            "help": "Maximum threads from the first API page"
+          },
+          {
+            "name": "account",
+            "type": "int",
+            "default": 0,
+            "min": 0,
+            "max": 20,
+            "help": "Gmail account index"
+          }
+        ]
+      }
+    },
+    "linkedin": {
+      "company": {
+        "description": "Read a LinkedIn company through the Voyager company API.",
+        "access": "read",
+        "domain": "linkedin.com",
+        "result": {
+          "kind": "rows",
+          "description": "Company details"
+        },
+        "args": [
+          {
+            "name": "company",
+            "type": "string",
+            "required": true,
+            "help": "Company name, /company/name path, or LinkedIn company URL"
+          }
+        ]
+      },
+      "connect": {
+        "description": "Verify a LinkedIn profile and optionally send a connection invitation through the Relationships API.",
+        "access": "write",
+        "domain": "linkedin.com",
+        "result": {
+          "kind": "rows",
+          "description": "Connection invitation outcome"
+        },
+        "args": [
+          {
+            "name": "profile_url",
+            "type": "string",
+            "required": true,
+            "positional": true
+          },
+          {
+            "name": "expected_name",
+            "type": "string",
+            "required": true
+          },
+          {
+            "name": "note",
+            "type": "string",
+            "default": ""
+          },
+          {
+            "name": "send",
+            "type": "boolean",
+            "default": false
+          }
+        ]
+      },
+      "connections": {
+        "description": "List first-degree LinkedIn connections through the Voyager API.",
+        "access": "read",
+        "domain": "linkedin.com",
+        "result": {
+          "kind": "rows",
+          "description": "Connections with stable profile URLs",
+          "paginated": true
+        },
+        "args": [
+          {
+            "name": "limit",
+            "type": "int",
+            "default": 20,
+            "min": 1,
+            "max": 500,
+            "help": "Maximum connections to return"
+          },
+          {
+            "name": "cursor",
+            "type": "int",
+            "min": 0,
+            "help": "Offset returned as nextCursor by a previous call"
+          }
+        ]
+      },
+      "inbox": {
+        "description": "List LinkedIn messaging conversations through the messenger GraphQL API.",
+        "access": "read",
+        "domain": "linkedin.com",
+        "result": {
+          "kind": "rows",
+          "description": "Messaging conversations",
+          "paginated": true
+        },
+        "args": [
+          {
+            "name": "limit",
+            "type": "int",
+            "default": 20,
+            "min": 1,
+            "max": 100
+          },
+          {
+            "name": "cursor",
+            "type": "string",
+            "help": "nextCursor from a previous page"
+          },
+          {
+            "name": "unread_only",
+            "type": "boolean",
+            "default": false
+          }
+        ]
+      },
+      "job-detail": {
+        "description": "Read a LinkedIn job posting through the Voyager jobPostings API.",
+        "access": "read",
+        "domain": "linkedin.com",
+        "result": {
+          "kind": "value",
+          "description": "Job detail"
+        },
+        "args": [
+          {
+            "name": "job",
+            "type": "string",
+            "required": true,
+            "help": "LinkedIn job ID or jobs/view URL"
+          }
+        ]
+      },
+      "jobs-preferences": {
+        "description": "Read LinkedIn job preferences and alerts through the Voyager API.",
+        "access": "read",
+        "domain": "linkedin.com",
+        "result": {
+          "kind": "rows",
+          "description": "Job preferences"
+        },
+        "args": []
+      },
+      "jobs": {
+        "description": "Search LinkedIn jobs through the Voyager jobs API.",
+        "access": "read",
+        "domain": "linkedin.com",
+        "result": {
+          "kind": "rows",
+          "description": "Job cards",
+          "paginated": true
+        },
+        "args": [
+          {
+            "name": "query",
+            "type": "string",
+            "required": true,
+            "help": "Job keywords"
+          },
+          {
+            "name": "location",
+            "type": "string",
+            "help": "Location name"
+          },
+          {
+            "name": "experience",
+            "type": "string",
+            "choices": [
+              "internship",
+              "entry",
+              "associate",
+              "mid",
+              "senior",
+              "director",
+              "executive"
+            ]
+          },
+          {
+            "name": "job_type",
+            "type": "string",
+            "choices": [
+              "full-time",
+              "part-time",
+              "contract",
+              "temporary",
+              "volunteer",
+              "internship"
+            ]
+          },
+          {
+            "name": "date_posted",
+            "type": "string",
+            "choices": [
+              "any",
+              "month",
+              "week",
+              "day"
+            ]
+          },
+          {
+            "name": "workplace",
+            "type": "string",
+            "choices": [
+              "onsite",
+              "hybrid",
+              "remote"
+            ]
+          },
+          {
+            "name": "limit",
+            "type": "int",
+            "default": 20,
+            "min": 1,
+            "max": 100
+          },
+          {
+            "name": "cursor",
+            "type": "int",
+            "min": 0,
+            "help": "Offset from a previous call"
+          }
+        ],
+        "aliases": [
+          "search"
+        ]
+      },
+      "people-search": {
+        "description": "Search LinkedIn people through Voyager Search GraphQL.",
+        "access": "read",
+        "domain": "linkedin.com",
+        "result": {
+          "kind": "rows",
+          "description": "People search results"
+        },
+        "args": [
+          {
+            "name": "keywords",
+            "type": "string",
+            "required": true,
+            "positional": true
+          },
+          {
+            "name": "limit",
+            "type": "int",
+            "default": 5,
+            "min": 1,
+            "max": 25
+          }
+        ]
+      },
+      "post-analytics": {
+        "description": "Summarize LinkedIn profile activity counters from the Voyager member feed API.",
+        "access": "read",
+        "domain": "linkedin.com",
+        "result": {
+          "kind": "rows",
+          "description": "Profile activity analytics"
+        },
+        "args": [
+          {
+            "name": "profile_url",
+            "type": "string",
+            "help": "LinkedIn /in/<handle>/ URL; defaults to your profile"
+          },
+          {
+            "name": "limit",
+            "type": "int",
+            "default": 30,
+            "min": 1,
+            "max": 100
+          }
+        ]
+      },
+      "posts": {
+        "description": "Read LinkedIn profile activity through the Voyager member feed API.",
+        "access": "read",
+        "domain": "linkedin.com",
+        "result": {
+          "kind": "rows",
+          "description": "Profile activity posts",
+          "paginated": true
+        },
+        "args": [
+          {
+            "name": "profile_url",
+            "type": "string",
+            "help": "LinkedIn /in/<handle>/ URL; defaults to your profile"
+          },
+          {
+            "name": "limit",
+            "type": "int",
+            "default": 20,
+            "min": 1,
+            "max": 100
+          },
+          {
+            "name": "cursor",
+            "type": "string",
+            "help": "nextCursor from a previous call"
+          }
+        ]
+      },
+      "profile-analytics": {
+        "description": "Read owner profile views and search appearances from LinkedIn analytics APIs.",
+        "access": "read",
+        "domain": "linkedin.com",
+        "result": {
+          "kind": "rows",
+          "description": "LinkedIn profile analytics"
+        },
+        "args": [
+          {
+            "name": "profile_url",
+            "type": "string",
+            "help": "Your LinkedIn /in/<handle>/ URL; defaults to your profile"
+          }
+        ]
+      },
+      "profile-experience": {
+        "description": "Read the complete LinkedIn profile Experience section through Voyager GraphQL.",
+        "access": "read",
+        "domain": "linkedin.com",
+        "result": {
+          "kind": "rows",
+          "description": "Profile experience"
+        },
+        "args": [
+          {
+            "name": "profile_url",
+            "type": "string",
+            "help": "LinkedIn /in/<handle>/ URL; defaults to your profile"
+          }
+        ]
+      },
+      "profile-projects": {
+        "description": "Read LinkedIn profile Projects through Voyager GraphQL.",
+        "access": "read",
+        "domain": "linkedin.com",
+        "result": {
+          "kind": "rows",
+          "description": "Profile projects"
+        },
+        "args": [
+          {
+            "name": "profile_url",
+            "type": "string",
+            "help": "LinkedIn /in/<handle>/ URL; defaults to your profile"
+          }
+        ]
+      },
+      "profile-read": {
+        "description": "Read LinkedIn profile details and sections through the Voyager profile APIs.",
+        "access": "read",
+        "domain": "linkedin.com",
+        "result": {
+          "kind": "rows",
+          "description": "LinkedIn profile details"
+        },
+        "args": [
+          {
+            "name": "profile_url",
+            "type": "string",
+            "help": "LinkedIn /in/<handle>/ URL; defaults to your profile"
+          }
+        ]
+      },
+      "salesnav-inbox": {
+        "description": "List LinkedIn Sales Navigator conversations through its sales API. Requires Sales Navigator access.",
+        "access": "read",
+        "domain": "linkedin.com",
+        "result": {
+          "kind": "rows",
+          "description": "Sales Navigator conversations",
+          "paginated": true
+        },
+        "args": [
+          {
+            "name": "limit",
+            "type": "int",
+            "default": 20,
+            "min": 1,
+            "max": 100
+          },
+          {
+            "name": "cursor",
+            "type": "string",
+            "help": "nextCursor from a previous call"
+          },
+          {
+            "name": "unread_only",
+            "type": "boolean",
+            "default": false
+          }
+        ]
+      },
+      "salesnav-message": {
+        "description": "Validate or send a Sales Navigator InMail through its sales API. Requires Sales Navigator access.",
+        "access": "write",
+        "domain": "linkedin.com",
+        "result": {
+          "kind": "value",
+          "description": "InMail validation or send result"
+        },
+        "args": [
+          {
+            "name": "recipient",
+            "type": "string",
+            "required": true,
+            "help": "Sales Navigator lead URL, LinkedIn profile URL, or lead URN"
+          },
+          {
+            "name": "subject",
+            "type": "string",
+            "required": true
+          },
+          {
+            "name": "body",
+            "type": "string",
+            "required": true
+          },
+          {
+            "name": "send",
+            "type": "boolean",
+            "default": false,
+            "help": "Send the InMail after validation"
+          },
+          {
+            "name": "copy_to_crm",
+            "type": "boolean",
+            "default": false
+          }
+        ]
+      },
+      "salesnav-search": {
+        "description": "Search LinkedIn Sales Navigator leads through its sales API. Requires Sales Navigator access.",
+        "access": "read",
+        "domain": "linkedin.com",
+        "result": {
+          "kind": "rows",
+          "description": "Sales Navigator leads",
+          "paginated": true
+        },
+        "args": [
+          {
+            "name": "keywords",
+            "type": "string",
+            "required": true,
+            "help": "Lead keywords"
+          },
+          {
+            "name": "limit",
+            "type": "int",
+            "default": 25,
+            "min": 1,
+            "max": 100
+          },
+          {
+            "name": "cursor",
+            "type": "int",
+            "min": 0,
+            "help": "Offset from a previous call"
+          }
+        ]
+      },
+      "salesnav-thread": {
+        "description": "Read full Sales Navigator conversation history through the sales API. Requires Sales Navigator access.",
+        "access": "read",
+        "domain": "linkedin.com",
+        "result": {
+          "kind": "rows",
+          "description": "Sales Navigator messages"
+        },
+        "args": [
+          {
+            "name": "thread_or_recipient",
+            "type": "string",
+            "required": true
+          },
+          {
+            "name": "limit",
+            "type": "int",
+            "default": 200,
+            "min": 1,
+            "max": 500
+          },
+          {
+            "name": "max_pages",
+            "type": "int",
+            "default": 30,
+            "min": 1,
+            "max": 100
+          }
+        ]
+      },
+      "sent-invitations": {
+        "description": "List pending sent LinkedIn connection invitations through the Relationships API.",
+        "access": "read",
+        "domain": "linkedin.com",
+        "result": {
+          "kind": "rows",
+          "description": "Sent invitations"
+        },
+        "args": []
+      },
+      "services-read": {
+        "description": "Read LinkedIn Services page details through its Voyager GraphQL API.",
+        "access": "read",
+        "domain": "linkedin.com",
+        "result": {
+          "kind": "rows",
+          "description": "LinkedIn Services page"
+        },
+        "args": [
+          {
+            "name": "profile_url",
+            "type": "string",
+            "help": "LinkedIn profile URL; defaults to your profile"
+          },
+          {
+            "name": "services_url",
+            "type": "string",
+            "help": "LinkedIn /services/page/<id>/ URL"
+          }
+        ]
+      },
+      "timeline": {
+        "description": "Read LinkedIn home feed posts through the Voyager main feed API.",
+        "access": "read",
+        "domain": "linkedin.com",
+        "result": {
+          "kind": "rows",
+          "description": "Home timeline posts"
+        },
+        "args": [
+          {
+            "name": "limit",
+            "type": "int",
+            "default": 20,
+            "min": 1,
+            "max": 100
+          }
+        ]
+      }
+    },
+    "reddit": {
+      "comment": {
+        "description": "Post a top-level comment on a Reddit post.",
+        "access": "write",
+        "domain": "reddit.com",
+        "args": [
+          {
+            "name": "post_id",
+            "type": "string",
+            "required": true,
+            "help": "Post id, t3_ fullname, or post URL"
+          },
+          {
+            "name": "text",
+            "type": "string",
+            "required": true,
+            "help": "Comment text"
+          }
+        ]
+      },
+      "frontpage": {
+        "description": "Posts from the public Reddit frontpage (r/all).",
+        "access": "read",
+        "domain": "reddit.com",
+        "args": [
+          {
+            "name": "limit",
+            "type": "int",
+            "default": 25,
+            "help": "How many posts to return"
+          },
+          {
+            "name": "cursor",
+            "type": "string",
+            "help": "nextCursor (fullname) from a previous call, to page further"
+          }
+        ]
+      },
+      "home": {
+        "description": "Your personalized Reddit home feed (Best). Requires being logged in.",
+        "access": "read",
+        "domain": "reddit.com",
+        "args": [
+          {
+            "name": "limit",
+            "type": "int",
+            "default": 25,
+            "help": "How many posts to return"
+          },
+          {
+            "name": "cursor",
+            "type": "string",
+            "help": "nextCursor (fullname) from a previous call, to page further"
+          }
+        ]
+      },
+      "hot": {
+        "description": "Hot posts from a subreddit, or the frontpage if subreddit is omitted.",
+        "access": "read",
+        "domain": "reddit.com",
+        "args": [
+          {
+            "name": "subreddit",
+            "type": "string",
+            "help": "Subreddit name without r/ (omit for the frontpage)"
+          },
+          {
+            "name": "limit",
+            "type": "int",
+            "default": 20,
+            "help": "How many posts to return"
+          },
+          {
+            "name": "cursor",
+            "type": "string",
+            "help": "nextCursor (fullname) from a previous call, to page further"
+          }
+        ]
+      },
+      "popular": {
+        "description": "Popular posts across Reddit (r/popular).",
+        "access": "read",
+        "domain": "reddit.com",
+        "args": [
+          {
+            "name": "limit",
+            "type": "int",
+            "default": 20,
+            "help": "How many posts to return"
+          },
+          {
+            "name": "cursor",
+            "type": "string",
+            "help": "nextCursor (fullname) from a previous call, to page further"
+          }
+        ]
+      },
+      "read": {
+        "description": "Read a Reddit post and a top-scored, threaded slice of its comments.",
+        "access": "read",
+        "domain": "reddit.com",
+        "args": [
+          {
+            "name": "post_id",
+            "type": "string",
+            "required": true,
+            "help": "Post id, t3_ fullname, or post URL"
+          },
+          {
+            "name": "sort",
+            "type": "string",
+            "default": "best",
+            "choices": [
+              "best",
+              "top",
+              "new",
+              "controversial",
+              "old",
+              "qa"
+            ],
+            "help": "Comment sort"
+          },
+          {
+            "name": "limit",
+            "type": "int",
+            "default": 25,
+            "help": "Number of top-level comments"
+          },
+          {
+            "name": "depth",
+            "type": "int",
+            "default": 2,
+            "help": "Max reply depth (1 = no replies, 2 = one level of replies, etc.)"
+          },
+          {
+            "name": "replies",
+            "type": "int",
+            "default": 5,
+            "help": "Max replies shown per comment at each level (by score)"
+          },
+          {
+            "name": "max_length",
+            "type": "int",
+            "default": 2000,
+            "help": "Max characters per comment body (min 100)"
+          },
+          {
+            "name": "expand_more",
+            "type": "boolean",
+            "default": false,
+            "help": "Follow Reddit \"more comments\" stubs via the morechildren API"
+          },
+          {
+            "name": "expand_rounds",
+            "type": "int",
+            "default": 2,
+            "help": "Max expansion passes when expand_more is on (1-5)"
+          }
+        ]
+      },
+      "reply": {
+        "description": "Reply to a Reddit comment.",
+        "access": "write",
+        "domain": "reddit.com",
+        "args": [
+          {
+            "name": "comment_id",
+            "type": "string",
+            "required": true,
+            "help": "Comment id, t1_ fullname, or comment URL"
+          },
+          {
+            "name": "text",
+            "type": "string",
+            "required": true,
+            "help": "Reply text"
+          }
+        ]
+      },
+      "save": {
+        "description": "Save or unsave a Reddit post.",
+        "access": "write",
+        "domain": "reddit.com",
+        "args": [
+          {
+            "name": "post_id",
+            "type": "string",
+            "required": true,
+            "help": "Post id, t3_ fullname, or post URL"
+          },
+          {
+            "name": "undo",
+            "type": "boolean",
+            "default": false,
+            "help": "Unsave instead of save"
+          }
+        ]
+      },
+      "saved": {
+        "description": "Your saved Reddit posts and comments. Requires being logged in.",
+        "access": "read",
+        "domain": "reddit.com",
+        "args": [
+          {
+            "name": "limit",
+            "type": "int",
+            "default": 25,
+            "help": "How many items to return"
+          },
+          {
+            "name": "cursor",
+            "type": "string",
+            "help": "nextCursor (fullname) from a previous call, to page further"
+          }
+        ]
+      },
+      "search": {
+        "description": "Search Reddit posts (optionally within a subreddit).",
+        "access": "read",
+        "domain": "reddit.com",
+        "args": [
+          {
+            "name": "query",
+            "type": "string",
+            "required": true,
+            "help": "Search text"
+          },
+          {
+            "name": "subreddit",
+            "type": "string",
+            "help": "Restrict to this subreddit (without r/)"
+          },
+          {
+            "name": "sort",
+            "type": "string",
+            "default": "relevance",
+            "choices": [
+              "relevance",
+              "hot",
+              "top",
+              "new",
+              "comments"
+            ],
+            "help": "Result sort"
+          },
+          {
+            "name": "limit",
+            "type": "int",
+            "default": 25,
+            "help": "How many results to return"
+          },
+          {
+            "name": "cursor",
+            "type": "string",
+            "help": "nextCursor (fullname) from a previous call"
+          }
+        ]
+      },
+      "subreddit-info": {
+        "description": "Metadata for a subreddit (subscribers, description, created date, NSFW).",
+        "access": "read",
+        "domain": "reddit.com",
+        "args": [
+          {
+            "name": "name",
+            "type": "string",
+            "required": true,
+            "help": "Subreddit name without r/"
+          }
+        ]
+      },
+      "subreddit": {
+        "description": "Posts from a subreddit (or your front page if subreddit is omitted).",
+        "access": "read",
+        "domain": "reddit.com",
+        "args": [
+          {
+            "name": "subreddit",
+            "type": "string",
+            "help": "Subreddit name without r/ (omit for your front page)"
+          },
+          {
+            "name": "sort",
+            "type": "string",
+            "default": "hot",
+            "choices": [
+              "hot",
+              "new",
+              "top",
+              "rising"
+            ],
+            "help": "Listing sort"
+          },
+          {
+            "name": "limit",
+            "type": "int",
+            "default": 25,
+            "help": "How many posts to return"
+          },
+          {
+            "name": "cursor",
+            "type": "string",
+            "help": "nextCursor (fullname) from a previous call, to page further"
+          }
+        ]
+      },
+      "subscribe": {
+        "description": "Subscribe to or unsubscribe from a subreddit.",
+        "access": "write",
+        "domain": "reddit.com",
+        "args": [
+          {
+            "name": "subreddit",
+            "type": "string",
+            "required": true,
+            "help": "Subreddit name without r/"
+          },
+          {
+            "name": "undo",
+            "type": "boolean",
+            "default": false,
+            "help": "Unsubscribe instead of subscribe"
+          }
+        ]
+      },
+      "subscribed": {
+        "description": "Subreddits you are subscribed to. Requires being logged in.",
+        "access": "read",
+        "domain": "reddit.com",
+        "args": [
+          {
+            "name": "limit",
+            "type": "int",
+            "default": 100,
+            "help": "Max subreddits to return (auto-paginates)"
+          }
+        ]
+      },
+      "upvote": {
+        "description": "Upvote, downvote, or clear your vote on a Reddit post.",
+        "access": "write",
+        "domain": "reddit.com",
+        "args": [
+          {
+            "name": "post_id",
+            "type": "string",
+            "required": true,
+            "help": "Post id, t3_ fullname, or post URL"
+          },
+          {
+            "name": "direction",
+            "type": "string",
+            "default": "up",
+            "choices": [
+              "up",
+              "down",
+              "none"
+            ],
+            "help": "Vote direction (none clears the vote)"
+          }
+        ]
+      },
+      "upvoted": {
+        "description": "Your upvoted Reddit posts. Requires being logged in.",
+        "access": "read",
+        "domain": "reddit.com",
+        "args": [
+          {
+            "name": "limit",
+            "type": "int",
+            "default": 25,
+            "help": "How many items to return"
+          },
+          {
+            "name": "cursor",
+            "type": "string",
+            "help": "nextCursor (fullname) from a previous call, to page further"
+          }
+        ]
+      },
+      "user-comments": {
+        "description": "A Reddit user's comment history.",
+        "access": "read",
+        "domain": "reddit.com",
+        "args": [
+          {
+            "name": "username",
+            "type": "string",
+            "required": true,
+            "help": "Reddit username without u/"
+          },
+          {
+            "name": "limit",
+            "type": "int",
+            "default": 25,
+            "help": "How many comments to return"
+          },
+          {
+            "name": "cursor",
+            "type": "string",
+            "help": "nextCursor (fullname) from a previous call, to page further"
+          }
+        ]
+      },
+      "user-posts": {
+        "description": "A Reddit user's submitted posts.",
+        "access": "read",
+        "domain": "reddit.com",
+        "args": [
+          {
+            "name": "username",
+            "type": "string",
+            "required": true,
+            "help": "Reddit username without u/"
+          },
+          {
+            "name": "limit",
+            "type": "int",
+            "default": 25,
+            "help": "How many posts to return"
+          },
+          {
+            "name": "cursor",
+            "type": "string",
+            "help": "nextCursor (fullname) from a previous call, to page further"
+          }
+        ]
+      },
+      "user": {
+        "description": "A Reddit user profile (karma, account age, status).",
+        "access": "read",
+        "domain": "reddit.com",
+        "args": [
+          {
+            "name": "username",
+            "type": "string",
+            "required": true,
+            "help": "Reddit username without u/"
+          }
+        ]
+      },
+      "whoami": {
+        "description": "The currently logged-in Reddit account.",
+        "access": "read",
+        "domain": "reddit.com",
+        "args": []
+      }
+    },
+    "twitter": {
+      "accept": {
+        "description": "Accept a pending follow request from a user.",
+        "access": "write",
+        "domain": "x.com",
+        "args": [
+          {
+            "name": "username",
+            "type": "string",
+            "required": true,
+            "help": "Screen name (with or without @)"
+          }
+        ]
+      },
+      "article": {
+        "description": "Fetch an X Article (long-form post) and return it as Markdown.",
+        "access": "read",
+        "domain": "x.com",
+        "args": [
+          {
+            "name": "tweet_id",
+            "type": "string",
+            "required": true,
+            "help": "Tweet ID, status URL, or an /i/article/<id> URL containing the article"
+          }
+        ]
+      },
+      "block": {
+        "description": "Block a user.",
+        "access": "write",
+        "domain": "x.com",
+        "args": [
+          {
+            "name": "username",
+            "type": "string",
+            "required": true,
+            "help": "Screen name (with or without @)"
+          }
+        ]
+      },
+      "bookmark-folder": {
+        "description": "Tweets inside one X bookmark folder. Get the folder id from the `bookmark-folders` command. t.co links are expanded (see `links`).",
+        "access": "read",
+        "domain": "x.com",
+        "args": [
+          {
+            "name": "folder_id",
+            "type": "string",
+            "required": true,
+            "help": "Folder id from the `bookmark-folders` command"
+          },
+          {
+            "name": "limit",
+            "type": "int",
+            "default": 20,
+            "help": "How many bookmarks to return"
+          },
+          {
+            "name": "cursor",
+            "type": "string",
+            "help": "nextCursor from a previous call, to page further"
+          },
+          {
+            "name": "top_by_engagement",
+            "type": "int",
+            "default": 0,
+            "help": "If >0, re-rank by weighted engagement and return the top N"
+          }
+        ]
+      },
+      "bookmark-folders": {
+        "description": "Your X bookmark folders (user-created collections under Bookmarks). Returns id, name, item count, created_at.",
+        "access": "read",
+        "domain": "x.com",
+        "args": []
+      },
+      "bookmark": {
+        "description": "Bookmark a tweet.",
+        "access": "write",
+        "domain": "x.com",
+        "args": [
+          {
+            "name": "tweet_id",
+            "type": "string",
+            "required": true,
+            "help": "Tweet numeric ID or a full status URL"
+          }
+        ]
+      },
+      "bookmarks": {
+        "description": "Your bookmarked tweets, most-recently-saved first. created_at is the tweet post time (the API has no per-bookmark save time). t.co links are expanded; see the `links` field.",
+        "access": "read",
+        "domain": "x.com",
+        "args": [
+          {
+            "name": "limit",
+            "type": "int",
+            "default": 20,
+            "help": "How many bookmarks to return"
+          },
+          {
+            "name": "cursor",
+            "type": "string",
+            "help": "nextCursor from a previous call, to page further back"
+          }
+        ]
+      },
+      "collection": {
+        "description": "A user timeline with relationship facts (original/reply/quote/repost) and a bounded completion receipt. Pages back until the `until` timestamp is reached or the timeline is exhausted.",
+        "access": "read",
+        "domain": "x.com",
+        "args": [
+          {
+            "name": "username",
+            "type": "string",
+            "required": true,
+            "help": "Screen name (with or without @)"
+          },
+          {
+            "name": "until",
+            "type": "string",
+            "required": true,
+            "help": "RFC3339 lower time boundary that must be reached or exhausted, e.g. 2026-07-23T00:00:00Z"
+          },
+          {
+            "name": "limit",
+            "type": "int",
+            "default": 10000,
+            "help": "Safety ceiling; reaching it is a typed failure"
+          }
+        ]
+      },
+      "delete": {
+        "description": "Delete one of your own tweets.",
+        "access": "write",
+        "domain": "x.com",
+        "args": [
+          {
+            "name": "tweet_id",
+            "type": "string",
+            "required": true,
+            "help": "Tweet numeric ID or a full status URL"
+          }
+        ]
+      },
+      "device-follow": {
+        "description": "The device-follow notification stream: tweets aggregated under a bell-icon \"new posts from @userA and N others\" notification.",
+        "access": "read",
+        "domain": "x.com",
+        "args": [
+          {
+            "name": "limit",
+            "type": "int",
+            "default": 20,
+            "help": "How many tweets to return (1-200)"
+          },
+          {
+            "name": "top_by_engagement",
+            "type": "int",
+            "default": 0,
+            "help": "If >0, re-rank by weighted engagement and return the top N"
+          }
+        ]
+      },
+      "download": {
+        "description": "Return media URLs (images and videos) from X. Pass username to list a profile's media via the UserMedia timeline, or tweet_url for a single tweet. Returns the media URLs as data (does not download files).",
+        "access": "read",
+        "domain": "x.com",
+        "args": [
+          {
+            "name": "username",
+            "type": "string",
+            "help": "Screen name (with or without @) to scan profile media. Provide this OR tweet_url."
+          },
+          {
+            "name": "tweet_url",
+            "type": "string",
+            "help": "A single tweet URL to pull media from. Provide this OR username."
+          },
+          {
+            "name": "limit",
+            "type": "int",
+            "default": 10,
+            "help": "Max media items when scanning a profile (1-1000)"
+          }
+        ]
+      },
+      "follow-batch": {
+        "description": "Follow several users in one call.",
+        "access": "write",
+        "domain": "x.com",
+        "args": [
+          {
+            "name": "usernames",
+            "type": "string",
+            "required": true,
+            "help": "Screen names, comma- or space-separated"
+          },
+          {
+            "name": "delay_ms",
+            "type": "int",
+            "default": 1500,
+            "help": "Pause between follows (ms) to avoid rate limits"
+          }
+        ]
+      },
+      "follow": {
+        "description": "Follow a user.",
+        "access": "write",
+        "domain": "x.com",
+        "args": [
+          {
+            "name": "username",
+            "type": "string",
+            "required": true,
+            "help": "Screen name (with or without @)"
+          }
+        ]
+      },
+      "followers": {
+        "description": "Accounts following an X user (defaults to the logged-in user). Follower counts are not exposed in this list view; use the `profile` command for counts.",
+        "access": "read",
+        "domain": "x.com",
+        "args": [
+          {
+            "name": "user",
+            "type": "string",
+            "help": "Screen name (with or without @). Omit for the logged-in user."
+          },
+          {
+            "name": "limit",
+            "type": "int",
+            "default": 50,
+            "help": "How many followers to return"
+          }
+        ]
+      },
+      "following": {
+        "description": "Accounts an X user follows (defaults to the logged-in user).",
+        "access": "read",
+        "domain": "x.com",
+        "args": [
+          {
+            "name": "user",
+            "type": "string",
+            "help": "Screen name (with or without @). Omit for the logged-in user."
+          },
+          {
+            "name": "limit",
+            "type": "int",
+            "default": 50,
+            "help": "How many accounts to return"
+          },
+          {
+            "name": "cursor",
+            "type": "string",
+            "help": "nextCursor from a previous call, to page further"
+          }
+        ]
+      },
+      "hide-reply": {
+        "description": "Hide a reply to one of your tweets (or unhide it with unhide:true).",
+        "access": "write",
+        "domain": "x.com",
+        "args": [
+          {
+            "name": "tweet_id",
+            "type": "string",
+            "required": true,
+            "help": "The reply tweet to hide (numeric ID or status URL)"
+          },
+          {
+            "name": "unhide",
+            "type": "boolean",
+            "default": false,
+            "help": "Set true to unhide instead"
+          }
+        ]
+      },
+      "like": {
+        "description": "Like a tweet.",
+        "access": "write",
+        "domain": "x.com",
+        "args": [
+          {
+            "name": "tweet_id",
+            "type": "string",
+            "required": true,
+            "help": "Tweet numeric ID or a full status URL"
+          }
+        ]
+      },
+      "likes": {
+        "description": "A user's liked tweets, newest first (defaults to the logged-in user). Note: likes are private by default on X — only the owner can read their own. t.co links are expanded (see `links`).",
+        "access": "read",
+        "domain": "x.com",
+        "args": [
+          {
+            "name": "username",
+            "type": "string",
+            "help": "Screen name (with or without @). Omit for the logged-in user."
+          },
+          {
+            "name": "limit",
+            "type": "int",
+            "default": 20,
+            "help": "How many liked tweets to return"
+          },
+          {
+            "name": "cursor",
+            "type": "string",
+            "help": "nextCursor from a previous call, to page further"
+          },
+          {
+            "name": "top_by_engagement",
+            "type": "int",
+            "default": 0,
+            "help": "If >0, re-rank by weighted engagement and return the top N"
+          }
+        ]
+      },
+      "list-add-batch": {
+        "description": "Add several users to a list you own.",
+        "access": "write",
+        "domain": "x.com",
+        "args": [
+          {
+            "name": "list_id",
+            "type": "string",
+            "required": true,
+            "help": "Numeric ID of a list you own"
+          },
+          {
+            "name": "usernames",
+            "type": "string",
+            "required": true,
+            "help": "Screen names, comma- or space-separated"
+          },
+          {
+            "name": "interval",
+            "type": "int",
+            "default": 1500,
+            "help": "Pause between operations (ms)"
+          }
+        ]
+      },
+      "list-add": {
+        "description": "Add a user to an X list you own (no-op if already a member).",
+        "access": "write",
+        "domain": "x.com",
+        "args": [
+          {
+            "name": "list_id",
+            "type": "string",
+            "required": true,
+            "help": "Numeric ID of a list you own (from the `lists` command)"
+          },
+          {
+            "name": "username",
+            "type": "string",
+            "required": true,
+            "help": "Screen name to add (with or without @)"
+          }
+        ]
+      },
+      "list-create": {
+        "description": "Create a new X list. Returns the new list id.",
+        "access": "write",
+        "domain": "x.com",
+        "args": [
+          {
+            "name": "name",
+            "type": "string",
+            "required": true,
+            "help": "List name (max 25 chars)"
+          },
+          {
+            "name": "description",
+            "type": "string",
+            "default": "",
+            "help": "Optional list description (max 100 chars)"
+          },
+          {
+            "name": "mode",
+            "type": "string",
+            "default": "public",
+            "choices": [
+              "public",
+              "private"
+            ],
+            "help": "public or private"
+          }
+        ]
+      },
+      "list-delete": {
+        "description": "Delete an X list you own.",
+        "access": "write",
+        "domain": "x.com",
+        "args": [
+          {
+            "name": "list_id",
+            "type": "string",
+            "required": true,
+            "help": "Numeric ID of the list to delete"
+          }
+        ]
+      },
+      "list-remove-batch": {
+        "description": "Remove several users from a list you own.",
+        "access": "write",
+        "domain": "x.com",
+        "args": [
+          {
+            "name": "list_id",
+            "type": "string",
+            "required": true,
+            "help": "Numeric ID of a list you own"
+          },
+          {
+            "name": "usernames",
+            "type": "string",
+            "required": true,
+            "help": "Screen names, comma- or space-separated"
+          },
+          {
+            "name": "interval",
+            "type": "int",
+            "default": 1500,
+            "help": "Pause between operations (ms)"
+          }
+        ]
+      },
+      "list-remove": {
+        "description": "Remove a user from an X list you own.",
+        "access": "write",
+        "domain": "x.com",
+        "args": [
+          {
+            "name": "list_id",
+            "type": "string",
+            "required": true,
+            "help": "Numeric ID of a list you own"
+          },
+          {
+            "name": "username",
+            "type": "string",
+            "required": true,
+            "help": "Screen name to remove (with or without @)"
+          }
+        ]
+      },
+      "list-tweets": {
+        "description": "Tweets from an X list timeline, newest first. t.co links are expanded (see `links`).",
+        "access": "read",
+        "domain": "x.com",
+        "args": [
+          {
+            "name": "list_id",
+            "type": "string",
+            "required": true,
+            "help": "Numeric ID of an X list (from the `lists` command)"
+          },
+          {
+            "name": "limit",
+            "type": "int",
+            "default": 50,
+            "help": "How many tweets to return"
+          },
+          {
+            "name": "cursor",
+            "type": "string",
+            "help": "nextCursor from a previous call, to page further"
+          },
+          {
+            "name": "top_by_engagement",
+            "type": "int",
+            "default": 0,
+            "help": "If >0, re-rank by weighted engagement and return the top N"
+          }
+        ]
+      },
+      "lists": {
+        "description": "Your X lists (owned + subscribed). Returns id, name, member/follower counts, and public/private mode.",
+        "access": "read",
+        "domain": "x.com",
+        "args": [
+          {
+            "name": "limit",
+            "type": "int",
+            "default": 50,
+            "help": "How many lists to return"
+          }
+        ]
+      },
+      "mute-word": {
+        "description": "Mute a keyword/phrase so tweets containing it are hidden.",
+        "access": "write",
+        "domain": "x.com",
+        "args": [
+          {
+            "name": "keyword",
+            "type": "string",
+            "required": true,
+            "help": "The word or phrase to mute"
+          }
+        ]
+      },
+      "notifications": {
+        "description": "Your X notifications (likes/replies/follows/mentions feed), newest first.",
+        "access": "read",
+        "domain": "x.com",
+        "args": [
+          {
+            "name": "limit",
+            "type": "int",
+            "default": 20,
+            "help": "How many notifications to return"
+          }
+        ]
+      },
+      "post": {
+        "description": "Post a new tweet.",
+        "access": "write",
+        "domain": "x.com",
+        "args": [
+          {
+            "name": "text",
+            "type": "string",
+            "required": true,
+            "help": "Tweet text (<=280 chars for a standard account)"
+          }
+        ]
+      },
+      "profile": {
+        "description": "An X user profile: bio, location, website, follower/following/tweet counts, verified status (defaults to the logged-in user).",
+        "access": "read",
+        "domain": "x.com",
+        "args": [
+          {
+            "name": "username",
+            "type": "string",
+            "help": "Screen name (with or without @). Omit for the logged-in user."
+          }
+        ]
+      },
+      "quote": {
+        "description": "Quote-tweet a tweet (retweet with your own comment).",
+        "access": "write",
+        "domain": "x.com",
+        "args": [
+          {
+            "name": "tweet_id",
+            "type": "string",
+            "required": true,
+            "help": "The tweet to quote (numeric ID or status URL)"
+          },
+          {
+            "name": "text",
+            "type": "string",
+            "required": true,
+            "help": "Your comment"
+          }
+        ]
+      },
+      "reply-dm": {
+        "description": "Send a message to your recent DM conversations (via the DM API, not the UI).",
+        "access": "write",
+        "domain": "x.com",
+        "args": [
+          {
+            "name": "text",
+            "type": "string",
+            "required": true,
+            "help": "Message text to send"
+          },
+          {
+            "name": "max",
+            "type": "int",
+            "default": 20,
+            "help": "Max conversations to message"
+          },
+          {
+            "name": "skip_replied",
+            "type": "boolean",
+            "default": true,
+            "help": "Skip conversations whose last message is already this text from you"
+          }
+        ]
+      },
+      "reply": {
+        "description": "Reply to a tweet.",
+        "access": "write",
+        "domain": "x.com",
+        "args": [
+          {
+            "name": "tweet_id",
+            "type": "string",
+            "required": true,
+            "help": "The tweet to reply to (numeric ID or status URL)"
+          },
+          {
+            "name": "text",
+            "type": "string",
+            "required": true,
+            "help": "Reply text"
+          }
+        ]
+      },
+      "retweet": {
+        "description": "Retweet a tweet.",
+        "access": "write",
+        "domain": "x.com",
+        "args": [
+          {
+            "name": "tweet_id",
+            "type": "string",
+            "required": true,
+            "help": "Tweet numeric ID or a full status URL"
+          }
+        ]
+      },
+      "search": {
+        "description": "Search X/Twitter through its signed-in web UI. Continue nextCursor before navigating or starting another search. t.co links are expanded (see links).",
+        "access": "read",
+        "domain": "x.com",
+        "result": {
+          "kind": "rows",
+          "paginated": true,
+          "description": "Tweets in UI order, deduplicated by ID. nextCursor continues this live search from retained Network evidence; it expires on navigation, host restart, or evidence eviction. An empty rows array means a verified empty or exhausted timeline."
+        },
+        "args": [
+          {
+            "name": "query",
+            "type": "string",
+            "required": true,
+            "help": "Search text (X search operators allowed)"
+          },
+          {
+            "name": "limit",
+            "type": "int",
+            "default": 20,
+            "min": 1,
+            "max": 100,
+            "help": "Maximum tweets to return in this call (1–100)"
+          },
+          {
+            "name": "sort",
+            "type": "string",
+            "default": "top",
+            "choices": [
+              "top",
+              "latest"
+            ],
+            "help": "Ranking: top or latest"
+          },
+          {
+            "name": "cursor",
+            "type": "string",
+            "help": "Opaque nextCursor from this live search with the same query and sort; omit to start a new search"
+          }
+        ]
+      },
+      "thread": {
+        "description": "A tweet thread: the original tweet plus its replies. t.co links are expanded (see `links`).",
+        "access": "read",
+        "domain": "x.com",
+        "args": [
+          {
+            "name": "tweet_id",
+            "type": "string",
+            "required": true,
+            "help": "Tweet numeric ID or a full status URL"
+          },
+          {
+            "name": "limit",
+            "type": "int",
+            "default": 50,
+            "help": "How many tweets (original + replies) to return"
+          },
+          {
+            "name": "top_by_engagement",
+            "type": "int",
+            "default": 0,
+            "help": "If >0, re-rank by weighted engagement and return the top N"
+          }
+        ]
+      },
+      "timeline": {
+        "description": "The logged-in user's home timeline. type=for-you is the algorithmic feed (default); type=following is the chronological feed of accounts you follow. t.co links are expanded (see `links`).",
+        "access": "read",
+        "domain": "x.com",
+        "args": [
+          {
+            "name": "type",
+            "type": "string",
+            "default": "for-you",
+            "choices": [
+              "for-you",
+              "following"
+            ],
+            "help": "Which feed: for-you (algorithmic) or following (chronological)"
+          },
+          {
+            "name": "limit",
+            "type": "int",
+            "default": 20,
+            "help": "How many tweets to return"
+          },
+          {
+            "name": "cursor",
+            "type": "string",
+            "help": "nextCursor from a previous call, to page further"
+          },
+          {
+            "name": "top_by_engagement",
+            "type": "int",
+            "default": 0,
+            "help": "If >0, re-rank by weighted engagement and return the top N"
+          }
+        ]
+      },
+      "trending": {
+        "description": "X trending topics. Returns rank, topic, and category.",
+        "access": "read",
+        "domain": "x.com",
+        "args": [
+          {
+            "name": "limit",
+            "type": "int",
+            "default": 20,
+            "help": "How many trends to return"
+          }
+        ]
+      },
+      "tweets": {
+        "description": "A user's recent tweets, newest first, excluding pinned (defaults to the logged-in user). t.co links are expanded (see `links`).",
+        "access": "read",
+        "domain": "x.com",
+        "args": [
+          {
+            "name": "username",
+            "type": "string",
+            "help": "Screen name (with or without @). Omit for the logged-in user."
+          },
+          {
+            "name": "limit",
+            "type": "int",
+            "default": 20,
+            "help": "How many tweets to return"
+          },
+          {
+            "name": "cursor",
+            "type": "string",
+            "help": "nextCursor from a previous call, to page further"
+          },
+          {
+            "name": "top_by_engagement",
+            "type": "int",
+            "default": 0,
+            "help": "If >0, re-rank by weighted engagement and return the top N"
+          }
+        ]
+      },
+      "unblock": {
+        "description": "Unblock a user.",
+        "access": "write",
+        "domain": "x.com",
+        "args": [
+          {
+            "name": "username",
+            "type": "string",
+            "required": true,
+            "help": "Screen name (with or without @)"
+          }
+        ]
+      },
+      "unbookmark": {
+        "description": "Remove a tweet from your bookmarks.",
+        "access": "write",
+        "domain": "x.com",
+        "args": [
+          {
+            "name": "tweet_id",
+            "type": "string",
+            "required": true,
+            "help": "Tweet numeric ID or a full status URL"
+          }
+        ]
+      },
+      "unfollow": {
+        "description": "Unfollow a user.",
+        "access": "write",
+        "domain": "x.com",
+        "args": [
+          {
+            "name": "username",
+            "type": "string",
+            "required": true,
+            "help": "Screen name (with or without @)"
+          }
+        ]
+      },
+      "unlike": {
+        "description": "Remove your like from a tweet.",
+        "access": "write",
+        "domain": "x.com",
+        "args": [
+          {
+            "name": "tweet_id",
+            "type": "string",
+            "required": true,
+            "help": "Tweet numeric ID or a full status URL"
+          }
+        ]
+      },
+      "unretweet": {
+        "description": "Undo your retweet of a tweet.",
+        "access": "write",
+        "domain": "x.com",
+        "args": [
+          {
+            "name": "tweet_id",
+            "type": "string",
+            "required": true,
+            "help": "The ORIGINAL tweet numeric ID or status URL (not your retweet)"
+          }
+        ]
+      }
+    }
+  }
+}

@@ -19,7 +19,7 @@
     "browsermcp": "dist/src/main.js"
   },
   "scripts": {
-    "build": "node scripts/clean.mjs && node scripts/extract-playwright-injected.mjs && tsc -p tsconfig.json && node scripts/gen-api-reference.mjs && node scripts/render-icons.mjs && node scripts/build-extension.mjs && node scripts/copy-assets.mjs",
+    "build": "node scripts/clean.mjs && node scripts/extract-playwright-injected.mjs && tsc -p tsconfig.json && node scripts/gen-adapter-manifest.mjs && node scripts/gen-api-reference.mjs && node scripts/render-icons.mjs && node scripts/build-extension.mjs && node scripts/copy-assets.mjs",
     "build:ext": "node scripts/render-icons.mjs && node scripts/build-extension.mjs",
     "dev": "tsx src/main.ts",
     "test": "vitest run",
@@ -32,7 +32,8 @@
     "pack:store": "npm run build && node scripts/pack-extension.mjs store",
     "pack:manual": "npm run build && node scripts/pack-extension.mjs manual",
     "smoke:native": "node scripts/smoke-native-capabilities.mjs",
-    "generate:chrome": "node scripts/gen-chrome-reference.mjs"
+    "generate:chrome": "node scripts/gen-chrome-reference.mjs",
+    "gen:adapters": "tsc -p tsconfig.json && node scripts/gen-adapter-manifest.mjs"
   },
   "files": [
     "dist/",

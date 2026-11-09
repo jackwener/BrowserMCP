@@ -1,8 +1,13 @@
 /**
  * SourceLoader — the adapter layer. An adapter is a self-describing module at `<source>/<site>/<command>.js` that
  * `export default defineAdapter({ description, access, args, run })`. Identity is the PATH; the module is the definition.
- * There is no manifest and no global registry: the loader lists by `readdir`, resolves by importing the file, and keeps
- * a small in-memory index (rebuilt on directory mtime change) for cross-site search.
+ * The loader lists by `readdir`, resolves by importing the file, and keeps a small in-memory index (rebuilt when a
+ * source changes) for cross-site search.
+ *
+ * Activation is lazy, as with VS Code's contribution manifests: a source may carry a build-generated `manifest.json`
+ * (see manifest.ts) holding every command's metadata, so listing and search never import its modules — a command's
+ * module loads on its first `resolve`. Files the manifest does not describe (and sources without one, such as the
+ * writable user source) are imported to index them.
  *
  * Sources are an ordered list; a later source overrides an earlier one for the same `<site>/<command>` — so the
  * built-in corpus, the user's `~/.browsermcp/adapters`, and agent-defined tools are one mechanism, not three.
@@ -55,6 +60,23 @@ export function adapterCommandFromDescriptor(site: string, name: string, source:
   };
 }
 
+/** A command's metadata as the index and a source manifest hold it: the descriptor minus `run` and identity. */
+export type AdapterMetadata = Omit<AdapterCommand, 'site' | 'name' | 'source' | 'run'>;
+
+/** `<source>/manifest.json`: the generated, static description of a read-only source's commands. */
+export const ADAPTER_MANIFEST_FILE = 'manifest.json';
+export const ADAPTER_MANIFEST_FORMAT = 1;
+export interface AdapterManifest { format: number; sites: Record<string, Record<string, AdapterMetadata>> }
+
+/** The metadata of a validated command, in index field order (also what a manifest stores). */
+export function adapterMetadata(cmd: AdapterCommand): AdapterMetadata {
+  return { description: cmd.description, access: cmd.access, domain: cmd.domain, result: cmd.result, args: cmd.args, aliases: cmd.aliases };
+}
+
+function described(sites: AdapterManifest['sites'] | null | undefined, site: string, name: string): AdapterMetadata | undefined {
+  return sites && Object.hasOwn(sites, site) && Object.hasOwn(sites[site], name) ? sites[site][name] : undefined;
+}
+
 const isCommandFile = (f: string): boolean => f.endsWith('.js') && !f.startsWith('_');
 const cmdName = (f: string): string => f.replace(/\.js$/, '');
 const INTENT_TERMS: Array<[RegExp, string[]]> = [
@@ -67,6 +89,7 @@ export class SiteRegistry {
   loadedAt: number | null = null;
   private index: Array<Omit<AdapterCommand, 'run'>> | null = null;
   private indexStamp = '';
+  private manifests = new Map<string, { key: string; sites: AdapterManifest['sites'] | null }>();
 
   constructor(private sources: Source[] = []) {}
 
@@ -78,16 +101,20 @@ export class SiteRegistry {
 
   private existingDirs(): Source[] { return this.sources.filter((s) => { try { return fs.statSync(s.dir).isDirectory(); } catch { return false; } }); }
 
-  /** Include file identity: replacing an adapter does not update its parent directory mtime. */
+  /** Include file identity: replacing an adapter does not update its parent directory mtime. A source with a
+   *  manifest is described by the manifest, so its identity is the manifest's plus its file names. */
   private stamp(): string {
     const parts: string[] = [];
     for (const s of this.existingDirs()) {
       try { parts.push(`${s.dir}:${fs.statSync(s.dir).mtimeMs}`); } catch { /* ignore */ }
+      const manifest = this.manifest(s.dir);
+      if (manifest) parts.push(this.manifests.get(s.dir)!.key);
       for (const site of this.siteDirs(s.dir)) {
         const dir = path.join(s.dir, site);
         try {
           parts.push(`${dir}:${fs.statSync(dir).mtimeMs}`);
           for (const name of fs.readdirSync(dir).filter(isCommandFile).sort()) {
+            if (described(manifest, site, cmdName(name))) { parts.push(name); continue; }
             const stat = fs.statSync(path.join(dir, name));
             parts.push(`${name}:${stat.ino}:${stat.mtimeMs}:${stat.ctimeMs}:${stat.size}`);
           }
@@ -95,6 +122,39 @@ export class SiteRegistry {
       }
     }
     return parts.join('|');
+  }
+
+  private manifestKey(dir: string): string | null {
+    try { const stat = fs.statSync(path.join(dir, ADAPTER_MANIFEST_FILE)); return `manifest:${stat.ino}:${stat.mtimeMs}:${stat.ctimeMs}:${stat.size}`; }
+    catch { return null; }
+  }
+
+  /** A source's manifest, re-read only when the file changes; null when it has none or it cannot be used. */
+  private manifest(dir: string): AdapterManifest['sites'] | null {
+    if ([...this.sources].reverse().find(source => source.dir === dir)?.kind === 'user') return null;
+    const key = this.manifestKey(dir);
+    if (!key) { this.manifests.delete(dir); return null; }
+    const cached = this.manifests.get(dir);
+    if (cached?.key === key) return cached.sites;
+    let sites: AdapterManifest['sites'] | null = null;
+    try {
+      const parsed = JSON.parse(fs.readFileSync(path.join(dir, ADAPTER_MANIFEST_FILE), 'utf8')) as Partial<AdapterManifest>;
+      if (parsed.format === ADAPTER_MANIFEST_FORMAT && parsed.sites && typeof parsed.sites === 'object' && !Array.isArray(parsed.sites)) {
+        const validated: AdapterManifest['sites'] = Object.create(null);
+        for (const [site, commands] of Object.entries(parsed.sites)) {
+          if (!commands || typeof commands !== 'object' || Array.isArray(commands)) throw new Error(`Invalid command map for ${site}`);
+          validated[site] = Object.create(null);
+          for (const [name, metadata] of Object.entries(commands)) {
+            if (!metadata || typeof metadata !== 'object' || Array.isArray(metadata)) throw new Error(`Invalid metadata for ${site}/${name}`);
+            validated[site][name] = adapterMetadata(adapterCommandFromDescriptor(site, name, 'builtin', { ...metadata, run: async () => undefined }));
+          }
+        }
+        sites = validated;
+      }
+      else process.stderr.write(`[browsermcp] ignoring adapter manifest ${path.join(dir, ADAPTER_MANIFEST_FILE)}: unsupported format\n`);
+    } catch (err) { process.stderr.write(`[browsermcp] ignoring adapter manifest ${path.join(dir, ADAPTER_MANIFEST_FILE)}: ${(err as Error).message}\n`); }
+    this.manifests.set(dir, { key, sites });
+    return sites;
   }
 
   private siteDirs(dir: string): string[] {
@@ -128,10 +188,12 @@ export class SiteRegistry {
     return out;
   }
 
-  private kindOf(file: string): SourceKind {
-    for (let i = this.sources.length - 1; i >= 0; i--) if (file.startsWith(this.sources[i].dir + path.sep)) return this.sources[i].kind;
-    return 'builtin';
+  private sourceOf(file: string): Source | undefined {
+    for (let i = this.sources.length - 1; i >= 0; i--) if (file.startsWith(this.sources[i].dir + path.sep)) return this.sources[i];
+    return undefined;
   }
+
+  private kindOf(file: string): SourceKind { return this.sourceOf(file)?.kind ?? 'builtin'; }
 
   private async importDescriptor(file: string): Promise<Record<string, unknown>> {
     const stat = fs.statSync(file);
@@ -149,8 +211,13 @@ export class SiteRegistry {
     if (this.index && this.indexStamp === stamp) return this.index;
     const map = this.map();
     const out: Array<Omit<AdapterCommand, 'run'>> = [];
+    const manifests = new Map(this.existingDirs().map((s) => [s.dir, this.manifest(s.dir)]));
     for (const [site, cmds] of map) {
       for (const [name, file] of cmds) {
+        const source = this.sourceOf(file);
+        const meta = source && described(manifests.get(source.dir), site, name);
+        // Described by its source's manifest: indexed without importing the module.
+        if (meta) { out.push({ site, name, source: source.kind, ...meta }); continue; }
         try { const { run: _run, ...meta } = this.toCommand(site, name, file, await this.importDescriptor(file)); out.push(meta); }
         catch (err) { process.stderr.write(`[browsermcp] failed to load adapter ${file}: ${(err as Error).message}\n`); }
       }
