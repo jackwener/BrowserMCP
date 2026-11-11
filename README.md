@@ -158,10 +158,14 @@ npm run typecheck
 npm run build:ext        # rebuild the extension
 npm test                 # core regression tests
 npm run smoke:setup      # isolated setup and Native Messaging end-to-end check
-npm run smoke:browser    # end-to-end check with a connected Chrome extension
+npm run smoke:feedback   # real Chromium + extension: what an agent observes, does and verifies
+npm run smoke:observation  # real Chromium + extension: frames, shadow DOM, refs, reads, pagination
+npm run smoke:native     # real Chromium + extension through MCP, the REPL and the native bridge
 ```
 
-Keep the automated suite focused on MCP browser flow, REPL persistence and interruption, connection recovery, session isolation, tab cleanup, and adapter execution. Prefer these integration checks over per-adapter mapping tests and implementation-detail assertions. Run the tests relevant to your change. `npm run check` runs typecheck, build, and the full test suite when a broader check is needed. For browser changes, use the browser smoke test. `docs/api-reference.md` is generated during the build; update its TypeScript source rather than editing the generated file.
+The three real-browser checks need Chromium (`BROWSERMCP_TEST_CHROMIUM` to point at it) and run without a display with `BROWSERMCP_TEST_HEADLESS=1`.
+
+Keep the automated suite focused on MCP browser flow, REPL persistence and interruption, connection recovery, session isolation, tab cleanup, and adapter execution. Prefer these integration checks over per-adapter mapping tests and implementation-detail assertions. Run the tests relevant to your change. `npm run check` runs typecheck, build, and the full test suite when a broader check is needed. For browser changes, run the three real-browser checks. `docs/api-reference.md` is generated during the build; update its TypeScript source rather than editing the generated file.
 
 Maintainers: use the [release workflow](docs/releasing.md) to publish the npm package and GitHub Release.
 

@@ -35,6 +35,9 @@ it('pages one capture across ARIA, oversized text and frame DOM without losing e
   expect(() => observationPage(capture, '2:0:0')).toThrow(/cursor/);
 });
 
-it('compacts only inert wrappers, preserving names, states, refs and sibling hierarchy', () => {
-  expect(compactAria('- generic:\n  - group:\n    - button "Save" [ref=e1]\n    - text: Invalid name\n  - group "Billing":\n    - checkbox "Default" [checked] [ref=e2]\n- generic [ref=e3]:\n  - button "More" [ref=e4]')).toBe('- button "Save" [ref=e1]\n- text: Invalid name\n- group "Billing":\n  - checkbox "Default" [checked] [ref=e2]\n- generic [ref=e3]:\n  - button "More" [ref=e4]');
+it('compacts only inert wrappers, preserving names, states, control refs and sibling hierarchy', () => {
+  // Unnamed generic/group wrappers and layout table parts (rowgroup, unnamed cell, empty row, "|" separators) print
+  // nothing and their children move up; named groups, named cells, rows and every control keep their lines.
+  expect(compactAria('- generic:\n  - group:\n    - button "Save" [ref=e1]\n    - text: Invalid name\n  - group "Billing":\n    - checkbox "Default" [checked] [ref=e2]\n- generic [ref=e3]:\n  - button "More" [ref=e4]')).toBe('- button "Save" [ref=e1]\n- text: Invalid name\n- group "Billing":\n  - checkbox "Default" [checked] [ref=e2]\n- button "More" [ref=e4]');
+  expect(compactAria('- table [ref=e1]:\n  - rowgroup [ref=e2]:\n    - row [ref=e3]:\n      - cell [ref=e4]:\n        - link "News" [ref=e5]\n        - text: "|"\n      - cell "1." [ref=e6]\n    - row [ref=e7]')).toBe('- table [ref=e1]:\n  - row [ref=e3]:\n    - link "News" [ref=e5]\n    - cell "1." [ref=e6]');
 });

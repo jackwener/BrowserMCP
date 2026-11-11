@@ -49,6 +49,9 @@ const pages = {
   '/details': `<title>Details</title><details><summary>Closed disclosure</summary>Hidden body<p id="hp">Hidden paragraph</p><input aria-label="Hidden field"></details>
     <details open><summary>Open disclosure</summary><p>Open body</p></details>`,
   '/late-button': `<title>Late button</title><p>Ticket 42</p><script>setTimeout(()=>{const b=document.createElement('button');b.textContent='Approve ticket';b.onclick=()=>{b.textContent='Approved'};document.body.append(b)},1500)</script>`,
+  '/secrets': `<title>Login</title><form aria-label="Sign in"><input type="password" aria-label="Password" value="hunter2-secret">
+    <input aria-label="Card number" autocomplete="cc-number" value="4242424242424242"><input aria-label="City" value="Hangzhou"></form>
+    <button id="under">Accept</button><div id="veil" style="position:fixed;inset:0;background:rgba(0,0,0,.3)" aria-label="Cookie banner"></div>`,
   '/xhr': `<title>Async</title><button id="load" onclick="fetch('/slow').then(r=>r.text()).then(t=>{document.querySelector('#out').textContent=t})">Load</button><div id="out"></div>`,
 };
 const fixture = createServer((req, res) => {
@@ -206,6 +209,19 @@ try {
     await page.close();
   }
 
+  // 1h. Credential values never reach the agent (snapshot, DOM evidence, expect actual); a covering layer is named.
+  {
+    const { page, tab } = await open('/secrets');
+    await page.bringToFront();
+    const state = (await tab.observe()).state;
+    const dom = JSON.stringify((await tab.observe({ format: 'dom' })).dom);
+    let actual; try { await tab.expect({ target: { label: 'Password' }, value: 'wrong' }, { timeoutMs: 200 }); } catch (e) { actual = JSON.stringify(e.toJSON?.().actual ?? e.data?.actual ?? ''); }
+    record('secrets', { snapshot: !/hunter2|4242424242424242/.test(state) && state.includes('Hangzhou'), dom: !/hunter2|4242424242424242/.test(dom) && dom.includes('Hangzhou'), expectActual: !/hunter2/.test(actual ?? '') });
+    let blocked; try { await tab.act({ action: 'click', target: { role: 'button', name: 'Accept' }, timeoutMs: 800 }); blocked = { code: 'clicked' }; } catch (e) { blocked = { code: e.code, message: e.message }; }
+    record('covered', { code: blocked.code, namesCover: /veil|Cookie banner/.test(blocked.message ?? '') });
+    await page.close();
+  }
+
   // 1g. A target that renders a moment after load is still waited for (fast failure is only for long-quiet pages).
   for (const [label, opts] of [['default', {}], ['explicitTimeout', { timeoutMs: 6000 }]]) {
     const { page, tab } = await open('/late-button');
@@ -293,6 +309,8 @@ try {
     assert.deepEqual(results['closed.observed'], [], 'controls inside closed shadow roots must be observed');
     assert.deepEqual(results['closed.acted'], { fill: true, click: 'changed', openClick: 'changed', expectText: true });
     assert.equal(results['closed.pageSeesNothing'], true, 'page scripts must still see closed roots as closed');
+    assert.deepEqual(results.secrets, { snapshot: true, dom: true, expectActual: true }, 'credential values must never reach the agent');
+    assert.deepEqual(results.covered, { code: 'intercepted', namesCover: true }, JSON.stringify(results.covered));
     assert.deepEqual(results.ambig, { code: 'selector_ambiguous', namesBoth: true, refs: 2 });
     assert.equal(results.notFound.code, 'not_found'); assert(results.notFound.ms < 1200, `not_found took ${results.notFound.ms} ms`);
     assert.deepEqual(results.actAmbiguityCandidates, ['form "Support"', 'shadow root of <div#widget>']);
