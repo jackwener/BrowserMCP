@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.0.39 — 2026-11-11
+
+Improve browser Agent Experience: wait for page content after navigation, observe and act inside closed shadow roots, report action outcomes, return named ambiguity candidates, keep waiting for late targets, compact layout tables, hide closed details and transparent text, and expose empty fields and selection state. Includes Chrome extension 0.0.28 and updated release-gate coverage.
+
 ## 0.0.38 — 2026-11-09
 
 Index built-in adapters from a build-generated manifest without importing command modules at startup or during search. Load a command module on execution. Validate manifest metadata and preserve live indexing for writable user adapters. Build, targeted checks, real Electron and installed ASAR verification completed before release.
