@@ -37,6 +37,8 @@ Semantic targets (`role/name`, `label`, `text`, `testid`, `selector`) resolve th
 ## Choose the evidence needed
 
 - `observe()` provides a compact viewport ARIA overview and child frames; use `{viewport:false}` for the rendered document. It is not full HTML. Keep headings, messages and surrounding context when choosing an action.
+- Observations and `read()` contain only rendered content: inactive tab panels hidden with `display:none` and transparent content are left out. In your own `tab.evaluate` code, `el.innerText` of a hidden element returns its full `textContent`, so filter with `el.checkVisibility({checkOpacity:true})` before extracting.
+- Snapshot lines carry state the ARIA tree lacks: `[empty class="salary"]` marks a field that exists but shows no value (often withheld until login: the field is not missing); `[current=page]` comes from `aria-current`; `[selected? class="cur"]` marks the one sibling of a group (tab strip, panel set) that the page styles as selected without ARIA state. The `?` means it is inferred from class names: confirm it before relying on it.
 - `observe({target})` expands a known branch. `observe({format:'dom'})` finds visible DOM controls and live values when ARIA lacks detail.
 - `read({target})` reads exact current element text/attributes without scrolling. `read()` scans document text, including bounded scroll-and-read for lazy content, and restores scrolling.
 - `find({query:'...'})` searches DOM evidence and returns candidate refs. `find({x,y})` connects screenshot coordinates to elements.

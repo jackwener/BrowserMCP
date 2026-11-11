@@ -27,6 +27,11 @@ const pages = {
   '/anim': `<title>Animated</title><div id="spin" class="spinner" style="width:20px;height:20px;background:#888"></div>
     <button id="go" onclick="this.textContent='Clicked'">Go</button><button id="idle">Idle</button>
     <script>let n=0;setInterval(()=>{const s=document.querySelector('#spin');s.className='spinner';s.style.transform='rotate('+(n++%360)+'deg)'},16)</script>`,
+  '/record': `<title>Jobs</title><style>.tabs span{display:inline-block;margin-right:12px}</style><nav><a href="/record" aria-current="page">Jobs</a><a href="/effects">Effects</a></nav>
+    <div class="tabs"><span class="cur">Sales</span><span class="">Support</span><span class="">Design</span></div>
+    <ul class="panel cur"><li><p class="name">Sales lead</p><p class="salary"></p><i class="icon" style="display:inline-block;width:12px;height:12px;background:#888"></i><p>Hangzhou</p></li></ul>
+    <ul class="panel" style="display:none"><li><p class="name">Support agent</p><p class="salary">10-15K</p></li></ul>
+    <ul class="panel" style="display:none"><li><p class="name">Product designer</p><p class="salary">20-30K</p></li></ul>`,
   '/xhr': `<title>Async</title><button id="load" onclick="fetch('/slow').then(r=>r.text()).then(t=>{document.querySelector('#out').textContent=t})">Load</button><div id="out"></div>`,
 };
 const fixture = createServer((req, res) => {
@@ -109,6 +114,29 @@ try {
     await page.close();
   }
 
+  // 1b. State the ARIA tree lacks: empty fields, class-marked selection, aria-current; hidden panels stay out.
+  {
+    const { page, tab } = await open('/record');
+    await page.bringToFront();
+    const first = await tab.observe();
+    const state = first.state;
+    record('record.emptySlot', /paragraph \[ref=[^\]]+\] \[empty class="salary"\]/.test(state));
+    record('record.decorationNotEmpty', !/class="icon"/.test(state));
+    record('record.selectedHint', /\[selected\? class="cur"\]: Sales/.test(state) && (state.match(/\[selected\? class="cur"\]/g) ?? []).length === 2);
+    record('record.currentLink', /link "Jobs" \[ref=[^\]]+\] \[current=page\]/.test(state));
+    record('record.hiddenPanelsOut', !state.includes('Support agent') && !(await tab.read()).text.includes('Support agent'));
+    await page.evaluate(() => {
+      const spans = document.querySelectorAll('.tabs span'), panels = document.querySelectorAll('ul.panel');
+      spans.forEach((s, i) => { s.className = i === 1 ? 'cur' : ''; });
+      panels.forEach((p, i) => { p.className = i === 1 ? 'panel cur' : 'panel'; p.style.display = i === 1 ? '' : 'none'; });
+    });
+    const after = await tab.observe({ since: first.snapshotId });
+    // A diff when most of the tree survived, a full state otherwise: either way the new selection and panel are there.
+    record('record.switchObserved', /\[selected\? class="cur"\]: Support/.test(after.state) && !/\[selected\? class="cur"\]: Sales/.test(after.state) && after.state.includes('Support agent'));
+    if (REPORT) console.log(state + '\n---\n' + after.state);
+    await page.close();
+  }
+
   // 2. The agent learns from the action itself whether the page reacted.
   {
     const { page, tab } = await open('/effects');
@@ -155,6 +183,8 @@ try {
     assert.equal(results['opacity.expectJoinsInlineText'], true, 'inline elements must not split words');
     assert.equal(results['opacity.expectHonorsVisibilityOverride'], true, 'visibility:visible inside visibility:hidden is on screen');
     console.log('Passed: transparent text is neither observed nor accepted as evidence.');
+    for (const key of ['record.emptySlot', 'record.decorationNotEmpty', 'record.selectedHint', 'record.currentLink', 'record.hiddenPanelsOut', 'record.switchObserved']) assert.equal(results[key], true, key);
+    console.log('Passed: empty fields, class-marked selection and aria-current are in the snapshot; hidden panels are not.');
     assert.equal(results['effect.noop'].effect, 'none');
     assert.equal(results['effect.grow'].effect, 'changed');
     assert.equal(results['effect.fill'].effect, 'changed');

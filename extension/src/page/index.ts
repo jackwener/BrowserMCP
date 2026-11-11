@@ -612,6 +612,50 @@ function observationRoot(args: AriaArgs): Element | Document {
   return matches[0];
 }
 
+// ── state the ARIA tree does not carry ──
+/** An empty text-level leaf the patched snapshot kept because it is a field of a record (see extract-playwright-injected). */
+const SLOT_TAGS = new Set(['P', 'SPAN', 'DIV', 'DD', 'TD', 'EM', 'STRONG', 'B', 'SMALL', 'LABEL', 'TIME', 'DATA', 'OUTPUT']);
+function isEmptySlot(el: Element): boolean {
+  if (!SLOT_TAGS.has(el.tagName) || el.children.length || (el.textContent ?? '').trim()) return false;
+  const box = el.getBoundingClientRect();
+  return !(box.width > 0 && box.height > 0); // still painting a box: a decoration, not a missing value
+}
+/** Class tokens that look authored (salary, job-salary), not generated (css-1x2y3z, sc-AbCdE, _a3f9). */
+function namingTokens(el: Element): string[] {
+  const tokens = [...el.classList].filter(t => t.length <= 32 && /^[a-z][a-z0-9]*(?:[-_]{1,2}[a-z0-9]+)*$/i.test(t) && !/\d{3}|^(?:css|sc|jsx|svelte|emotion)-/i.test(t));
+  return el.id && !/\d{3}/.test(el.id) ? [`#${el.id}`, ...tokens] : tokens;
+}
+const SELECTED_TOKEN = /^(?:.*[-_])?(?:cur|current|active|actived|selected|checked|on)$/i;
+/**
+ * Suffix for a snapshot line: [empty class="salary"] for an empty field, [current] for aria-current (Playwright drops
+ * it), and [selected? class="cur"] when a sibling group without ARIA state marks exactly one member with a selection
+ * class. The question mark says the state is inferred from styling, not declared.
+ */
+function stateHints(el: Element, empty: boolean): string {
+  let out = '';
+  if (empty) {
+    const names = namingTokens(el);
+    out += names.length ? ` [empty ${names[0].startsWith('#') ? `id="${names[0].slice(1)}"` : `class="${names.slice(0, 2).join(' ')}"`}]` : ' [empty]';
+  }
+  const current = el.getAttribute('aria-current');
+  if (current && current !== 'false') out += current === 'true' ? ' [current]' : ` [current=${current}]`;
+  else if (!['aria-selected', 'aria-pressed', 'aria-checked'].some(a => el.hasAttribute(a)) && !(el instanceof HTMLInputElement)) {
+    const token = selectionToken(el);
+    if (token) out += ` [selected? class="${token}"]`;
+  }
+  return out;
+}
+/** The selection class of el when it is the only one of its same-tag siblings (2..50 of them) that has one. */
+function selectionToken(el: Element): string | null {
+  const parent = el.parentElement;
+  if (!parent) return null;
+  const siblings = [...parent.children].filter(s => s.tagName === el.tagName);
+  if (siblings.length < 2 || siblings.length > 50) return null;
+  const marked = siblings.filter(s => [...s.classList].some(t => SELECTED_TOKEN.test(t)));
+  if (marked.length !== 1 || marked[0] !== el) return null;
+  return [...el.classList].find(t => SELECTED_TOKEN.test(t))!;
+}
+
 export function aria(args: AriaArgs = {}): string {
   const root = observationRoot(args);
   const i = injected();
@@ -641,9 +685,13 @@ export function aria(args: AriaArgs = {}): string {
     if (!m) { out.push(line); continue; }
     const el = elements.get(m[2])!;
     // pin the line to the element's stable ref (identity is independent of the viewport filter below)
-    let rline = m[1] + stableRefOf(el) + m[3] + (m[4] ?? '');
-    // a ref opens that branch even when it is off screen; viewport is not a page of the tree
-    if (args.viewport && !args.ref && !intersectsViewport(el)) { dropBelow = indent; continue; }
+    const empty = !m[4] && !m[1].includes(' "') && isEmptySlot(el);
+    const hints = stateHints(el, empty);
+    const closing = hints && m[3].endsWith("'") ? m[3].slice(0, -1) + hints + "'" : m[3] + hints;
+    let rline = m[1] + stableRefOf(el) + closing + (m[4] ?? '');
+    // a ref opens that branch even when it is off screen; viewport is not a page of the tree.
+    // An empty slot has no box of its own: it is on screen where its record is.
+    if (args.viewport && !args.ref && !intersectsViewport(empty && el.parentElement ? el.parentElement : el)) { dropBelow = indent; continue; }
     if (m[4] && isCredentialField(el)) { out.push(rline.slice(0, rline.length - m[4].length) + ': <redacted>'); continue; }
     // Drop a value that just repeats the accessible name (Playwright renders `textbox "X": X` → the reported "X X" dup).
     if (m[4]) { const val = m[4].replace(/^:\s*/, '').trim(); if (val && rline.includes('"' + val + '"')) rline = rline.slice(0, rline.length - m[4].length); }
