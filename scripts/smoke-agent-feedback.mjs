@@ -35,6 +35,13 @@ const pages = {
   '/late': `<title>Late</title><div id="app"></div><script>setTimeout(()=>{document.querySelector('#app').innerHTML='<h1>Release notes</h1><p>Version 9.4.1 shipped</p>'},800)</script>`,
   '/spinner': `<title>Spinner</title><div id="app">Loading…</div><script>setTimeout(()=>{document.querySelector('#app').textContent='Order 7731 confirmed'},1500)</script>`,
   '/blank': `<title>Blank</title><div style="width:100px;height:100px;background:#ccc"></div>`,
+  '/closed': `<title>Closed</title><div id="host"></div><x-pay></x-pay><p>Outside text</p><div id="open"></div><script>
+    const r = document.querySelector('#host').attachShadow({mode:'closed'});
+    r.innerHTML = '<label>Card number<input id=c></label><button onclick="this.textContent=\\'Paid\\'">Pay now</button><div id=inner></div>';
+    r.querySelector('#inner').attachShadow({mode:'closed'}).innerHTML = '<button>Nested closed</button>';
+    customElements.define('x-pay', class extends HTMLElement { constructor() { super(); this.attachShadow({mode:'closed'}).innerHTML = '<a href="#terms">Terms</a>'; } });
+    document.querySelector('#open').attachShadow({mode:'open'}).innerHTML = '<button onclick="this.textContent=\\'Opened\\'">Open shadow</button>';
+  </script>`,
   '/xhr': `<title>Async</title><button id="load" onclick="fetch('/slow').then(r=>r.text()).then(t=>{document.querySelector('#out').textContent=t})">Load</button><div id="out"></div>`,
 };
 const fixture = createServer((req, res) => {
@@ -57,11 +64,14 @@ try {
     import { routeFrames } from './extension/src/frames.ts';
     import { frameSteps } from './src/shared/engine.ts';
     import { performAct } from './extension/src/act.ts';
+    import { exposeClosedShadowRoots } from './extension/src/shadow.ts';
     cdp.registerListeners(); registerFrameTracking();
     globalThis.runCommand = async ({action, params, tabId}) => {
       if (action === 'act') return {data: await performAct(tabId, params.act, {aggressive:false})};
       if (action !== 'exec') throw new Error('Unexpected command: ' + action);
       const route = await routeFrames(tabId, frameSteps(params.frame), false);
+      // As background.ts handleExec does: closed shadow roots are adopted before every engine-world read.
+      if (params.world === 'engine') await exposeClosedShadowRoots(tabId, route?.frameId ?? null, false);
       const data = params.world === 'engine'
         ? await evaluateInWorld(tabId, route?.frameId ?? null, params.code, false, params.timeoutMs)
         : await evaluateMain(tabId, route?.frameId ?? null, params.code, false, params.timeoutMs);
@@ -151,6 +161,24 @@ try {
     await page.close();
   }
 
+  // 1d. Controls inside closed shadow roots (also nested, also in a custom element) are observable and actionable,
+  // and a change inside a shadow tree counts as the action's effect.
+  {
+    const { page, tab } = await open('/closed');
+    await page.bringToFront();
+    const state = (await tab.observe()).state;
+    record('closed.observed', ['textbox "Card number"', 'button "Pay now"', 'button "Nested closed"', 'link "Terms"', 'button "Open shadow"'].filter(t => !state.includes(t)));
+    let fill, click, openClick, byRole;
+    try { fill = await tab.act({ action: 'fill', target: { label: 'Card number' }, value: '4242' }); } catch (e) { fill = { error: e.code }; }
+    try { click = await tab.act({ action: 'click', target: { role: 'button', name: 'Pay now' } }); } catch (e) { click = { error: e.code }; }
+    try { openClick = await tab.act({ action: 'click', target: { role: 'button', name: 'Open shadow' } }); } catch (e) { openClick = { error: e.code }; }
+    try { byRole = (await tab.expect({ text: 'Paid' }, { timeoutMs: 500 })).ok; } catch { byRole = false; }
+    record('closed.acted', { fill: fill.verified ?? fill.error, click: click.effect ?? click.error, openClick: openClick.effect ?? openClick.error, expectText: byRole });
+    record('closed.pageSeesNothing', await page.evaluate(() => document.querySelector('#host').shadowRoot === null && document.querySelector('x-pay').shadowRoot === null));
+    if (REPORT) console.log(state);
+    await page.close();
+  }
+
   // 2. The agent learns from the action itself whether the page reacted.
   {
     const { page, tab } = await open('/effects');
@@ -206,6 +234,10 @@ try {
     assert.equal(results['content/late'].state, 'ready'); assert.equal(results['content/spinner'].state, 'ready'); assert.equal(results['content/blank'].state, 'empty');
     assert(results['content/blank'].waitedMs < 3000, 'a page without text is released after about 2 s');
     console.log('Passed: after a load the wait returns once script-rendered content and placeholders have resolved.');
+    assert.deepEqual(results['closed.observed'], [], 'controls inside closed shadow roots must be observed');
+    assert.deepEqual(results['closed.acted'], { fill: true, click: 'changed', openClick: 'changed', expectText: true });
+    assert.equal(results['closed.pageSeesNothing'], true, 'page scripts must still see closed roots as closed');
+    console.log('Passed: closed shadow roots are observed, actionable and watched for effects.');
     console.log('Passed: empty fields, class-marked selection and aria-current are in the snapshot; hidden panels are not.');
     assert.equal(results['effect.noop'].effect, 'none');
     assert.equal(results['effect.grow'].effect, 'changed');

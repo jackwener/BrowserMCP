@@ -6,6 +6,7 @@ import { callPage, frameCommand, evaluateInWorld } from './world';
 import { PAGE_GLOBAL } from '../../src/shared/page-contract';
 import { routeFrames } from './frames';
 import { networkActivity } from './inflight';
+import { exposeClosedShadowRoots } from './shadow';
 
 export { ActError };
 
@@ -41,6 +42,7 @@ async function setFiles(tabId: number, frameId: string | null, files: string[], 
 export async function performAct(tabId: number, spec: ActSpec, opts: { aggressive: boolean; cursor?: (x: number, y: number) => Promise<unknown> }): Promise<ActResult> {
   await executor.ensureAttached(tabId, opts.aggressive);
   const route = typeof spec.target.x === 'number' ? null : await routeFrames(tabId, frameSteps(spec.target.frame), opts.aggressive, true);
+  await exposeClosedShadowRoots(tabId, route?.frameId ?? null, opts.aggressive);
   if (route) {
     const { frame: _frame, ...target } = spec.target;
     return run({

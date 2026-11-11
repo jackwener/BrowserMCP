@@ -154,6 +154,11 @@ export async function evaluateMain(tabId: number, frameId: string | null, expres
   return executor.evaluationValue(r.result);
 }
 
+/** The engine world's execution context id of a frame, on the session that owns it (see frameCommand). */
+export function engineContextId(tabId: number, frameId: string | null, aggressive: boolean): Promise<number> {
+  return frameId === null ? ensureContext(tabId, aggressive) : ensureFrameContext(tabId, frameId, aggressive);
+}
+
 /** Call one page-module function (extension/src/page) in the main frame's world or a child frame's world. */
 export async function callPage(tabId: number, frameId: string | null, fn: string, args: unknown, aggressive: boolean, timeoutMs?: number): Promise<unknown> {
   return unwrapPageResult(await evaluateInWorld(tabId, frameId, pageCallJs(fn, args), aggressive, timeoutMs));

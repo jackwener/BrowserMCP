@@ -14,6 +14,7 @@ import { NativeHost } from './native';
 import { SessionManager, SessionError, type Session } from './sessions';
 import { performAct, ActError } from './act';
 import { evaluateInWorld, evaluateMain, registerFrameTracking, forgetTab as forgetEngineTab } from './world';
+import { exposeClosedShadowRoots } from './shadow';
 
 import { callChrome, describeChrome } from './chrome-api';
 import { watchStream, readStream, closeStream, closeSessionStreams, endTabStreams } from './streams';
@@ -178,6 +179,8 @@ async function handleExec(cmd: Command, s: Session): Promise<Result> {
   const aggressive = s.surface === 'browser';
   if (cmd.world === 'engine') {
     const route = await routeFrames(tabId, frameSteps(cmd.frame), aggressive);
+    // Page-module reads (observe, find, read, expect) see controls inside closed shadow roots once they are adopted.
+    await exposeClosedShadowRoots(tabId, route?.frameId ?? null, aggressive);
     return pageScoped(cmd.id, tabId, await evaluateInWorld(tabId, route?.frameId ?? null, cmd.code, aggressive, commandTimeoutMs(cmd)));
   }
   const { result, error } = await sessions.withChildTabs(tabId, async () => {

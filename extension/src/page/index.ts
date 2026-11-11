@@ -267,6 +267,53 @@ export function resolveUpload(args: { selector: string; fallback: string | null;
 }
 export function fileSelectionCount(): number { const el = actEl(); return el instanceof HTMLInputElement ? el.files?.length ?? 0 : 0; }
 
+// ── closed shadow roots ──
+// Page script cannot reach a closed shadow root, and neither can this world: element.shadowRoot is null, so the
+// snapshot, locators and hit tests stopped at the host and the controls inside were invisible. The host hands this
+// world the roots it found through CDP (DOM.describeNode pierces closed roots; DOM.resolveNode resolves one here), and
+// this world's own Element.prototype.shadowRoot returns them. Pages never see the change: an isolated world has its own
+// prototypes. Playwright's snapshot, role engine and hit testing then walk them like open roots.
+const nativeShadowRoot = Object.getOwnPropertyDescriptor(Element.prototype, 'shadowRoot')!.get!;
+const adoptedRoots = new WeakMap<Element, ShadowRoot>();
+Object.defineProperty(Element.prototype, 'shadowRoot', {
+  configurable: true, enumerable: true,
+  get(this: Element) { return nativeShadowRoot.call(this) ?? adoptedRoots.get(this) ?? null; },
+});
+const SHADOW_HOST_TAGS = new Set(['ARTICLE', 'ASIDE', 'BLOCKQUOTE', 'BODY', 'DIV', 'FOOTER', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'HEADER', 'MAIN', 'NAV', 'P', 'SECTION', 'SPAN']);
+/** Elements asked about once: a custom element after it is defined (it attaches its root then), any other host once. */
+const shadowChecked = new WeakSet<Element>();
+const MAX_SHADOW_CANDIDATES = 40;
+/**
+ * Elements that may host a closed shadow root, for the host to check through CDP: custom elements, and plain host-capable
+ * elements that render a box but have no content of their own (the content is in the shadow tree). Each is returned once.
+ */
+export function closedShadowCandidates(): Element[] {
+  const out: Element[] = [];
+  const visit = (root: Document | ShadowRoot) => {
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT);
+    for (let n = walker.nextNode() as Element | null; n && out.length < MAX_SHADOW_CANDIDATES; n = walker.nextNode() as Element | null) {
+      const shadow = n.shadowRoot;
+      if (shadow) { visit(shadow); continue; }
+      if (shadowChecked.has(n)) continue;
+      const custom = n.localName.includes('-');
+      if (custom) { if (!n.matches(':defined')) continue; }
+      else if (!SHADOW_HOST_TAGS.has(n.tagName) || n.childElementCount || (n.textContent ?? '').trim()) continue;
+      else { const r = n.getBoundingClientRect(); if (!r.width || !r.height) continue; }
+      shadowChecked.add(n);
+      out.push(n);
+    }
+  };
+  visit(document);
+  return out;
+}
+/** Called by the host on a closed ShadowRoot it resolved into this world. */
+export function adoptShadowRoot(root: unknown): boolean {
+  if (!(root instanceof ShadowRoot) || !root.host || nativeShadowRoot.call(root.host)) return false;
+  adoptedRoots.set(root.host, root);
+  watchDocument(root, true);
+  return true;
+}
+
 // ── page activity: did an action change anything, and when did the page go quiet ──
 // One watcher per isolated world, installed with the module, so it has history before the first action. It sees the
 // shared DOM without writing to it. Same-origin child documents count as this page (a datepicker in an iframe).
@@ -276,11 +323,11 @@ export function fileSelectionCount(): number { const el = actEl(); return el ins
 const OWN_LAYERS = new Set(['browsermcp-overlay-root', 'browsermcp-annotate']);
 const STYLE_REPEAT_MS = 200;
 const activityState = { n: 0, last: performance.now(), installed: performance.now() };
-const watchedDocuments = new WeakSet<Document>();
+const watchedDocuments = new WeakSet<Document | ShadowRoot>();
 const styledAt = new WeakMap<Node, number>();
 const ownLayer = (node: Node | null): boolean => node instanceof Element && OWN_LAYERS.has(node.id);
 function bump(at: number): void { activityState.n++; activityState.last = at; }
-function watchDocument(doc: Document, counted: boolean): void {
+function watchDocument(doc: Document | ShadowRoot, counted: boolean): void {
   if (watchedDocuments.has(doc)) return;
   watchedDocuments.add(doc);
   if (counted) bump(performance.now());
@@ -303,7 +350,18 @@ function watchDocument(doc: Document, counted: boolean): void {
     }
     if (real) bump(now);
   }).observe(doc, { subtree: true, childList: true, attributes: true, attributeOldValue: true, characterData: true });
-  for (const type of ['input', 'change', 'scroll']) doc.addEventListener(type, () => bump(performance.now()), true);
+  // input/change are composed and reach the document; scroll inside a shadow tree does not bubble out of it.
+  for (const type of doc instanceof Document ? ['input', 'change', 'scroll'] : ['scroll']) doc.addEventListener(type, () => bump(performance.now()), true);
+}
+/** A document-level MutationObserver does not see inside shadow trees: watch each one (open or adopted closed). */
+function watchShadowRoots(root: Document | ShadowRoot, counted: boolean): void {
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT);
+  for (let n = walker.nextNode(); n; n = walker.nextNode()) {
+    const shadow = (n as Element).shadowRoot;
+    if (!shadow) continue;
+    watchDocument(shadow, counted);
+    watchShadowRoots(shadow, counted);
+  }
 }
 function watchFrames(doc: Document, counted: boolean): void {
   for (const frame of doc.querySelectorAll('iframe,frame')) {
@@ -327,8 +385,10 @@ export function contentProbe(): ContentProbe {
 /** A document identity shared by every world of one document: it changes when the frame navigates to a new document. */
 const documentId = (): string => String(performance.timeOrigin);
 /** Snapshot before an action, compared after it: the action navigated, changed this page, or did nothing visible to the DOM. */
-export function activity(): ActivityInfo {
+export function activity(args: { scan?: boolean } = {}): ActivityInfo {
   watchFrames(document, true);
+  // Before an action: start watching shadow trees, so a change inside one counts as the action's effect.
+  if (args.scan) watchShadowRoots(document, false);
   const now = performance.now();
   return { n: activityState.n, idleMs: Math.round(now - activityState.last), ready: document.readyState, url: location.href, doc: documentId() };
 }
@@ -913,7 +973,7 @@ export function check(args: CheckArgs): CheckResult {
   return { ok: failed.length === 0, failed, url: location.href, title: document.title, actual };
 }
 
-export const api = { check, resolve, resolveUpload, fileSelectionCount, pointInfo, focus, readValue, fill, isChecked, select, caretToEnd, actionTarget, clearActionTarget, activity, contentProbe, frameProbe, frameElement, clearFrameProbe, aria, observeFrame, visibleDom, readElement, find, findByQuery, elementAt, annotate, unannotate, armClickProbe, readClickProbe, domClick, readText };
+export const api = { check, resolve, resolveUpload, fileSelectionCount, pointInfo, focus, readValue, fill, isChecked, select, caretToEnd, actionTarget, clearActionTarget, activity, contentProbe, closedShadowCandidates, adoptShadowRoot, frameProbe, frameElement, clearFrameProbe, aria, observeFrame, visibleDom, readElement, find, findByQuery, elementAt, annotate, unannotate, armClickProbe, readClickProbe, domClick, readText };
 export type PageApi = typeof api;
 
 (globalThis as any)[PAGE_GLOBAL] = api;

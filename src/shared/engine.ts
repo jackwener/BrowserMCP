@@ -137,10 +137,12 @@ const QUIET_MS = 100;
 const LOADING_CAP_MS = 3000;
 
 interface Activity { target: ActivityInfo | null; top: ActivityInfo | null }
-async function readActivity(io: ActIO): Promise<Activity> {
+/** scan: before an action, also start watching shadow trees so changes inside them count. */
+async function readActivity(io: ActIO, scan = false): Promise<Activity> {
+  const args = scan ? { scan: true } : undefined;
   const [target, top] = await Promise.all([
-    (io.call('activity', undefined, 1000) as Promise<ActivityInfo>).catch(() => null),
-    io.callTop ? (io.callTop('activity', undefined, 1000) as Promise<ActivityInfo>).catch(() => null) : Promise.resolve(null),
+    (io.call('activity', args, 1000) as Promise<ActivityInfo>).catch(() => null),
+    io.callTop ? (io.callTop('activity', args, 1000) as Promise<ActivityInfo>).catch(() => null) : Promise.resolve(null),
   ]);
   return { target, top };
 }
@@ -247,7 +249,7 @@ async function performAction(io: ActIO, spec: ActSpec): Promise<ActResult> {
   const readValue = () => io.call('readValue') as Promise<string | null>;
   let expectedValue: string | null = null;
   // After resolve: its scrollIntoView is not the action's effect.
-  const before = await readActivity(io);
+  const before = await readActivity(io, true);
   const actionStarted = Date.now();
   const navWait = spec.kind === 'click' || spec.kind === 'dblclick' || spec.kind === 'press' ? io.waitForNavigation?.(300, timeoutMs + 12_000) : undefined;
   switch (spec.kind) {
@@ -375,7 +377,7 @@ async function performDomClick(io: ActIO, spec: ActSpec): Promise<ActResult> {
   if (!selector) throw new ActError('invalid_target', 'target needs an observed ref, a selector, or a semantic locator (role/name/label/text/testid)');
   const timeoutMs = spec.timeoutMs ?? 3000;
   const started = Date.now();
-  const before = await readActivity(io);
+  const before = await readActivity(io, true);
   const clicked = Date.now();
   const res = await io.call('domClick', { selector, fallback: fallbackSelector(spec.target) }) as { ok?: true; error?: { code: string; message: string; hint?: string; candidates?: unknown[] }; ref?: string | null; tag?: string; selector?: string | null; x?: number; y?: number; matches_n?: number };
   if (!res || res.ok !== true) {
