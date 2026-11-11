@@ -27,6 +27,7 @@
     "smoke:setup": "node scripts/smoke-setup.mjs",
     "smoke:browser": "node scripts/smoke-browser.mjs",
     "smoke:observation": "node scripts/smoke-observation.mjs",
+    "smoke:feedback": "node scripts/smoke-agent-feedback.mjs",
     "prepare": "npm run build",
     "check": "npm run typecheck && npm run build && npm test",
     "pack:store": "npm run build && node scripts/pack-extension.mjs store",

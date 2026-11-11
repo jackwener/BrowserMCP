@@ -5,6 +5,7 @@ import * as executor from './cdp';
 import { callPage, frameCommand, evaluateInWorld } from './world';
 import { PAGE_GLOBAL } from '../../src/shared/page-contract';
 import { routeFrames } from './frames';
+import { networkActivity } from './inflight';
 
 export { ActError };
 
@@ -60,6 +61,9 @@ export async function performAct(tabId: number, spec: ActSpec, opts: { aggressiv
       cursor: opts.cursor,
       waitForNavigation: (classifyMs, timeoutMs) => waitForNavigation(tabId, classifyMs, timeoutMs),
       pointOffset: route.offset,
+      // A click in a frame often changes the page around it (closes the dialog that holds the frame).
+      ...(route.frameId !== null && { callTop: (fn: string, args?: unknown, timeoutMs?: number) => callPage(tabId, null, fn, args, opts.aggressive, timeoutMs) }),
+      network: since => networkActivity(tabId, since),
     }, { ...spec, target });
   }
   return run({
@@ -68,5 +72,6 @@ export async function performAct(tabId: number, spec: ActSpec, opts: { aggressiv
     setFiles: files => setFiles(tabId, null, files, opts.aggressive),
     cursor: opts.cursor,
     waitForNavigation: (classifyMs, timeoutMs) => waitForNavigation(tabId, classifyMs, timeoutMs),
+    network: since => networkActivity(tabId, since),
   }, spec);
 }

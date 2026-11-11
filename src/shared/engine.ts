@@ -6,8 +6,8 @@
  * → wall-clock stable box → hit-test → cursor overlay → real CDP mouse/keyboard → navigation wait → DOM settle.
  */
 import { ELEMENT_REF } from './element-ref.js';
-import type { ActSpec, ActResult, ActTarget, FrameStep } from '../protocol.js';
-import { ENGINE_GLOBAL, PAGE_GLOBAL, type ResolveOutcome, type Resolved, type PointInfo, type SelectResult } from './page-contract.js';
+import type { ActSpec, ActResult, ActTarget, ActionEffect, FrameStep } from '../protocol.js';
+import { ENGINE_GLOBAL, PAGE_GLOBAL, type ResolveOutcome, type Resolved, type PointInfo, type SelectResult, type ActivityInfo } from './page-contract.js';
 export { ENGINE_GLOBAL, PAGE_GLOBAL } from './page-contract.js';
 
 /** Evaluate once per world: installs Playwright's InjectedScript as globalThis.__browsermcpInjected, then the page module. */
@@ -123,6 +123,69 @@ export interface ActIO {
   waitForNavigation?(classifyMs: number, timeoutMs: number): Promise<{ navigated: boolean; url?: string }>;
   /** When the world is a child frame: the frame's position in the top viewport — input events are dispatched on the tab. */
   pointOffset?: { x: number; y: number };
+  /** When the world is a child frame: call the same page-module function in the top document. */
+  callTop?(fn: string, args?: unknown, timeoutMs?: number): Promise<unknown>;
+  /** Requests started at or after `since` (Date.now() ms) still in flight, and ms since their last event. */
+  network?(since: number): Promise<{ pending: number; idleMs: number }> | { pending: number; idleMs: number };
+}
+
+/** Upper bound of the post-action wait. A quiet page ends it after QUIET_MS; only a busy page waits this long. */
+export const DEFAULT_SETTLE_MS = 1000;
+/** How long the page must show no change and no new request before an action counts as settled. */
+const QUIET_MS = 100;
+/** A document still parsing gets at least this long: navigations need longer than in-page updates. */
+const LOADING_CAP_MS = 3000;
+
+interface Activity { target: ActivityInfo | null; top: ActivityInfo | null }
+async function readActivity(io: ActIO): Promise<Activity> {
+  const [target, top] = await Promise.all([
+    (io.call('activity', undefined, 1000) as Promise<ActivityInfo>).catch(() => null),
+    io.callTop ? (io.callTop('activity', undefined, 1000) as Promise<ActivityInfo>).catch(() => null) : Promise.resolve(null),
+  ]);
+  return { target, top };
+}
+
+/**
+ * Wait until the page has reacted to an action: the document is parsed, no request the action started is in flight,
+ * and no real DOM change for QUIET_MS, measured from the action itself. Event-based, never a fixed sleep; bounded by capMs.
+ */
+async function settle(io: ActIO, since: number, capMs: number): Promise<{ quiet: boolean; pendingRequests: number }> {
+  const started = Date.now();
+  let limit = capMs;
+  let pendingRequests = 0;
+  while (Date.now() - started < limit) {
+    const page = await (io.call('activity', undefined, 1000) as Promise<ActivityInfo>).catch(() => null); // null: navigation in flight
+    if (page?.ready === 'loading') limit = Math.max(capMs, LOADING_CAP_MS);
+    const net = io.network ? await io.network(since) : { pending: 0, idleMs: Number.POSITIVE_INFINITY };
+    pendingRequests = net.pending;
+    const idle = page ? Math.min(page.idleMs, Date.now() - since) : 0;
+    if (page && page.ready !== 'loading' && idle >= QUIET_MS && net.pending === 0 && net.idleMs >= QUIET_MS) return { quiet: true, pendingRequests: 0 };
+    await new Promise((r) => setTimeout(r, page && page.ready !== 'loading' ? Math.min(100, Math.max(20, QUIET_MS - Math.min(idle, net.idleMs))) : 40));
+  }
+  return { quiet: false, pendingRequests };
+}
+
+/** What the action did, from activity snapshots taken just before input and after the settle. */
+function effectOf(before: Activity, after: Activity, navigated: boolean): { effect: ActionEffect; url?: string } {
+  if (navigated) return { effect: 'navigated' };
+  const pairs = [[before.target, after.target], [before.top, after.top]] as const;
+  for (const [b, a] of pairs) if (b && a && (a.doc !== b.doc || a.url !== b.url)) return { effect: 'navigated', url: a.url };
+  if (!after.target || !before.target) return { effect: 'unknown' };
+  for (const [b, a] of pairs) if (b && a && a.n !== b.n) return { effect: 'changed' };
+  return { effect: 'none' };
+}
+
+/** Shared tail of every input action: wait for navigation and settle together, then report the effect. */
+async function conclude(io: ActIO, base: ActResult, before: Activity, actionStarted: number, navWait: Promise<{ navigated: boolean; url?: string }> | undefined, settleMs: number): Promise<void> {
+  const [nav, settled] = await Promise.all([
+    navWait ? navWait.catch(() => ({ navigated: false as const, url: undefined })) : Promise.resolve({ navigated: false as const, url: undefined }),
+    settleMs > 0 ? settle(io, actionStarted, settleMs) : Promise.resolve({ quiet: true, pendingRequests: 0 }),
+  ]);
+  if (nav.navigated) Object.assign(base, { navigated: true, ...(nav.url !== undefined && { url: nav.url }) });
+  const result = effectOf(before, await readActivity(io), nav.navigated);
+  base.effect = result.effect;
+  if (result.effect === 'navigated' && !base.navigated) Object.assign(base, { navigated: true, ...(result.url !== undefined && { url: result.url }) });
+  if (!settled.quiet) Object.assign(base, { settled: false, pendingRequests: settled.pendingRequests });
 }
 
 async function mouse(io: ActIO, type: 'mouseMoved' | 'mousePressed' | 'mouseReleased', x: number, y: number, clickCount = 0, button: 'left' | 'none' = 'left'): Promise<void> {
@@ -183,6 +246,9 @@ async function performAction(io: ActIO, spec: ActSpec): Promise<ActResult> {
   const focus = () => io.call('focus') as Promise<string>;
   const readValue = () => io.call('readValue') as Promise<string | null>;
   let expectedValue: string | null = null;
+  // After resolve: its scrollIntoView is not the action's effect.
+  const before = await readActivity(io);
+  const actionStarted = Date.now();
   const navWait = spec.kind === 'click' || spec.kind === 'dblclick' || spec.kind === 'press' ? io.waitForNavigation?.(300, timeoutMs + 12_000) : undefined;
   switch (spec.kind) {
     case 'hover': await mouse(io, 'mouseMoved', r.x, r.y); break;
@@ -197,7 +263,7 @@ async function performAction(io: ActIO, spec: ActSpec): Promise<ActResult> {
       try { landed = Boolean(await io.call('readClickProbe', undefined, 1500)); } catch { landed = false; }
       if (!landed && navWait) {
         const nav = await navWait.catch(() => ({ navigated: false as const }));
-        if (nav.navigated) { landed = true; Object.assign(base, { navigated: true, url: nav.url }); }
+        if (nav.navigated) landed = true;
       }
       if (!landed) {
         const hint = spec.kind === 'click'
@@ -272,10 +338,8 @@ async function performAction(io: ActIO, spec: ActSpec): Promise<ActResult> {
       break;
     }
   }
-  if (navWait) { const nav = await navWait.catch(() => ({ navigated: false as const })); if (nav.navigated) Object.assign(base, { navigated: true, url: nav.url }); }
-  const settleMs = spec.settleMs ?? 600;
   const actionDone = Date.now();
-  if (settleMs > 0 && !(base as { navigated?: boolean }).navigated) { try { await io.call('settle', { maxMs: settleMs, quietMs: Math.min(200, settleMs) }, settleMs + 1500); } catch { /* navigation in flight */ } }
+  await conclude(io, base, before, actionStarted, navWait, spec.settleMs ?? DEFAULT_SETTLE_MS);
   if (spec.kind === 'fill' || spec.kind === 'type') {
     // Observe the settled control without overwriting formatting, validation, or editor state.
     // Navigation or replacement can make the original control unavailable after input was sent.
@@ -311,6 +375,8 @@ async function performDomClick(io: ActIO, spec: ActSpec): Promise<ActResult> {
   if (!selector) throw new ActError('invalid_target', 'target needs an observed ref, a selector, or a semantic locator (role/name/label/text/testid)');
   const timeoutMs = spec.timeoutMs ?? 3000;
   const started = Date.now();
+  const before = await readActivity(io);
+  const clicked = Date.now();
   const res = await io.call('domClick', { selector, fallback: fallbackSelector(spec.target) }) as { ok?: true; error?: { code: string; message: string; hint?: string; candidates?: unknown[] }; ref?: string | null; tag?: string; selector?: string | null; x?: number; y?: number; matches_n?: number };
   if (!res || res.ok !== true) {
     const e = res?.error ?? { code: 'action_failed', message: 'DOM click failed' };
@@ -318,10 +384,8 @@ async function performDomClick(io: ActIO, spec: ActSpec): Promise<ActResult> {
   }
   const base: ActResult = { ok: true, kind: 'click', ref: res.ref, matches_n: 1, visible_n: 1, match_level: 'exact', point: { x: Math.round(res.x ?? 0), y: Math.round(res.y ?? 0) }, method: 'dom', hit: 'target', tag: res.tag ?? '', waitedMs: Date.now() - started, selector: res.selector ?? undefined };
   const navWait = io.waitForNavigation?.(300, timeoutMs + 12_000);
-  if (navWait) { const nav = await navWait.catch(() => ({ navigated: false as const })); if (nav.navigated) Object.assign(base, { navigated: true, url: nav.url }); }
-  const settleMs = spec.settleMs ?? 600;
   const actionDone = Date.now();
-  if (settleMs > 0 && !base.navigated) { try { await io.call('settle', { maxMs: settleMs, quietMs: Math.min(200, settleMs) }, settleMs + 1500); } catch { /* navigation in flight */ } }
+  await conclude(io, base, before, clicked, navWait, spec.settleMs ?? DEFAULT_SETTLE_MS);
   Object.assign(base, { elapsedMs: Date.now() - started, timings: { resolveMs: base.waitedMs, actionMs: actionDone - started - base.waitedMs, settleMs: Date.now() - actionDone } });
   return base;
 }

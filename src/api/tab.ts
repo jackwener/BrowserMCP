@@ -31,6 +31,16 @@ export interface ActionOutcome {
   delivery: 'applied' | 'received' | 'dispatched';
   controlState: 'verified' | 'unverified';
   network?: { afterSequence: number; cursor: number };
+  /**
+   * What the page did in response, measured in the action's document (and the top document for a frame target):
+   * `navigated` (new document or URL), `changed` (DOM, form value or scroll changed), `none` (nothing changed: the
+   * input reached the page but it did not react), `unknown` (the page could not be read afterwards).
+   */
+  effect?: 'navigated' | 'changed' | 'none' | 'unknown';
+  /** Present when the page was still changing or loading when the wait ended (default limit 1000 ms, `settleMs`). */
+  settled?: false;
+  /** Requests the action started that were still in flight when the wait ended. */
+  pendingRequests?: number;
   matches_n?: number;
   navigated?: boolean; url?: string; title?: string; timedOut?: boolean;
   ref?: string;
@@ -379,7 +389,7 @@ export class Tab {
           opts = { ...opts, target: { x: vp.x, y: vp.y } };
         }
         if (!opts.target) throw new ActionError('missing_target', `action "${action}" needs a target`, 'Pass a target: a {ref} from observe, or a selector/role+name/label/text/testid.');
-        const r = await page.act({ kind: action, target: opts.target as Record<string, unknown>, value: opts.value, files: opts.files, to: opts.to as Record<string, unknown> | undefined, direction: opts.direction, amount: opts.amount, timeoutMs: opts.timeoutMs, settleMs: opts.settleMs ?? 600, cursor: this.ctx.rt.cursorEnabled, ...(opts.method ? { method: opts.method } : {}) });
+        const r = await page.act({ kind: action, target: opts.target as Record<string, unknown>, value: opts.value, files: opts.files, to: opts.to as Record<string, unknown> | undefined, direction: opts.direction, amount: opts.amount, timeoutMs: opts.timeoutMs, settleMs: opts.settleMs, cursor: this.ctx.rt.cursorEnabled, ...(opts.method ? { method: opts.method } : {}) });
         if (capture) await this.harvest(page);
         if (r.ref) this.rememberRefs([r.ref], frameSteps(opts.target.frame));
         const delivery = action === 'fill' || action === 'type' ? (r.verified ? 'applied' : 'dispatched') : r.method === 'dom' || ['check', 'uncheck', 'select', 'upload', 'focus'].includes(action) ? 'applied' : action === 'click' || action === 'dblclick' ? 'received' : 'dispatched';
@@ -390,6 +400,8 @@ export class Tab {
           delivery,
           controlState: controlVerified ? 'verified' : 'unverified',
           ...(capture && { network: { afterSequence: networkFrom, cursor: this.ctx.state.netLog.get(this.id)?.seq ?? networkFrom } }),
+          ...(r.effect ? { effect: r.effect } : {}),
+          ...(r.settled === false ? { settled: false as const, pendingRequests: r.pendingRequests ?? 0 } : {}),
           ...(r.matches_n > 1 ? { matches_n: r.matches_n } : {}),
           ...(r.navigated ? { navigated: true, ...(r.url !== undefined && { url: r.url }) } : {}),
           ...(r.ref ? { ref: r.ref } : {}),

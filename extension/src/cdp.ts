@@ -1,3 +1,4 @@
+import { noteNetworkEvent, forgetTab } from './inflight';
 import { EventBuffer } from './event-buffer';
 import type { StreamEntry, StreamReadOptions, StreamBatch } from '../../src/protocol.js';
 // Derived from OpenCLI (https://github.com/jackwener/OpenCLI), Apache-2.0. Adapted for browsermcp.
@@ -354,6 +355,8 @@ async function attachNow(tabId: number, aggressiveRetry: boolean): Promise<void>
   }
   // Page events carry javascriptDialogOpening/Closed (dialog tracking) — must be enabled per attach
   await sendDebuggerCommand({ tabId }, 'Page.enable').catch(() => {});
+  // Network events tell the post-action settle which requests an action started (see inflight.ts).
+  await sendDebuggerCommand({ tabId }, 'Network.enable').catch(() => {});
   // out-of-process iframes announce themselves as child sessions from now on (see trackOopifs)
   await armOopifAutoAttach(tabId);
   // like the ChatGPT plugin: pages gate on document.hasFocus() even when the tab is not the active one
@@ -771,6 +774,7 @@ export function registerListeners(): void {
   });
   chrome.debugger.onEvent.addListener((source, method, params: any) => {
     if (!source.tabId) return;
+    if (method.startsWith('Network.') && !(source as { sessionId?: string }).sessionId) noteNetworkEvent(source.tabId, method, params);
     if (method.startsWith('Target.')) { trackOopifs(source, method, params); return; }
     if (method === 'Page.downloadWillBegin') { notePageDownload(source.tabId, params ?? {}); return; }
     if (method === 'Runtime.consoleAPICalled') {
@@ -794,6 +798,7 @@ export function registerListeners(): void {
     attached.delete(tabId);
     networkCaptures.delete(tabId);
     pageDownloads.delete(tabId);
+    forgetTab(tabId);
       oopifByTab.delete(tabId);
   });
   chrome.debugger.onDetach.addListener((source) => {
@@ -810,6 +815,7 @@ export function registerListeners(): void {
       attached.delete(source.tabId);
       networkCaptures.delete(source.tabId);
       oopifByTab.delete(source.tabId);
+      forgetTab(source.tabId);
       for (const k of [...directTargets.keys()]) if (k.startsWith(`${source.tabId}:`)) directTargets.delete(k);
       return;
     }

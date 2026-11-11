@@ -17,9 +17,16 @@ The same target works in `observe({target})`, `find(target)`, `read({target})`, 
 
 Semantic targets (`role/name`, `label`, `text`, `testid`, `selector`) resolve the current page. Add `frame` for an explicit iframe route and `within` for a container. Resolution is strict: multiple matches require exactly one visible match, or fail with `selector_ambiguous`. An explicit `nth` is supported when you have inspected the ordered candidates; the engine never silently chooses the first match.
 
-`act` waits for actionability, scrolls, hit-tests, dispatches input and settles. Input delivery does not prove the site's task is complete. Verify the cheapest authoritative result:
+`act` waits for actionability, scrolls, hit-tests, dispatches input and settles: it returns once the page shows no change and no request the action started is in flight, or after `settleMs` (default 1000). Every outcome carries `effect`:
 
-- `expect({target})` waits for visibility.
+- `navigated`: a new document or URL (`url` says where).
+- `changed`: the DOM, a form value or the scroll position changed.
+- `none`: the input reached the page and nothing changed. The control did not react: inspect it (disabled look, overlay, wrong target) before acting again; do not repeat the same action.
+- `unknown`: the page could not be read afterwards.
+
+`settled:false` with `pendingRequests` means the page was still loading when `act` returned; wait with `expect` rather than acting on a half-updated page. `changed` says the page reacted, not that the task succeeded. Verify the cheapest authoritative result:
+
+- `expect({target})` waits for visibility. Elements with `opacity:0` are not visible, and their text is not page text: observations leave it out, `expect({text})` does not match it. A transparent native control (a styled checkbox) stays in observations because a click still reaches it.
 - `expect({target, value:'42'})`, `{target, checked:true}`, `{target, selected:['id']}`, or `{target, enabled:true}` check control state. Multiple conditions must all hold.
 - `expect({target, text:'Saved'})` checks text in that element; `{text:'Saved'}` checks the document.
 - `expect({url:'/receipt'})` or `{title:'Receipt'}` checks the page. Keep page and element expectations separate.

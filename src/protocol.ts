@@ -96,6 +96,7 @@ export interface Command {
   act?: ActSpec;
 }
 
+export type ActionEffect = 'navigated' | 'changed' | 'none' | 'unknown';
 export type ActKind = 'click' | 'dblclick' | 'hover' | 'focus' | 'fill' | 'type' | 'press' | 'check' | 'uncheck' | 'select' | 'scroll' | 'upload' | 'drag';
 export interface ActTarget { ref?: number | string; /** raw Playwright selector, e.g. the `selector` returned by find */ selector?: string; /** scope: selector of a container, or an observed ref — the target is resolved inside it (generic labels are ambiguous by default; scope them) */ within?: string; nth?: number; role?: string; name?: string; label?: string; text?: string; testid?: string; x?: number; y?: number; /** iframe(s) to enter first, outermost first: css selector of the <iframe> or its 0-based index; a string may chain with ' >> ' (Codex enter-frame); same- and cross-origin frames are handled alike */ frame?: FrameStep | FrameStep[] }
 export type FrameStep = string | number;
@@ -143,6 +144,12 @@ export interface ActResult {
   timings?: { resolveMs: number; actionMs: number; settleMs: number };
   /** Playwright-generated selector for locating the same element again. */
   selector?: string;
+  /** What the page did in response: a new document or URL, a DOM/form/scroll change, no change, or unknown (the page could not be read afterwards). */
+  effect?: ActionEffect;
+  /** Present when the page was still changing or loading when the settle wait ended. */
+  settled?: false;
+  /** Requests the action started that were still in flight when the settle wait ended. */
+  pendingRequests?: number;
   /** set when the action triggered a navigation that has now finished */
   navigated?: boolean;
   url?: string;

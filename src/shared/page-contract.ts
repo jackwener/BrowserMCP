@@ -82,7 +82,8 @@ export interface PointInfo { tag: string; editable: boolean; isSelect: boolean }
 
 export interface FrameProbeResult { found: boolean; sameOrigin?: boolean; x?: number; y?: number; src?: string }
 
-export interface SettleArgs { maxMs: number; quietMs: number }
+/** Page activity in the action's document: `n` counts real changes, `idleMs` is the time since the last one. */
+export interface ActivityInfo { n: number; idleMs: number; ready: DocumentReadyState; url: string; doc: string }
 
 export interface SelectResult { selected?: string[]; error?: string; available?: string[] }
 

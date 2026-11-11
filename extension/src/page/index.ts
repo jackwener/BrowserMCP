@@ -7,7 +7,7 @@
 import {
   ENGINE_GLOBAL, PAGE_GLOBAL,
   type ResolveArgs, type ResolveOutcome, type ResolveFail, type Candidate, type FindArgs, type FindResult, type FindEntry, type QueryFindResult, type UploadTarget,
-  type AriaArgs, type PointInfo, type FrameProbeResult, type SettleArgs, type SelectResult, type ElementAtResult, type Box, type CheckArgs, type CheckResult,
+  type AriaArgs, type PointInfo, type FrameProbeResult, type ActivityInfo, type SelectResult, type ElementAtResult, type Box, type CheckArgs, type CheckResult,
   type ReadTextArgs, type ReadTextResult, type DomClickArgs, type DomClickResult, type DomSnapshot, type ObserveFrameArgs, type FrameObservation, type ElementDetails,
 } from '../../../src/shared/page-contract.js';
 import { ARIA_REF_LINE } from '../../../src/shared/element-ref.js';
@@ -267,18 +267,63 @@ export function resolveUpload(args: { selector: string; fallback: string | null;
 }
 export function fileSelectionCount(): number { const el = actEl(); return el instanceof HTMLInputElement ? el.files?.length ?? 0 : 0; }
 
-/** Wait until the DOM has been quiet for `quietMs` (or `maxMs` elapsed). */
-export function settle(args: SettleArgs): Promise<{ waitedMs: number; quiet: boolean }> {
-  return new Promise((resolveP) => {
-    const t0 = performance.now();
-    let timer: ReturnType<typeof setTimeout>;
-    const finish = (quiet: boolean) => { obs.disconnect(); clearTimeout(cap); resolveP({ waitedMs: Math.round(performance.now() - t0), quiet }); };
-    const arm = () => { clearTimeout(timer); timer = setTimeout(() => finish(true), args.quietMs); };
-    const obs = new MutationObserver(arm);
-    obs.observe(document.documentElement, { childList: true, subtree: true, attributes: true, characterData: true });
-    const cap = setTimeout(() => { clearTimeout(timer); finish(false); }, args.maxMs);
-    arm();
-  });
+// ── page activity: did an action change anything, and when did the page go quiet ──
+// One watcher per isolated world, installed with the module, so it has history before the first action. It sees the
+// shared DOM without writing to it. Same-origin child documents count as this page (a datepicker in an iframe).
+// Mutations that are not the page reacting are ignored: our own overlay layers, attribute writes that keep the old
+// value (sites that rewrite a class every frame), and repeated style writes on one element (animation loops). A style
+// write counts once it is the first on its element for STYLE_REPEAT_MS, so a menu shown with style.display still counts.
+const OWN_LAYERS = new Set(['browsermcp-overlay-root', 'browsermcp-annotate']);
+const STYLE_REPEAT_MS = 200;
+const activityState = { n: 0, last: performance.now(), installed: performance.now() };
+const watchedDocuments = new WeakSet<Document>();
+const styledAt = new WeakMap<Node, number>();
+const ownLayer = (node: Node | null): boolean => node instanceof Element && OWN_LAYERS.has(node.id);
+function bump(at: number): void { activityState.n++; activityState.last = at; }
+function watchDocument(doc: Document, counted: boolean): void {
+  if (watchedDocuments.has(doc)) return;
+  watchedDocuments.add(doc);
+  if (counted) bump(performance.now());
+  new MutationObserver((records) => {
+    const now = performance.now();
+    let real = false;
+    for (const r of records) {
+      if (ownLayer(r.target) || [...r.addedNodes, ...r.removedNodes].some(ownLayer)) continue;
+      if (r.type === 'attributes') {
+        const target = r.target as Element;
+        if (r.oldValue === target.getAttributeNS(r.attributeNamespace, r.attributeName!)) continue;
+        if (r.attributeName === 'style') {
+          const previous = styledAt.get(target);
+          styledAt.set(target, now);
+          // Without history (first write right after install) a style write cannot be told apart from an animation.
+          if (previous === undefined ? now - activityState.installed < STYLE_REPEAT_MS : now - previous <= STYLE_REPEAT_MS) continue;
+        }
+      }
+      real = true;
+    }
+    if (real) bump(now);
+  }).observe(doc, { subtree: true, childList: true, attributes: true, attributeOldValue: true, characterData: true });
+  for (const type of ['input', 'change', 'scroll']) doc.addEventListener(type, () => bump(performance.now()), true);
+}
+function watchFrames(doc: Document, counted: boolean): void {
+  for (const frame of doc.querySelectorAll('iframe,frame')) {
+    let child: Document | null = null;
+    try { child = (frame as HTMLIFrameElement).contentDocument; } catch { child = null; }
+    if (!child) continue; // cross-origin: its own world reports it
+    watchDocument(child, counted);
+    watchFrames(child, counted);
+  }
+}
+watchDocument(document, false);
+watchFrames(document, false);
+
+/** A document identity shared by every world of one document: it changes when the frame navigates to a new document. */
+const documentId = (): string => String(performance.timeOrigin);
+/** Snapshot before an action, compared after it: the action navigated, changed this page, or did nothing visible to the DOM. */
+export function activity(): ActivityInfo {
+  watchFrames(document, true);
+  const now = performance.now();
+  return { n: activityState.n, idleMs: Math.round(now - activityState.last), ready: document.readyState, url: location.href, doc: documentId() };
 }
 
 // ── frames ──
@@ -395,13 +440,45 @@ function skipRead(el: Element | null, visible: WeakMap<Element, boolean>): boole
     if (cached === false) return true;
     if (cached === undefined) {
       const style = getComputedStyle(el);
-      const shown = style.display !== 'none' && style.visibility !== 'hidden' && style.visibility !== 'collapse';
+      // opacity:0 is not inherited, so every ancestor is checked: text inside a transparent banner is not on screen.
+      const shown = style.display !== 'none' && style.visibility !== 'hidden' && style.visibility !== 'collapse' && style.opacity !== '0';
       visible.set(el, shown);
       if (!shown) return true;
     }
     el = el.parentElement ?? (el.getRootNode() as ShadowRoot).host ?? null;
   }
   return false;
+}
+/**
+ * The text a person can see under root: rendered, not transparent, open shadow roots included. Block boundaries become
+ * spaces so words from adjacent blocks never run together; inline boundaries add nothing, so `Hel<b>lo</b>` stays one word.
+ */
+function shownText(root: Element): string {
+  if (skipRead(root, new WeakMap())) return '';
+  const parts: string[] = [];
+  // visibility is inherited and a child may set it back to visible, so a hidden element is still descended into.
+  const visit = (node: Node, textShown: boolean) => {
+    for (const n of node.childNodes) {
+      if (n.nodeType === Node.TEXT_NODE) { if (textShown) parts.push(n.textContent ?? ''); continue; }
+      if (!(n instanceof Element) || /^(SCRIPT|STYLE|NOSCRIPT|TEMPLATE)$/.test(n.tagName) || n.id === 'browsermcp-annotate' || n.hasAttribute('hidden')) continue;
+      // display:none and opacity:0 hide the whole subtree; ancestors were already checked on the way down.
+      const style = getComputedStyle(n);
+      if (style.display === 'none' || style.opacity === '0') continue;
+      const shown = style.visibility !== 'hidden' && style.visibility !== 'collapse';
+      const block = n.tagName === 'BR' || (style.display !== 'inline' && style.display !== 'contents');
+      if (block) parts.push(' ');
+      visit(n, shown);
+      if (n.shadowRoot) visit(n.shadowRoot, shown);
+      if (block) parts.push(' ');
+    }
+  };
+  visit(root, true);
+  if (root.shadowRoot) visit(root.shadowRoot, true);
+  return parts.join('').replace(/\s+/g, ' ').trim();
+}
+/** Playwright's visible (a box, not visibility:hidden) and not transparent: what a person can see, for verification. */
+function shownElement(el: Element): boolean {
+  return is(el, 'visible') && !skipRead(el, new WeakMap());
 }
 function pageLines(): Array<{ node: Node; text: string }> {
   const out: Array<{ node: Node; text: string }> = [];
@@ -741,7 +818,7 @@ export function check(args: CheckArgs): CheckResult {
       matches = visible;
     }
     element = matches[0];
-    actual.visible = !!element && is(element, 'visible');
+    actual.visible = !!element && shownElement(element);
     const visibilityOnly = ['text', 'notText', 'value', 'checked', 'selected', 'enabled'].every(key => args[key as keyof CheckArgs] === undefined);
     if (args.visible !== undefined || visibilityOnly) {
       if (actual.visible !== (args.visible ?? true)) failed.push(`visible is ${actual.visible}, expected ${args.visible ?? true}`);
@@ -750,7 +827,7 @@ export function check(args: CheckArgs): CheckResult {
   }
   if (args.selector === undefined || element) {
     const root = element ?? document.body;
-    const content = element && isCredentialField(element) ? '<redacted>' : ((root as HTMLElement)?.innerText ?? root?.textContent ?? '').replace(/\s+/g, ' ');
+    const content = element && isCredentialField(element) ? '<redacted>' : root ? shownText(root) : '';
     if (args.text !== undefined || args.notText !== undefined) {
       actual.text = content.slice(0, 1000);
       if (args.text !== undefined && !content.includes(args.text)) failed.push(`text does not include "${args.text}"`);
@@ -781,7 +858,7 @@ export function check(args: CheckArgs): CheckResult {
   return { ok: failed.length === 0, failed, url: location.href, title: document.title, actual };
 }
 
-export const api = { check, resolve, resolveUpload, fileSelectionCount, pointInfo, focus, readValue, fill, isChecked, select, caretToEnd, actionTarget, clearActionTarget, settle, frameProbe, frameElement, clearFrameProbe, aria, observeFrame, visibleDom, readElement, find, findByQuery, elementAt, annotate, unannotate, armClickProbe, readClickProbe, domClick, readText };
+export const api = { check, resolve, resolveUpload, fileSelectionCount, pointInfo, focus, readValue, fill, isChecked, select, caretToEnd, actionTarget, clearActionTarget, activity, frameProbe, frameElement, clearFrameProbe, aria, observeFrame, visibleDom, readElement, find, findByQuery, elementAt, annotate, unannotate, armClickProbe, readClickProbe, domClick, readText };
 export type PageApi = typeof api;
 
 (globalThis as any)[PAGE_GLOBAL] = api;
