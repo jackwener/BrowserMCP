@@ -77,7 +77,7 @@ it('runs discovery → observe → act → verify → cleanup through MCP and th
     pageCall: async (method: string) => method === 'observeFrame' ? { state: clicked ? '- heading "Done"' : '- button "Continue" [ref=e1]', children: [] } : null,
     act: async () => { clicked = true; return { ok: true, kind: 'click', matches_n: 1, method: 'cdp', ref: 'e1' }; },
     expect: async () => ({ ok: clicked, failed: clicked ? [] : ['not clicked'] }),
-    finalize: async () => { finalized = true; return { closed: ['page-one'], kept: [], failed: [] }; },
+    finalize: async () => { finalized = true; return { closed: ['page-one'], released: [], retained: [], failed: [] }; },
   } as unknown as RuntimePage;
   rt.backend = () => 'extension';
   rt.getBrowserPage = async () => page;
@@ -94,7 +94,7 @@ it('runs discovery → observe → act → verify → cleanup through MCP and th
     return { result: r, text, body: (() => { try { return JSON.parse(text); } catch { return null; } })() };
   };
   try {
-    expect((await client.listTools()).tools.map(t => t.name).sort()).toEqual(['docs_get', 'doctor', 'js', 'js_reset', 'session_finalize', 'site_run', 'sites_search']);
+    expect((await client.listTools()).tools.map(t => t.name).sort()).toEqual(['claim_tab', 'close_tab', 'docs_get', 'doctor', 'js', 'js_reset', 'navigate_tab', 'open_tab', 'release_tab', 'session_finish', 'site_run', 'sites_search', 'tab_act', 'tab_observe', 'tabs_close', 'tabs_list']);
     expect((await call('docs_get', { name: 'api-reference', member: 'Tab.act' })).text).toContain('ActionOutcome');
     const opened = await call('js', { code: 'let tab = await browser.tabs.new("https://example.com/"); tab' });
     expect(opened.body, opened.text).toEqual({ ok: true, value: { type: 'Tab', id: 'page-one' } });
@@ -110,7 +110,7 @@ it('runs discovery → observe → act → verify → cleanup through MCP and th
     const observed = await call('js', { code: 'await tab.observe({mode:"both"})' });
     expect(observed.result.content).toContainEqual({ type: 'image', data: 'aW1hZ2U=', mimeType: 'image/png' });
     expect(observed.body.value.image).toEqual({ image: 'image/png' });
-    await call('session_finalize');
+    await call('session_finish');
     expect(finalized).toBe(true);
   } finally { await client.close(); await session.close(); await rt.shutdown(); }
 });

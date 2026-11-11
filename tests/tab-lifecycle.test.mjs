@@ -41,7 +41,7 @@ describe('browser tab ownership', () => {
     await manager.adoptCreatedTab(other, { id: 4, windowId: 1 });
 
     expect(await manager.finalize(session, [{ page: '3', status: 'deliverable' }])).toEqual({
-      closed: ['2'], kept: ['1', '3'], failed: [],
+      closed: ['2'], released: ['1', '3'], retained: [], failed: [],
     });
     expect(tabs.remove.mock.calls).toEqual([[2]]);
     expect(session.leases.size).toBe(0);
@@ -56,7 +56,7 @@ describe('browser tab ownership', () => {
     await expect(manager.finalize(session, [{ page: 'itab', status: 'deliverable' }])).rejects.toThrow();
     await expect(manager.finalize(session, [{ page: '99', status: 'deliverable' }])).rejects.toThrow();
     expect(tabs.remove).not.toHaveBeenCalled();
-    expect(await manager.finalize(session, [])).toEqual({ closed: ['2'], kept: ['3'], failed: [] });
+    expect(await manager.finalize(session, [])).toEqual({ closed: ['2'], released: ['3'], retained: [], failed: [] });
   });
 
 });

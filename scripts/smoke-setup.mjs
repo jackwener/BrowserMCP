@@ -196,7 +196,7 @@ try {
   assert.equal(connected.host.extensionConnected, true);
   assert.equal(connected.ok, true);
   assert.equal(connected.host.backend, 'extension');
-  assert.match(connected.host.protocolWarning, /Browser commands remain available/);
+  assert.match(connected.host.protocolWarning, /Browser commands are blocked/);
   assert(connected.advice.some((line) => line.startsWith('Warning: Extension protocol')));
   assert(!('built' in connected.extension));
   // Replace stale selected commands; do not confuse entry existence with correctness.
