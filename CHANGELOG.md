@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.0.41 — 2026-11-12
+
+Unify single-target name disambiguation across actions, DOM clicks, upload, targeted observation, reading, and expectations. Improve child-frame recovery hints, including frames inside shadow roots. Includes Chrome extension 0.0.29.
+
 ## 0.0.40 — 2026-11-11
 
 Unified stable and embedded 0.0.40 release line. Adds content readiness waiting, closed Shadow DOM support, actionable ambiguity candidates, improved action feedback, compact observations, hidden-content filtering, and Chrome extension 0.0.28.
