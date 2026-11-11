@@ -378,7 +378,7 @@ async function performUpload(io: ActIO, spec: ActSpec): Promise<ActResult> {
   const selector = targetToSelector(spec.target);
   if (!selector) throw new ActError('invalid_target', 'upload needs a file-input ref or a locator associated with one');
   const started = Date.now();
-  const resolved = await io.call('resolveUpload', { selector, fallback: fallbackSelector(spec.target), files: files.length }) as import('./page-contract.js').UploadTarget | import('./page-contract.js').ResolveFail;
+  const resolved = await io.call('resolveUpload', { selector, fallback: fallbackSelector(spec.target), name: spec.target.name, files: files.length }) as import('./page-contract.js').UploadTarget | import('./page-contract.js').ResolveFail;
   if (!('ok' in resolved)) throw new ActError(resolved.error.code, resolved.error.message, resolved.error.hint, resolved.error.candidates ? { candidates: resolved.error.candidates } : undefined);
   if (!io.setFiles) throw new ActError('unsupported', 'This runtime cannot upload files');
   await io.setFiles(files);
@@ -396,7 +396,7 @@ async function performDomClick(io: ActIO, spec: ActSpec): Promise<ActResult> {
   const started = Date.now();
   const before = await readActivity(io, true);
   const clicked = Date.now();
-  const res = await io.call('domClick', { selector, fallback: fallbackSelector(spec.target) }) as { ok?: true; error?: { code: string; message: string; hint?: string; candidates?: unknown[] }; ref?: string | null; tag?: string; selector?: string | null; x?: number; y?: number; matches_n?: number };
+  const res = await io.call('domClick', { selector, fallback: fallbackSelector(spec.target), name: spec.target.name }) as { ok?: true; error?: { code: string; message: string; hint?: string; candidates?: unknown[] }; ref?: string | null; tag?: string; selector?: string | null; x?: number; y?: number; matches_n?: number };
   if (!res || res.ok !== true) {
     const e = res?.error ?? { code: 'action_failed', message: 'DOM click failed' };
     throw new ActError(e.code, e.message, e.hint, e.candidates ? { candidates: e.candidates } : undefined);

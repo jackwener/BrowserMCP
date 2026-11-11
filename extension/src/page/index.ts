@@ -161,6 +161,24 @@ function ambiguity(n: number, selector: string, visibleN: number, matches: Eleme
   return { code: 'selector_ambiguous', message: `${n} elements match ${selector}${visibleN ? ` (${visibleN} visible)` : ''}: ${list}${n > 8 ? `; …${n - 8} more` : ''}`, hint: `Act on one of these refs, or scope the locator with within (a container ref or selector).${substring}`, candidates };
 }
 
+/** Shared single-target selection; list queries deliberately keep all matches. */
+function singleTarget(matches: Element[], selector: string, name?: string): Element | ResolveFail {
+  if (!matches.length) return { error: { code: 'not_found', message: `no element matches ${selector}`, ...frameHint() }, retry: true };
+  if (matches.length === 1) return matches[0];
+  const visible = matches.filter(el => is(el, 'visible'));
+  const pool = visible.length ? visible : matches;
+  const selected = pool.length === 1 ? pool[0] : exactName(pool, name);
+  return selected ?? { error: ambiguity(matches.length, selector, visible.length, pool, name), retry: false };
+}
+function requireSingleTarget(matches: Element[], selector: string, name?: string): Element {
+  const result = singleTarget(matches, selector, name);
+  if ('error' in result) {
+    const e = result.error;
+    throw pageError(e.code, e.message, e.hint ?? '', e.candidates ? { candidates: e.candidates } : undefined);
+  }
+  return result;
+}
+
 // Action state belongs to this isolated world, never to shared DOM attributes.
 let actionElement: Element | null = null;
 export function actionTarget(): Element | null {
@@ -179,15 +197,8 @@ export async function resolve(args: ResolveArgs): Promise<ResolveOutcome> {
   let usedSelector = selector;
   let matches = query(selector);
   if (!matches.length && fallback) { usedSelector = fallback; matches = query(fallback); }
-  if (!matches.length) return { error: { code: 'not_found', message: `no element matches ${selector}`, ...frameHint() }, retry: true };
-  let el = matches[0];
-  if (matches.length > 1 && strict) {
-    const visible = matches.filter((m) => is(m, 'visible'));
-    const exact = exactName(visible.length ? visible : matches, args.name);
-    if (visible.length === 1) el = visible[0];
-    else if (exact) el = exact;
-    else return { error: ambiguity(matches.length, selector, visible.length, visible.length > 1 ? visible : matches, args.name), retry: false };
-  }
+  const el = strict ? singleTarget(matches, selector, args.name) : matches[0] ?? singleTarget(matches, selector, args.name);
+  if ('error' in el) return el;
   for (const st of states) {
     const r = stateOf(el, st);
     if (r.received === 'error:notconnected') return { error: { code: 'stale_ref', message: 'element detached during resolution' }, retry: true };
@@ -297,12 +308,11 @@ export function caretToEnd(): void {
   }
 }
 /** Remember the file input associated with the target (inside it, its label's control, or the nearest form). */
-export function resolveUpload(args: { selector: string; fallback: string | null; files: number }): UploadTarget | ResolveFail {
+export function resolveUpload(args: { selector: string; fallback: string | null; name?: string; files: number }): UploadTarget | ResolveFail {
   let matches = query(args.selector);
   if (!matches.length && args.fallback) matches = query(args.fallback);
-  if (!matches.length) return { error: { code: 'not_found', message: 'Upload target was not found. Observe again for a fresh file-input ref.' } };
-  if (matches.length !== 1) return { error: { code: 'selector_ambiguous', message: `${matches.length} upload targets match`, candidates: matches.slice(0, 8).map(candidate) } };
-  const el = matches[0];
+  const el = singleTarget(matches, args.selector, args.name);
+  if ('error' in el) return el;
   const direct = el instanceof HTMLInputElement && el.type === 'file' ? [el] : [];
   const controlled = el instanceof HTMLLabelElement && el.control instanceof HTMLInputElement && el.control.type === 'file' ? [el.control] : [];
   const nested = [...el.querySelectorAll<HTMLInputElement>('input[type=file]')];
@@ -487,13 +497,8 @@ export function readClickProbe(): boolean {
 export function domClick(args: DomClickArgs): DomClickResult {
   let matches = query(args.selector);
   if (!matches.length && args.fallback) matches = query(args.fallback);
-  if (!matches.length) return { error: { code: 'not_found', message: `no element matches ${args.selector}`, ...frameHint() }, retry: true };
-  let el = matches[0];
-  if (matches.length > 1) {
-    const visible = matches.filter((m) => is(m, 'visible'));
-    if (visible.length === 1) el = visible[0];
-    else return { error: ambiguity(matches.length, args.selector, visible.length, visible.length > 1 ? visible : matches), retry: false };
-  }
+  const el = singleTarget(matches, args.selector, args.name);
+  if ('error' in el) return el;
   const enabled = stateOf(el, 'enabled');
   if (!enabled.matches) return { error: { code: 'not_enabled', message: `element is not enabled${enabled.received.startsWith('error:') ? ` (${enabled.received.slice(6)})` : ''}`, candidates: [candidate(el)] }, retry: true };
   rememberActionTarget(el);
@@ -732,13 +737,7 @@ function observationRoot(args: AriaArgs): Element | Document {
   if (!args.selector) return document;
   let matches = query(args.selector);
   if (!matches.length && args.fallback) matches = query(args.fallback);
-  if (!matches.length) throw pageError('not_found', `No element matches ${args.selector}`, 'Observe the page or find the container again.');
-  if (matches.length > 1) {
-    const visible = matches.filter(el => is(el, 'visible'));
-    if (visible.length !== 1) { const a = ambiguity(matches.length, args.selector, visible.length, visible.length > 1 ? visible : matches); throw pageError(a.code, a.message, a.hint, { candidates: a.candidates }); }
-    matches = visible;
-  }
-  return matches[0];
+  return requireSingleTarget(matches, args.selector, args.name);
 }
 
 // ── state the ARIA tree does not carry ──
@@ -901,13 +900,8 @@ export function observeFrame(args: ObserveFrameArgs = {}): FrameObservation {
 export function readElement(args: FindArgs): ElementDetails | ResolveFail {
   let matches = query(args.selector);
   if (!matches.length && args.fallback) matches = query(args.fallback);
-  if (!matches.length) return { error: { code: 'not_found', message: `no element matches ${args.selector}`, hint: 'Observe or find the target again.' } };
-  if (matches.length > 1) {
-    const visible = matches.filter(el => is(el, 'visible'));
-    if (visible.length !== 1) return { error: ambiguity(matches.length, args.selector, visible.length, visible.length > 1 ? visible : matches) };
-    matches = visible;
-  }
-  const el = matches[0];
+  const el = singleTarget(matches, args.selector, args.name);
+  if ('error' in el) return el;
   return { ref: ariaRefOf(el)!, tag: el.tagName.toLowerCase(), name: nameOf(el), text: isCredentialField(el) ? '<redacted>' : (el as HTMLElement).innerText ?? el.textContent ?? '', attrs: domAttributes(el) };
 }
 
@@ -993,13 +987,7 @@ export function check(args: CheckArgs): CheckResult {
   if (args.selector !== undefined) {
     let matches = query(args.selector);
     if (!matches.length && args.fallback) matches = query(args.fallback);
-    if (matches.length > 1) {
-      const visible = matches.filter(el => is(el, 'visible'));
-      const exact = visible.length === 1 ? null : exactName(visible.length ? visible : matches, args.targetName);
-      if (visible.length !== 1 && !exact) { const a = ambiguity(matches.length, args.selector, visible.length, visible.length > 1 ? visible : matches, args.targetName); throw Object.assign(new Error(a.message), { code: a.code, hint: a.hint, data: { candidates: a.candidates } }); }
-      matches = exact ? [exact] : visible;
-    }
-    element = matches[0];
+    element = matches.length ? requireSingleTarget(matches, args.selector, args.targetName) : undefined;
     // A text locator resolves to the innermost element containing the text; for a text node directly inside a closed
     // <details> that is the details element itself, which is visible. "Is this text visible" asks about the text.
     actual.visible = !!element && shownElement(element) && (args.targetText === undefined || fold(shownText(element)).includes(fold(args.targetText)));

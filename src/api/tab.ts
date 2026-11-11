@@ -281,7 +281,7 @@ export class Tab {
         };
         const capture = (frame: FrameStep[], ref?: string, root = false) => page.pageCall('observeFrame', {
           format: opts.format ?? 'aria', viewport, ...(ref && { ref }),
-          ...(root && { start: opts.start, limit: opts.limit, ...(selector && { selector, fallback: fallbackSelector(opts.target!) }) }),
+          ...(root && { start: opts.start, limit: opts.limit, ...(selector && { selector, fallback: fallbackSelector(opts.target!), name: 'name' in opts.target! ? opts.target!.name : undefined }) }),
         }, 5000, frame) as Promise<FrameObservation>;
         const root = await capture(base, opts.ref, true);
         Object.assign(out, render(root, base, opts.ref));
@@ -365,7 +365,7 @@ export class Tab {
       if ('target' in opts) {
         const selector = targetToSelector(opts.target);
         if (!selector) throw new ActionError('invalid_target', 'Exact read needs a ref or locator.', 'Use find({x,y}) first for a screenshot coordinate.');
-        const result = await page.pageCall('readElement', { selector, fallback: fallbackSelector(opts.target), limit: 1 }, undefined, opts.target.frame) as ElementDetails | ResolveFail;
+        const result = await page.pageCall('readElement', { selector, fallback: fallbackSelector(opts.target), name: 'name' in opts.target ? opts.target.name : undefined, limit: 1 }, undefined, opts.target.frame) as ElementDetails | ResolveFail;
         if ('error' in result) throw new ActionError(result.error.code, result.error.message, result.error.hint);
         this.rememberRefs([result.ref], frameSteps(opts.target.frame));
         return result;

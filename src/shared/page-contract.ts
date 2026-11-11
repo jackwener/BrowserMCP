@@ -41,7 +41,7 @@ export interface Resolved {
 export interface ResolveFail { error: { code: string; message: string; hint?: string; candidates?: Candidate[] }; retry?: boolean }
 export type ResolveOutcome = Resolved | ResolveFail;
 
-export interface FindArgs { selector: string; fallback: string | null; limit: number }
+export interface FindArgs { name?: string; selector: string; fallback: string | null; limit: number }
 export interface FindEntry {
   nth: number;
   ref: string | null;
@@ -55,6 +55,7 @@ export interface FindResult { matches_n: number; visible_n: number; selector: st
 export interface QueryFindResult { matches_n: number; entries: Array<FindEntry & { path: string[]; interactiveAncestorRef: string | null }> }
 
 export interface AriaArgs {
+  name?: string;
   selector?: string;
   fallback?: string | null;
   /** only the subtree of elements intersecting the viewport */
@@ -76,7 +77,7 @@ export interface ReadTextArgs { maxChars?: number; start?: number; readId?: stri
 /** Linear document text from one bounded scan. `readId` and `nextStart` continue that same capture. */
 export interface ReadTextResult { readId: string; text: string; complete: boolean; reason?: 'budget' | 'scan_limit' | 'unbounded' | 'stale'; chars: number; start: number; nextStart?: number }
 
-export interface DomClickArgs { selector: string; fallback: string | null }
+export interface DomClickArgs { name?: string; selector: string; fallback: string | null }
 export interface UploadTarget { ok: true; ref: string | null; selector: string | null; matches_n: number }
 export interface DomClickOk { ok: true; ref: string | null; tag: string; selector: string | null; x: number; y: number }
 export type DomClickResult = DomClickOk | ResolveFail

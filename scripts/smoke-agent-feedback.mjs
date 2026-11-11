@@ -237,6 +237,22 @@ try {
     record('exactName', results1i);
   }
 
+  // A single semantic target identifies the same card for evidence, expectations, and either click method.
+  {
+    const { page, tab } = await open('/cards');
+    const target = { role: 'link', name: 'Senior Product Designer 1' };
+    const detail = await tab.read({ target });
+    assert.match(detail.text, /Designer 1/);
+    assert.doesNotMatch(detail.text, /Designer 10/);
+    const observation = await tab.observe({ target, viewport: false });
+    assert.match(observation.state, /Designer 1/);
+    assert.doesNotMatch(observation.state, /Designer 10/);
+    await tab.expect({ target, visible: true });
+    const clicked = await tab.act({ action: 'click', target, method: 'dom' });
+    assert.equal(clicked.url, `${origin}/effects#job1`);
+    await page.close();
+  }
+
   // 1j. A locator that misses in the top document says that child frames are not searched and how to reach them.
   {
     const { page, tab } = await open('/framed');
