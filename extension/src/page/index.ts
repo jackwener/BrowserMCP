@@ -129,6 +129,11 @@ function regionOf(el: Element): string {
   }
 }
 const candidate = (el: Element): Candidate => ({ ref: ariaRefOf(el), role: roleOf(el), name: nameOf(el).replace(/\s+/g, ' ').trim().slice(0, 80), within: regionOf(el), tag: el.tagName.toLowerCase(), text: text(el).slice(0, 80), visible: is(el, 'visible'), box: box(el) });
+/** A locator searches only its own document: say so when this one has child frames the target may be in. */
+function frameHint(): { hint?: string } {
+  const n = document.querySelectorAll('iframe,frame').length;
+  return n ? { hint: `This document has ${n} child frame${n > 1 ? 's' : ''}, and a locator does not search inside them. For a target in a frame, use its ref from observe (refs route to their frame) or pass target.frame from observe().frames[].frame.` } : {};
+}
 /**
  * Role locators match names by case-insensitive substring ("Designer 1" also matches "Designer 10"–"19"). Of several
  * matches, the single one whose whole name equals the requested name (case and spacing aside) is what was meant.
@@ -173,7 +178,7 @@ export async function resolve(args: ResolveArgs): Promise<ResolveOutcome> {
   let usedSelector = selector;
   let matches = query(selector);
   if (!matches.length && fallback) { usedSelector = fallback; matches = query(fallback); }
-  if (!matches.length) return { error: { code: 'not_found', message: `no element matches ${selector}` }, retry: true };
+  if (!matches.length) return { error: { code: 'not_found', message: `no element matches ${selector}`, ...frameHint() }, retry: true };
   let el = matches[0];
   if (matches.length > 1 && strict) {
     const visible = matches.filter((m) => is(m, 'visible'));
@@ -481,7 +486,7 @@ export function readClickProbe(): boolean {
 export function domClick(args: DomClickArgs): DomClickResult {
   let matches = query(args.selector);
   if (!matches.length && args.fallback) matches = query(args.fallback);
-  if (!matches.length) return { error: { code: 'not_found', message: `no element matches ${args.selector}` }, retry: true };
+  if (!matches.length) return { error: { code: 'not_found', message: `no element matches ${args.selector}`, ...frameHint() }, retry: true };
   let el = matches[0];
   if (matches.length > 1) {
     const visible = matches.filter((m) => is(m, 'visible'));

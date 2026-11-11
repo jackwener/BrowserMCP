@@ -36,7 +36,7 @@ Semantic targets (`role/name`, `label`, `text`, `testid`, `selector`) resolve th
 
 ## Choose the evidence needed
 
-- `observe()` provides a compact viewport ARIA overview and child frames; use `{viewport:false}` for the rendered document. It is not full HTML. Keep headings, messages and surrounding context when choosing an action.
+- `observe()` provides a compact viewport ARIA overview and child frames; use `{viewport:false}` for the rendered document. Child-frame content is in `frames[]` (each with its `frame` path and `state`), not in the top-level `state`: read both. Refs from a frame route there automatically; a semantic locator searches only the top document unless you pass `target.frame`. It is not full HTML. Keep headings, messages and surrounding context when choosing an action.
 - `browser.tabs.new(url)` and `tab.goto(url)` return after the page shows content, not only after its load event: script-rendered text and "Loading…" placeholders get a few seconds. `goto` reports `content:'empty'` or `content:'placeholder'` when the page still had nothing to read; wait for the specific content with `expect` before concluding the page is empty.
 - Controls inside closed shadow roots (payment fields, some design-system widgets) are observed and actionable like any other: refs, role/name locators and `expect` reach them. Page scripts still see those roots as closed.
 - Observations and `read()` contain only rendered content: inactive tab panels hidden with `display:none` and transparent content are left out. In your own `tab.evaluate` code, `el.innerText` of a hidden element returns its full `textContent`, so filter with `el.checkVisibility({checkOpacity:true})` before extracting.

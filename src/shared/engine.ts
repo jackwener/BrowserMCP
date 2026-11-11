@@ -243,7 +243,7 @@ async function resolve(io: ActIO, spec: ActSpec, target: ActTarget, timeoutMs: n
     await new Promise((s) => setTimeout(s, 100));
   }
   const e = last?.error ?? { code: 'timeout', message: 'target did not become actionable' };
-  const hint = quietMiss ? `Nothing matched and the page had not changed for ${NOT_FOUND_QUIET_MS / 1000} s, so this did not wait the full timeout. Observe again for the right target; if it renders later (a lazy panel, a timer), pass timeoutMs to wait for it.` : e.hint;
+  const hint = quietMiss ? `Nothing matched and the page had not changed for ${NOT_FOUND_QUIET_MS / 1000} s, so this did not wait the full timeout. Observe again for the right target; if it renders later (a lazy panel, a timer), pass timeoutMs to wait for it.${e.hint ? ` ${e.hint}` : ''}` : e.hint;
   throw new ActError(e.code, `${e.message} (waited ${Date.now() - started}ms)`, hint, e.candidates ? { candidates: e.candidates } : undefined);
 }
 

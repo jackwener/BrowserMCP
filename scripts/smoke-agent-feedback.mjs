@@ -53,6 +53,7 @@ const pages = {
     <input aria-label="Card number" autocomplete="cc-number" value="4242424242424242"><input aria-label="City" value="Hangzhou"></form>
     <button id="under">Accept</button><div id="veil" style="position:fixed;inset:0;background:rgba(0,0,0,.3)" aria-label="Cookie banner"></div>`,
   '/cards': `<title>Cards</title><ul>${Array.from({length: 12}, (_, i) => `<li><a href="/effects#job${i + 1}"><h3>Senior Product Designer ${i + 1}</h3><p>Hangzhou</p></a></li>`).join('')}</ul>`,
+  '/framed': `<title>Framed</title><p>Outer</p><iframe srcdoc="<button>Inner action</button>"></iframe>`,
   '/xhr': `<title>Async</title><button id="load" onclick="fetch('/slow').then(r=>r.text()).then(t=>{document.querySelector('#out').textContent=t})">Load</button><div id="out"></div>`,
 };
 const fixture = createServer((req, res) => {
@@ -235,6 +236,17 @@ try {
     record('exactName', results1i);
   }
 
+  // 1j. A locator that misses in the top document says that child frames are not searched and how to reach them.
+  {
+    const { page, tab } = await open('/framed');
+    const st = await tab.observe();
+    let miss; try { await tab.act({ action: 'click', target: { role: 'button', name: 'Inner action' } }); miss = 'clicked'; } catch (e) { miss = `${e.code}${/child frame/.test(e.hint ?? '') ? ' (frame hint)' : ''}`; }
+    const framePath = st.frames?.[0]?.frame;
+    let hit; try { hit = (await tab.act({ action: 'click', target: { role: 'button', name: 'Inner action', frame: framePath } })).effect; } catch (e) { hit = e.code; }
+    record('frameHint', { miss, withFrame: hit === 'changed' || hit === 'none' });
+    await page.close();
+  }
+
   // 1g. A target that renders a moment after load is still waited for (fast failure is only for long-quiet pages).
   for (const [label, opts] of [['default', {}], ['explicitTimeout', { timeoutMs: 6000 }]]) {
     const { page, tab } = await open('/late-button');
@@ -325,6 +337,7 @@ try {
     assert.deepEqual(results.secrets, { snapshot: true, dom: true, expectActual: true }, 'credential values must never reach the agent');
     assert.deepEqual(results.covered, { code: 'intercepted', namesCover: true }, JSON.stringify(results.covered));
     assert.deepEqual(results.exactName, { 'Senior Product Designer 1': `${origin}/effects#job1`, 'senior  product designer 1': `${origin}/effects#job1`, 'Senior Product Designer': 'selector_ambiguous (substring hint)' });
+    assert.deepEqual(results.frameHint, { miss: 'not_found (frame hint)', withFrame: true });
     assert.deepEqual(results.ambig, { code: 'selector_ambiguous', namesBoth: true, refs: 2 });
     assert.equal(results.notFound.code, 'not_found'); assert(results.notFound.ms < 1200, `not_found took ${results.notFound.ms} ms`);
     assert.deepEqual(results.actAmbiguityCandidates, ['form "Support"', 'shadow root of <div#widget>']);
