@@ -11,6 +11,7 @@ import { chromium } from 'playwright-core';
 import { Tab } from '../dist/src/api/tab.js';
 import { Runtime } from '../dist/src/runtime/runtime.js';
 import { createExtensionPage } from '../dist/src/backends/extension-page.js';
+import { BrowserCommandError } from '../dist/src/host/bridge.js';
 
 const REPORT = process.argv.includes('--report');
 const directory = await mkdtemp(join(tmpdir(), 'browsermcp-feedback-'));
@@ -99,9 +100,10 @@ try {
     const bridge = { extensionFeatures: ['frame-evaluate'], send: async (action, params) => {
       const result = await worker.evaluate(async command => {
         try { return await globalThis.runCommand(command); }
-        catch (e) { return {error:{message:e.message, code:e.code, hint:e.hint}}; }
+        // As background.ts errorResult: an action error keeps its data (candidates, openedTabs).
+        catch (e) { return {error:{message:e.message, code:e.code, hint:e.hint, data:e.extra}}; }
       }, {action, params, tabId});
-      if (result.error) throw Object.assign(new Error(result.error.message), result.error);
+      if (result.error) throw new BrowserCommandError(result.error.message, result.error.code, result.error.hint, result.error.data);
       return result;
     } };
     const session = `feedback-${tabId}`;
@@ -194,6 +196,7 @@ try {
     await new Promise(r => setTimeout(r, 2000)); // the agent has been reading this page for a while
     const t0 = Date.now();
     let missing; try { await tab.act({ action: 'click', target: { role: 'button', name: 'Does not exist' } }); missing = 'none'; } catch (e) { missing = e.code; }
+    record('actAmbiguityCandidates', (amb.candidates ?? []).map(c => c.within));
     record('ambig', { code: amb.code, namesBoth: /form "Support"/.test(amb.message ?? '') && /shadow root of <div#widget>/.test(amb.message ?? ''), refs: (amb.message?.match(/\[ref=/g) ?? []).length });
     record('notFound', { code: missing, ms: Date.now() - t0 });
     let expAmb; try { await tab.expect({ target: { role: 'textbox', name: 'Work email' }, visible: true }, { timeoutMs: 300 }); expAmb = null; } catch (e) { expAmb = e.toJSON?.() ?? e; }
@@ -292,6 +295,7 @@ try {
     assert.equal(results['closed.pageSeesNothing'], true, 'page scripts must still see closed roots as closed');
     assert.deepEqual(results.ambig, { code: 'selector_ambiguous', namesBoth: true, refs: 2 });
     assert.equal(results.notFound.code, 'not_found'); assert(results.notFound.ms < 1200, `not_found took ${results.notFound.ms} ms`);
+    assert.deepEqual(results.actAmbiguityCandidates, ['form "Support"', 'shadow root of <div#widget>']);
     assert.deepEqual(results.expectAmbiguityCandidates, ['form "Support"', 'shadow root of <div#widget>']);
     assert.equal(results['lateTarget.default'].effect, 'changed', JSON.stringify(results['lateTarget.default']));
     assert.equal(results['lateTarget.explicitTimeout'].effect, 'changed', JSON.stringify(results['lateTarget.explicitTimeout']));
