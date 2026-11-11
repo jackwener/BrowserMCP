@@ -40,14 +40,16 @@ await new Promise(r => fixture.listen(0, '127.0.0.1', r));
 const url = `http://127.0.0.1:${fixture.address().port}/`;
 let context, client, session, channel;
 try {
-  let executablePath = process.env.BROWSERMCP_SMOKE_CHROME;
+  let executablePath = process.env.BROWSERMCP_SMOKE_CHROME ?? process.env.BROWSERMCP_TEST_CHROMIUM;
   if (!executablePath && process.platform === 'darwin') {
     const cache = join(homedir(), 'Library/Caches/ms-playwright');
     const revisions = (await readdir(cache)).filter(p => /^chromium-\d+$/.test(p)).sort().reverse();
     executablePath = join(cache, revisions[0], 'chrome-mac-arm64/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing');
   }
-  context = await chromium.launchPersistentContext(join(scratch, 'profile'), { executablePath, headless: true,
-    args: [`--disable-extensions-except=${ext}`, `--load-extension=${ext}`], acceptDownloads: true });
+  // BROWSERMCP_TEST_HEADLESS=1: full Chromium in --headless=new (Playwright's headless shell has no extensions on Linux).
+  const newHeadless = process.env.BROWSERMCP_TEST_HEADLESS === '1';
+  context = await chromium.launchPersistentContext(join(scratch, 'profile'), { executablePath, headless: !newHeadless,
+    args: [...(newHeadless ? ['--headless=new'] : []), `--disable-extensions-except=${ext}`, `--load-extension=${ext}`], acceptDownloads: true });
   await context.pages()[0].goto(url);
   const worker = context.serviceWorkers()[0] ?? await context.waitForEvent('serviceworker');
   await worker.evaluate(() => { if (!globalThis.__command) throw new Error('Extension dispatcher not initialized'); });
@@ -153,7 +155,7 @@ try {
     await browser.chrome.call('tabs.update',[kept.id,{muted:true}]);
     let group = await browser.chrome.call('tabs.group',[{tabIds:[kept.id]}]);
     ({id:kept.id,group})`);
-  const finalized = await call('session_finalize', {keep:[{tab:String(kept.id),status:'deliverable'}]});
+  const finalized = await call('session_finish', {keep:[{tab:String(kept.id),status:'deliverable'}]});
   assert.deepEqual(finalized.failed, []);
   assert.equal(finalized.closed.length, 3);
   const keptNative = await worker.evaluate(id => chrome.tabs.get(id), kept.id);

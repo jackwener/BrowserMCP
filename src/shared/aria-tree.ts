@@ -1,3 +1,4 @@
+const SEPARATOR_TEXT = /^- text: (?:"[\s|·•,;:()[\]\/\\\-–—]*"|[\s|·•,;:()[\]\/\\\-–—]+)$/;
 /** Compact a serialized ARIA tree without discarding unique names or control state. */
 export function compactAria(text: string): string {
   type Node = { line: string; indent: number; children: Node[] };
@@ -11,7 +12,11 @@ export function compactAria(text: string): string {
   }
   const normalize = (s: string) => s.replace(/\s+/g, ' ').trim();
   function render(node: Node, depth: number): { lines: string[]; text: string } {
-    const unnamed = /^- (generic|group)(?: \[ref=[^\]]+\])?:?$/.test(node.line);
+    // Inert wrappers print no line; their children move up a level. Unnamed cells and row groups are layout (HN's
+    // nested tables spent a third of the snapshot on them); a row stays, it groups a record.
+    const unnamed = /^- (generic|group|rowgroup|cell)(?: \[ref=[^\]]+\])?:?$/.test(node.line);
+    // An empty row and a separator-only text ("|", "·", "(") carry nothing.
+    if (!node.children.length && (/^- row(?: \[ref=[^\]]+\])?$/.test(node.line) || SEPARATOR_TEXT.test(node.line))) return { lines: [], text: '' };
     const children = node.children.map(child => render(child, depth + (unnamed ? 0 : 1)));
     const childText = normalize(children.map(child => child.text).join(' '));
     let line = node.line;

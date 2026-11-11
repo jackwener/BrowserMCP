@@ -133,6 +133,8 @@ export interface ActIO {
 export const DEFAULT_SETTLE_MS = 1000;
 /** How long the page must show no change and no new request before an action counts as settled. */
 const QUIET_MS = 100;
+/** A locator that matches nothing on a page that has been this quiet fails now instead of at its timeout. */
+const NOT_FOUND_QUIET_MS = 500;
 /** A document still parsing gets at least this long: navigations need longer than in-page updates. */
 const LOADING_CAP_MS = 3000;
 
@@ -224,6 +226,12 @@ async function resolve(io: ActIO, spec: ActSpec, target: ActTarget, timeoutMs: n
       break; // other alignments only matter after a hit-test miss
     }
     if (Date.now() - started >= timeoutMs) break;
+    // Nothing matches and the page has stopped changing: the target is not coming. Waiting out the timeout only made
+    // every wrong locator cost 3 s. A page that is still changing keeps the full wait (the target may be rendering).
+    if (last?.error.code === 'not_found' && Date.now() - started >= NOT_FOUND_QUIET_MS) {
+      const page = await (io.call('activity', undefined, 1000) as Promise<ActivityInfo>).catch(() => null);
+      if (page && page.ready !== 'loading' && page.idleMs >= NOT_FOUND_QUIET_MS) break;
+    }
     await new Promise((s) => setTimeout(s, 100));
   }
   const e = last?.error ?? { code: 'timeout', message: 'target did not become actionable' };

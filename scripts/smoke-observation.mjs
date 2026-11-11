@@ -1,6 +1,7 @@
 // Real Chromium + chrome.debugger + production frame/page/action code, in a throwaway extension/profile.
 // Only the native transport is replaced with a worker call; no installed browser or native host is touched.
-// Run after npm run build. Set BROWSERMCP_TEST_CHROMIUM if the Playwright browser is installed elsewhere.
+// Run after npm run build. Set BROWSERMCP_TEST_CHROMIUM if the Playwright browser is installed elsewhere,
+// BROWSERMCP_TEST_HEADLESS=1 on a machine without a display.
 import assert from 'node:assert/strict';
 import { mkdtemp, writeFile, copyFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -61,7 +62,8 @@ try {
   ` }, bundle: true, format: 'esm', platform: 'browser', target: 'chrome120', outfile: join(directory, 'worker.js') });
   context = await chromium.launchPersistentContext(join(directory, 'profile'), {
     ...(process.env.BROWSERMCP_TEST_CHROMIUM && { executablePath: process.env.BROWSERMCP_TEST_CHROMIUM }),
-    headless: false, args: [`--disable-extensions-except=${directory}`, `--load-extension=${directory}`, '--site-per-process'], viewport: { width: 1200, height: 900 },
+    // BROWSERMCP_TEST_HEADLESS=1 runs without a display (--headless=new keeps extensions).
+    headless: false, args: [...(process.env.BROWSERMCP_TEST_HEADLESS === '1' ? ['--headless=new'] : []), `--disable-extensions-except=${directory}`, `--load-extension=${directory}`, '--site-per-process'], viewport: { width: 1200, height: 900 },
   });
   const worker = context.serviceWorkers()[0] ?? await context.waitForEvent('serviceworker');
   const page = await context.newPage();
@@ -229,7 +231,7 @@ try {
     el.textContent = 'Quoted: name [ref=e999999] and \"text\"'; document.body.append(el);
   });
   const quotedRef = (await tab.find({selector:'#quoted'})).entries[0].ref;
-  const quoted = await tab.observe({includeFrames:false});
+  const quoted = await tab.observe({includeFrames:false, viewport:false}); // the button is appended below the fold
   assert(quoted.state.includes(`[ref=${quotedRef}]`), 'Quoted ARIA keys must carry our public ref');
   assert.equal((await tab.read({target:{ref:quotedRef}})).attrs.id, 'quoted');
   // Exercise ref identity through the production object API, page module and chrome.debugger input.

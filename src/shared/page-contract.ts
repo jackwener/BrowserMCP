@@ -18,7 +18,8 @@ export interface ResolveArgs {
   align: { block: string; inline: string };
 }
 
-export interface Candidate { tag: string; role: string; text: string; ref: string | null; visible: boolean; box: Box }
+/** One of several matches: ref to act on, accessible role and name, and the region it sits in (named landmark, form, dialog or shadow host). */
+export interface Candidate { ref: string | null; role: string; name: string; within: string; tag: string; text: string; visible: boolean; box: Box }
 export interface Box { x: number; y: number; w: number; h: number }
 
 export interface Resolved {

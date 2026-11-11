@@ -110,7 +110,31 @@ function stableRefOf(el: Element): string {
 }
 export function ariaRefOf(el: Element): string | null { return stableRefOf(el); }
 
-const candidate = (el: Element): Candidate => ({ tag: el.tagName.toLowerCase(), role: el.getAttribute('role') || '', text: text(el).slice(0, 80), ref: ariaRefOf(el), visible: is(el, 'visible'), box: box(el) });
+const REGION_ROLES = new Set(['form', 'dialog', 'alertdialog', 'region', 'navigation', 'main', 'complementary', 'banner', 'contentinfo', 'search', 'group', 'listitem', 'row', 'article', 'tabpanel', 'menu', 'list', 'table']);
+/** Where an element sits, in words a model can tell apart: the nearest named region, form or dialog, or the shadow host. */
+function regionOf(el: Element): string {
+  for (let n = el; ;) {
+    const parent = n.parentElement;
+    if (!parent) {
+      const root = n.getRootNode();
+      if (!(root instanceof ShadowRoot)) return 'page';
+      const host = root.host;
+      const label = host.getAttribute('aria-label');
+      return `shadow root of <${host.localName}${host.id ? `#${host.id}` : ''}>${label ? ` "${label.slice(0, 60)}"` : ''}`;
+    }
+    n = parent;
+    const role = roleOf(n);
+    const name = REGION_ROLES.has(role) ? nameOf(n).replace(/\s+/g, ' ').trim().slice(0, 60) : '';
+    if (name || ['form', 'dialog', 'alertdialog', 'navigation', 'main', 'search'].includes(role)) return `${role}${name ? ` "${name}"` : ''}`;
+  }
+}
+const candidate = (el: Element): Candidate => ({ ref: ariaRefOf(el), role: roleOf(el), name: nameOf(el).replace(/\s+/g, ' ').trim().slice(0, 80), within: regionOf(el), tag: el.tagName.toLowerCase(), text: text(el).slice(0, 80), visible: is(el, 'visible'), box: box(el) });
+/** The ambiguity message itself names the candidates: a model that reads only the message can still pick one. */
+function ambiguity(n: number, selector: string, visibleN: number, matches: Element[]): { code: string; message: string; hint: string; candidates: Candidate[] } {
+  const candidates = matches.slice(0, 8).map(candidate);
+  const list = candidates.map(c => `[ref=${c.ref}] ${c.role || c.tag}${c.name ? ` "${c.name}"` : ''} in ${c.within}${c.visible ? '' : ' (hidden)'}`).join('; ');
+  return { code: 'selector_ambiguous', message: `${n} elements match ${selector}${visibleN ? ` (${visibleN} visible)` : ''}: ${list}${n > 8 ? `; …${n - 8} more` : ''}`, hint: 'Act on one of these refs, or scope the locator with within (a container ref or selector).', candidates };
+}
 
 // Action state belongs to this isolated world, never to shared DOM attributes.
 let actionElement: Element | null = null;
@@ -135,7 +159,7 @@ export async function resolve(args: ResolveArgs): Promise<ResolveOutcome> {
   if (matches.length > 1 && strict) {
     const visible = matches.filter((m) => is(m, 'visible'));
     if (visible.length === 1) el = visible[0];
-    else return { error: { code: 'selector_ambiguous', message: `${matches.length} elements match ${selector}${visible.length ? ` (${visible.length} visible)` : ''}`, hint: 'Add nth, use a more specific locator, or act on a ref/selector from find.', candidates: matches.slice(0, 8).map(candidate) }, retry: false };
+    else return { error: ambiguity(matches.length, selector, visible.length, visible.length > 1 ? visible : matches), retry: false };
   }
   for (const st of states) {
     const r = stateOf(el, st);
@@ -441,7 +465,7 @@ export function domClick(args: DomClickArgs): DomClickResult {
   if (matches.length > 1) {
     const visible = matches.filter((m) => is(m, 'visible'));
     if (visible.length === 1) el = visible[0];
-    else return { error: { code: 'selector_ambiguous', message: `${matches.length} elements match ${args.selector}${visible.length ? ` (${visible.length} visible)` : ''}`, hint: 'Add nth, use a more specific locator, or act on a ref/selector from find.', candidates: matches.slice(0, 8).map(candidate) }, retry: false };
+    else return { error: ambiguity(matches.length, args.selector, visible.length, visible.length > 1 ? visible : matches), retry: false };
   }
   const enabled = stateOf(el, 'enabled');
   if (!enabled.matches) return { error: { code: 'not_enabled', message: `element is not enabled${enabled.received.startsWith('error:') ? ` (${enabled.received.slice(6)})` : ''}`, candidates: [candidate(el)] }, retry: true };
@@ -497,7 +521,16 @@ function pickPort(): ScrollPort {
   }
   return best;
 }
+/** A closed <details> shows only its <summary>: anything else inside has no box on screen. */
+function inClosedDetails(node: Node): boolean {
+  let child: Node = node;
+  for (let parent: Node | null = node.parentNode; parent; child = parent, parent = parent.parentNode ?? (parent as ShadowRoot).host ?? null) {
+    if (parent instanceof HTMLDetailsElement && !parent.open && child.nodeName !== 'SUMMARY') return true;
+  }
+  return false;
+}
 function skipRead(el: Element | null, visible: WeakMap<Element, boolean>): boolean {
+  if (el && inClosedDetails(el)) return true;
   while (el) {
     const tag = el.tagName;
     if (tag === 'SCRIPT' || tag === 'STYLE' || tag === 'NOSCRIPT') return true;
@@ -526,6 +559,7 @@ function shownText(root: Element): string {
   // visibility is inherited and a child may set it back to visible, so a hidden element is still descended into.
   const visit = (node: Node, textShown: boolean) => {
     for (const n of node.childNodes) {
+      if (node instanceof HTMLDetailsElement && !node.open && n.nodeName !== 'SUMMARY') continue;
       if (n.nodeType === Node.TEXT_NODE) { if (textShown) parts.push(n.textContent ?? ''); continue; }
       if (!(n instanceof Element) || /^(SCRIPT|STYLE|NOSCRIPT|TEMPLATE)$/.test(n.tagName) || n.id === 'browsermcp-annotate' || n.hasAttribute('hidden')) continue;
       // display:none and opacity:0 hide the whole subtree; ancestors were already checked on the way down.
@@ -553,6 +587,7 @@ function pageLines(): Array<{ node: Node; text: string }> {
   const visible = new WeakMap<Element, boolean>();
   const visit = (root: Node) => {
     for (const n of root.childNodes) {
+      if (root instanceof HTMLDetailsElement && !root.open && n.nodeName !== 'SUMMARY') continue;
       if (n.nodeType === Node.TEXT_NODE) {
         const parent = n.parentElement ?? (n.getRootNode() as ShadowRoot).host;
         if (!skipRead(parent, visible)) {
@@ -673,7 +708,7 @@ function observationRoot(args: AriaArgs): Element | Document {
   if (!matches.length) throw pageError('not_found', `No element matches ${args.selector}`, 'Observe the page or find the container again.');
   if (matches.length > 1) {
     const visible = matches.filter(el => is(el, 'visible'));
-    if (visible.length !== 1) throw pageError('selector_ambiguous', `${matches.length} elements match ${args.selector}`, 'Use a more specific locator.');
+    if (visible.length !== 1) { const a = ambiguity(matches.length, args.selector, visible.length, visible.length > 1 ? visible : matches); throw pageError(a.code, a.message, a.hint); }
     matches = visible;
   }
   return matches[0];
@@ -704,6 +739,9 @@ function stateHints(el: Element, empty: boolean): string {
     const names = namingTokens(el);
     out += names.length ? ` [empty ${names[0].startsWith('#') ? `id="${names[0].slice(1)}"` : `class="${names.slice(0, 2).join(' ')}"`}]` : ' [empty]';
   }
+  // Playwright gives a <details> disclosure no state: its summary (what a click toggles) says whether the content shows.
+  const details = el.tagName === 'SUMMARY' && el.parentElement instanceof HTMLDetailsElement ? el.parentElement : null;
+  if (details && !el.hasAttribute('aria-expanded')) out += details.open ? ' [expanded]' : ' [collapsed]';
   const current = el.getAttribute('aria-current');
   if (current && current !== 'false') out += current === 'true' ? ' [current]' : ` [current=${current}]`;
   else if (!['aria-selected', 'aria-pressed', 'aria-checked'].some(a => el.hasAttribute(a)) && !(el instanceof HTMLInputElement)) {
@@ -839,7 +877,7 @@ export function readElement(args: FindArgs): ElementDetails | ResolveFail {
   if (!matches.length) return { error: { code: 'not_found', message: `no element matches ${args.selector}`, hint: 'Observe or find the target again.' } };
   if (matches.length > 1) {
     const visible = matches.filter(el => is(el, 'visible'));
-    if (visible.length !== 1) return { error: { code: 'selector_ambiguous', message: `${matches.length} elements match ${args.selector}`, hint: 'Use a ref from observe/find, or a more specific locator.' } };
+    if (visible.length !== 1) return { error: ambiguity(matches.length, args.selector, visible.length, visible.length > 1 ? visible : matches) };
     matches = visible;
   }
   const el = matches[0];
@@ -929,7 +967,7 @@ export function check(args: CheckArgs): CheckResult {
     if (!matches.length && args.fallback) matches = query(args.fallback);
     if (matches.length > 1) {
       const visible = matches.filter(el => is(el, 'visible'));
-      if (visible.length !== 1) throw Object.assign(new Error(`${matches.length} elements match; use a scoped target or an observed ref.`), { code: 'selector_ambiguous' });
+      if (visible.length !== 1) { const a = ambiguity(matches.length, args.selector, visible.length, visible.length > 1 ? visible : matches); throw Object.assign(new Error(a.message), { code: a.code, hint: a.hint }); }
       matches = visible;
     }
     element = matches[0];
