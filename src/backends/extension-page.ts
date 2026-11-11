@@ -255,7 +255,7 @@ class ExtensionPage implements ExtensionRuntimePage {
     const { target, ...conditions } = what;
     const selector = target ? targetToSelector(target) : undefined;
     if (target && !selector) throw new ActError('invalid_target', 'Expectation needs an observed ref or semantic locator.');
-    const args = { ...conditions, ...(target && { selector, fallback: fallbackSelector(target), ...('text' in target && typeof target.text === 'string' && { targetText: target.text }) }) };
+    const args = { ...conditions, ...(target && { selector, fallback: fallbackSelector(target), ...('text' in target && typeof target.text === 'string' && { targetText: target.text }), ...('name' in target && typeof target.name === 'string' && { targetName: target.name }) }) };
     const deadline = Date.now() + (opts.timeoutMs ?? 5000);
     let last: CheckResult | null = null;
     for (;;) {

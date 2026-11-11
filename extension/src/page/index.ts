@@ -129,11 +129,30 @@ function regionOf(el: Element): string {
   }
 }
 const candidate = (el: Element): Candidate => ({ ref: ariaRefOf(el), role: roleOf(el), name: nameOf(el).replace(/\s+/g, ' ').trim().slice(0, 80), within: regionOf(el), tag: el.tagName.toLowerCase(), text: text(el).slice(0, 80), visible: is(el, 'visible'), box: box(el) });
+/**
+ * Role locators match names by case-insensitive substring ("Designer 1" also matches "Designer 10"–"19"). Of several
+ * matches, the single one whose whole name equals the requested name (case and spacing aside) is what was meant.
+ */
+function exactName(matches: Element[], name: string | undefined): Element | null {
+  if (name === undefined) return null;
+  const norm = (v: string) => v.replace(/\s+/g, ' ').trim().toLowerCase();
+  const want = norm(name);
+  if (!want) return null;
+  const names = matches.map(m => norm(nameOf(m)));
+  const equal = matches.filter((_, i) => names[i] === want);
+  if (equal.length) return equal.length === 1 ? equal[0] : null;
+  // A card link's name is all its text ("Designer 1 Hangzhou …"): the requested name as a whole phrase, not the start of
+  // a longer word or number ("Designer 1" inside "Designer 10"), identifies it.
+  const phrase = new RegExp(`(?:^|[^\\p{L}\\p{N}])${want.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?:$|[^\\p{L}\\p{N}])`, 'u');
+  const whole = matches.filter((_, i) => phrase.test(names[i]));
+  return whole.length === 1 ? whole[0] : null;
+}
 /** The ambiguity message itself names the candidates: a model that reads only the message can still pick one. */
-function ambiguity(n: number, selector: string, visibleN: number, matches: Element[]): { code: string; message: string; hint: string; candidates: Candidate[] } {
+function ambiguity(n: number, selector: string, visibleN: number, matches: Element[], name?: string): { code: string; message: string; hint: string; candidates: Candidate[] } {
   const candidates = matches.slice(0, 8).map(candidate);
   const list = candidates.map(c => `[ref=${c.ref}] ${c.role || c.tag}${c.name ? ` "${c.name}"` : ''} in ${c.within}${c.visible ? '' : ' (hidden)'}`).join('; ');
-  return { code: 'selector_ambiguous', message: `${n} elements match ${selector}${visibleN ? ` (${visibleN} visible)` : ''}: ${list}${n > 8 ? `; …${n - 8} more` : ''}`, hint: 'Act on one of these refs, or scope the locator with within (a container ref or selector).', candidates };
+  const substring = name !== undefined ? ` A name matches by case-insensitive substring and no single one of these is named "${name}".` : '';
+  return { code: 'selector_ambiguous', message: `${n} elements match ${selector}${visibleN ? ` (${visibleN} visible)` : ''}: ${list}${n > 8 ? `; …${n - 8} more` : ''}`, hint: `Act on one of these refs, or scope the locator with within (a container ref or selector).${substring}`, candidates };
 }
 
 // Action state belongs to this isolated world, never to shared DOM attributes.
@@ -158,8 +177,10 @@ export async function resolve(args: ResolveArgs): Promise<ResolveOutcome> {
   let el = matches[0];
   if (matches.length > 1 && strict) {
     const visible = matches.filter((m) => is(m, 'visible'));
+    const exact = exactName(visible.length ? visible : matches, args.name);
     if (visible.length === 1) el = visible[0];
-    else return { error: ambiguity(matches.length, selector, visible.length, visible.length > 1 ? visible : matches), retry: false };
+    else if (exact) el = exact;
+    else return { error: ambiguity(matches.length, selector, visible.length, visible.length > 1 ? visible : matches, args.name), retry: false };
   }
   for (const st of states) {
     const r = stateOf(el, st);
@@ -968,8 +989,9 @@ export function check(args: CheckArgs): CheckResult {
     if (!matches.length && args.fallback) matches = query(args.fallback);
     if (matches.length > 1) {
       const visible = matches.filter(el => is(el, 'visible'));
-      if (visible.length !== 1) { const a = ambiguity(matches.length, args.selector, visible.length, visible.length > 1 ? visible : matches); throw Object.assign(new Error(a.message), { code: a.code, hint: a.hint, data: { candidates: a.candidates } }); }
-      matches = visible;
+      const exact = visible.length === 1 ? null : exactName(visible.length ? visible : matches, args.targetName);
+      if (visible.length !== 1 && !exact) { const a = ambiguity(matches.length, args.selector, visible.length, visible.length > 1 ? visible : matches, args.targetName); throw Object.assign(new Error(a.message), { code: a.code, hint: a.hint, data: { candidates: a.candidates } }); }
+      matches = exact ? [exact] : visible;
     }
     element = matches[0];
     // A text locator resolves to the innermost element containing the text; for a text node directly inside a closed

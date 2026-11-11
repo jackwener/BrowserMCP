@@ -221,7 +221,7 @@ async function resolve(io: ActIO, spec: ActSpec, target: ActTarget, timeoutMs: n
   let quietMiss = false;
   for (;;) {
     for (const align of spec.force ? [ALIGNMENTS[0]] : ALIGNMENTS) {
-      const res = await io.call('resolve', { selector, fallback, strict, states, align }, timeoutMs + 2000) as ResolveOutcome;
+      const res = await io.call('resolve', { selector, fallback, strict, states, align, ...(typeof target.name === 'string' && { name: target.name }) }, timeoutMs + 2000) as ResolveOutcome;
       if ('ok' in res && res.ok) {
         if (res.hit === 'other' && !spec.force) { last = { error: { code: 'intercepted', message: `${res.blocker ?? 'another element'} intercepts the ${spec.kind} point`, hint: 'Dismiss the overlay or use a different target from tab_find.' }, retry: true }; continue; }
         return res;
