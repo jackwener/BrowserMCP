@@ -83,8 +83,8 @@ function liveElement(ref: string): Element | undefined {
   const el = refToEl.get(ref)?.deref();
   return el?.isConnected && el.ownerDocument === document ? el : undefined;
 }
-function pageError(code: string, message: string, hint: string): Error {
-  return Object.assign(new Error(message), { code, hint });
+function pageError(code: string, message: string, hint: string, data?: Record<string, unknown>): Error {
+  return Object.assign(new Error(message), { code, hint, ...(data && { data }) });
 }
 function requireRef(ref: string): Element {
   const el = liveElement(ref);
@@ -708,7 +708,7 @@ function observationRoot(args: AriaArgs): Element | Document {
   if (!matches.length) throw pageError('not_found', `No element matches ${args.selector}`, 'Observe the page or find the container again.');
   if (matches.length > 1) {
     const visible = matches.filter(el => is(el, 'visible'));
-    if (visible.length !== 1) { const a = ambiguity(matches.length, args.selector, visible.length, visible.length > 1 ? visible : matches); throw pageError(a.code, a.message, a.hint); }
+    if (visible.length !== 1) { const a = ambiguity(matches.length, args.selector, visible.length, visible.length > 1 ? visible : matches); throw pageError(a.code, a.message, a.hint, { candidates: a.candidates }); }
     matches = visible;
   }
   return matches[0];
@@ -958,6 +958,7 @@ export function annotate(): number {
 export function unannotate(): void { document.getElementById(ANNOTATE_ID)?.remove(); }
 
 /** Evaluate an expectation once (the host polls until it holds or times out). */
+const fold = (value: string): string => value.replace(/\s+/g, ' ').trim().toLowerCase();
 export function check(args: CheckArgs): CheckResult {
   const failed: string[] = [];
   const actual: Record<string, unknown> = {};
@@ -967,11 +968,13 @@ export function check(args: CheckArgs): CheckResult {
     if (!matches.length && args.fallback) matches = query(args.fallback);
     if (matches.length > 1) {
       const visible = matches.filter(el => is(el, 'visible'));
-      if (visible.length !== 1) { const a = ambiguity(matches.length, args.selector, visible.length, visible.length > 1 ? visible : matches); throw Object.assign(new Error(a.message), { code: a.code, hint: a.hint }); }
+      if (visible.length !== 1) { const a = ambiguity(matches.length, args.selector, visible.length, visible.length > 1 ? visible : matches); throw Object.assign(new Error(a.message), { code: a.code, hint: a.hint, data: { candidates: a.candidates } }); }
       matches = visible;
     }
     element = matches[0];
-    actual.visible = !!element && shownElement(element);
+    // A text locator resolves to the innermost element containing the text; for a text node directly inside a closed
+    // <details> that is the details element itself, which is visible. "Is this text visible" asks about the text.
+    actual.visible = !!element && shownElement(element) && (args.targetText === undefined || fold(shownText(element)).includes(fold(args.targetText)));
     const visibilityOnly = ['text', 'notText', 'value', 'checked', 'selected', 'enabled'].every(key => args[key as keyof CheckArgs] === undefined);
     if (args.visible !== undefined || visibilityOnly) {
       if (actual.visible !== (args.visible ?? true)) failed.push(`visible is ${actual.visible}, expected ${args.visible ?? true}`);

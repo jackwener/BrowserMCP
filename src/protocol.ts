@@ -105,6 +105,8 @@ export interface ActSpec {
   target: ActTarget;
   value?: string;
   timeoutMs?: number;
+  /** The caller chose timeoutMs (transports fill in a default): a missing target is then waited for the whole time. */
+  explicitTimeout?: boolean;
   settleMs?: number;
   cursor?: boolean;
   force?: boolean;

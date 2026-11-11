@@ -241,7 +241,7 @@ class ExtensionPage implements ExtensionRuntimePage {
   async dialog(op: 'get' | 'accept' | 'dismiss', text?: string): Promise<{ dialog: DialogInfo | null; handled?: string }> { return (await this.send('dialog', { dialogOp: op, ...(text !== undefined && { text }), timeoutMs: 10_000 })).data as { dialog: DialogInfo | null; handled?: string }; }
   async act(spec: ActSpec): Promise<ActResult> {
     const budget = spec.timeoutMs ?? 3000;
-    const r = (await this.send('act', { act: { ...spec, timeoutMs: budget }, timeoutMs: budget + 8000 })).data as ActResult;
+    const r = (await this.send('act', { act: { ...spec, timeoutMs: budget, explicitTimeout: spec.timeoutMs !== undefined }, timeoutMs: budget + 8000 })).data as ActResult;
     // an action may navigate (link click, Enter in a form): the cached URL from goto is no longer trustworthy
     if (r.navigated) this._lastUrl = r.url ?? null; else if (spec.kind === 'click' || spec.kind === 'dblclick' || spec.kind === 'press') this._lastUrl = null;
     return r;
@@ -255,7 +255,7 @@ class ExtensionPage implements ExtensionRuntimePage {
     const { target, ...conditions } = what;
     const selector = target ? targetToSelector(target) : undefined;
     if (target && !selector) throw new ActError('invalid_target', 'Expectation needs an observed ref or semantic locator.');
-    const args = { ...conditions, ...(target && { selector, fallback: fallbackSelector(target) }) };
+    const args = { ...conditions, ...(target && { selector, fallback: fallbackSelector(target), ...('text' in target && typeof target.text === 'string' && { targetText: target.text }) }) };
     const deadline = Date.now() + (opts.timeoutMs ?? 5000);
     let last: CheckResult | null = null;
     for (;;) {

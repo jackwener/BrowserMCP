@@ -31,7 +31,7 @@ export function installEngineJs(injectedSource: string, pageModuleSource: string
 export function pageCallJs(fn: string, args: unknown): string {
   if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(fn)) throw new Error(`invalid page function name ${fn}`);
   return `(async () => { try { return await globalThis.${PAGE_GLOBAL}.${fn}(${args === undefined ? '' : JSON.stringify(args)}); }
-    catch (e) { return { __browsermcpPageError: { code: e?.code ?? 'page_error', message: e?.message ?? String(e), hint: e?.hint } }; } })()`;
+    catch (e) { return { __browsermcpPageError: { code: e?.code ?? 'page_error', message: e?.message ?? String(e), hint: e?.hint, data: e?.data } }; } })()`;
 }
 
 export class ActError extends Error {
@@ -40,8 +40,8 @@ export class ActError extends Error {
 
 /** Restore page errors after the JSON boundary, including observation and frame-routing failures. */
 export function unwrapPageResult(value: unknown): unknown {
-  const error = (value as { __browsermcpPageError?: { code: string; message: string; hint?: string } } | null)?.__browsermcpPageError;
-  if (error) throw new ActError(error.code, error.message, error.hint);
+  const error = (value as { __browsermcpPageError?: { code: string; message: string; hint?: string; data?: Record<string, unknown> } } | null)?.__browsermcpPageError;
+  if (error) throw new ActError(error.code, error.message, error.hint, error.data);
   return value;
 }
 
@@ -133,8 +133,13 @@ export interface ActIO {
 export const DEFAULT_SETTLE_MS = 1000;
 /** How long the page must show no change and no new request before an action counts as settled. */
 const QUIET_MS = 100;
-/** A locator that matches nothing on a page that has been this quiet fails now instead of at its timeout. */
-const NOT_FOUND_QUIET_MS = 500;
+/**
+ * Without an explicit timeoutMs, a locator that matches nothing fails early when the page has not changed for this long
+ * (DOM and requests) — counted from before the call, so a page that just loaded or just reacted keeps the full wait for
+ * content still rendering, while a page the agent has been reading for a while answers a wrong locator in ~0.5 s.
+ */
+const NOT_FOUND_QUIET_MS = 2000;
+const NOT_FOUND_MIN_WAIT_MS = 500;
 /** A document still parsing gets at least this long: navigations need longer than in-page updates. */
 const LOADING_CAP_MS = 3000;
 
@@ -213,6 +218,7 @@ async function resolve(io: ActIO, spec: ActSpec, target: ActTarget, timeoutMs: n
   const strict = WRITE_KINDS.has(spec.kind);
   const states = spec.kind === 'hover' || spec.kind === 'focus' || spec.kind === 'scroll' ? ['visible'] : spec.kind === 'fill' || spec.kind === 'type' ? ['visible', 'enabled', 'editable'] : ['visible', 'enabled'];
   let last: Exclude<ResolveOutcome, Resolved> | null = null;
+  let quietMiss = false;
   for (;;) {
     for (const align of spec.force ? [ALIGNMENTS[0]] : ALIGNMENTS) {
       const res = await io.call('resolve', { selector, fallback, strict, states, align }, timeoutMs + 2000) as ResolveOutcome;
@@ -228,14 +234,17 @@ async function resolve(io: ActIO, spec: ActSpec, target: ActTarget, timeoutMs: n
     if (Date.now() - started >= timeoutMs) break;
     // Nothing matches and the page has stopped changing: the target is not coming. Waiting out the timeout only made
     // every wrong locator cost 3 s. A page that is still changing keeps the full wait (the target may be rendering).
-    if (last?.error.code === 'not_found' && Date.now() - started >= NOT_FOUND_QUIET_MS) {
+    // An explicit timeoutMs is the caller saying "this may take a while": it is always waited out.
+    if (!(spec.explicitTimeout ?? spec.timeoutMs !== undefined) && last?.error.code === 'not_found' && Date.now() - started >= NOT_FOUND_MIN_WAIT_MS) {
       const page = await (io.call('activity', undefined, 1000) as Promise<ActivityInfo>).catch(() => null);
-      if (page && page.ready !== 'loading' && page.idleMs >= NOT_FOUND_QUIET_MS) break;
+      const net = io.network ? await io.network(Date.now() - NOT_FOUND_QUIET_MS) : { pending: 0, idleMs: Number.POSITIVE_INFINITY };
+      if (page && page.ready !== 'loading' && page.idleMs >= NOT_FOUND_QUIET_MS && net.pending === 0) { quietMiss = true; break; }
     }
     await new Promise((s) => setTimeout(s, 100));
   }
   const e = last?.error ?? { code: 'timeout', message: 'target did not become actionable' };
-  throw new ActError(e.code, `${e.message} (waited ${Date.now() - started}ms)`, e.hint, e.candidates ? { candidates: e.candidates } : undefined);
+  const hint = quietMiss ? `Nothing matched and the page had not changed for ${NOT_FOUND_QUIET_MS / 1000} s, so this did not wait the full timeout. Observe again for the right target; if it renders later (a lazy panel, a timer), pass timeoutMs to wait for it.` : e.hint;
+  throw new ActError(e.code, `${e.message} (waited ${Date.now() - started}ms)`, hint, e.candidates ? { candidates: e.candidates } : undefined);
 }
 
 export async function performAct(io: ActIO, spec: ActSpec): Promise<ActResult> {

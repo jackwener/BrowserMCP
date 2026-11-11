@@ -102,5 +102,6 @@ export type Target = ({ frame?: FrameStep | FrameStep[]; /** container (css/sele
 
 export interface Expectation { target?: Target; text?: string; notText?: string; url?: string; title?: string; visible?: boolean; value?: string; checked?: boolean; selected?: string[]; enabled?: boolean }
 /** Compiled once by the host; evaluated in the target document. */
-export interface CheckArgs extends Omit<Expectation, 'target'> { selector?: string; fallback?: string | null }
+/** targetText: the text of a text locator, so `visible` asks whether that text (not its container) is on screen. */
+export interface CheckArgs extends Omit<Expectation, 'target'> { selector?: string; fallback?: string | null; targetText?: string }
 export interface CheckResult { ok: boolean; failed: string[]; url: string; title: string; actual?: Record<string, unknown> }
