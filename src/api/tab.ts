@@ -14,8 +14,9 @@ import { ariaDiff } from './diff.js';
 import { networkDetail, networkSummary } from './network.js';
 import { compactAria } from '../shared/aria-tree.js';
 import { observationPage } from './observation.js';
+import { waitForContent, type ContentState } from './content-wait.js';
 import { targetToSelector, fallbackSelector, frameSteps } from '../shared/engine.js';
-import type { Target, FindResult, QueryFindResult, ElementAtResult, Expectation, CheckResult, ReadTextResult, FrameObservation, FrameOwner, DomSnapshot, ElementDetails, ResolveFail } from '../shared/page-contract.js';
+import type { ContentProbe, Target, FindResult, QueryFindResult, ElementAtResult, Expectation, CheckResult, ReadTextResult, FrameObservation, FrameOwner, DomSnapshot, ElementDetails, ResolveFail } from '../shared/page-contract.js';
 import type { DialogInfo, DownloadWaitResult, FrameStep } from '../protocol.js';
 import type { SessionContext } from './context.js';
 
@@ -150,12 +151,22 @@ export class Tab {
     return frame?.length ? { ...target, frame } : target;
   }
 
-  async goto(url: string, opts: { waitUntil?: 'load' | 'none'; settleMs?: number; ready?: Expectation; timeoutMs?: number } = {}): Promise<{ url: string | null; title: string | null }> {
+  /** @internal After a load: wait until the page shows content (see content-wait.ts). */
+  async waitForContentOn(page: RuntimePage): Promise<ContentState> {
+    return waitForContent(() => page.pageCall('contentProbe', undefined, 2000) as Promise<ContentProbe>);
+  }
+
+  /**
+   * Navigate and wait for the page's content, not only its load event. `content` is present when the page still had
+   * no text (`empty`) or only a loading placeholder (`placeholder`) after the bounded wait.
+   */
+  async goto(url: string, opts: { waitUntil?: 'load' | 'none'; settleMs?: number; ready?: Expectation; timeoutMs?: number } = {}): Promise<{ url: string | null; title: string | null; content?: 'empty' | 'placeholder' }> {
     if (!/^(https?:\/\/|data:text\/html)/i.test(url)) throw new ActionError('invalid_url', 'Only http(s) (or data:text/html) URLs can be opened', 'Pass an absolute http:// or https:// URL');
     if (opts.ready) checkExpect(opts.ready);
     if (opts.timeoutMs !== undefined && (!Number.isFinite(opts.timeoutMs) || opts.timeoutMs < 0)) throw new ActionError('invalid_args', 'timeoutMs must be a finite non-negative number.');
     return this.use(async (page) => {
       await page.goto(url, opts);
+      const content = opts.waitUntil === 'none' || opts.ready ? 'unknown' : await this.waitForContentOn(page);
       if (opts.ready) {
         const timeoutMs = opts.timeoutMs ?? 15000;
         try { await page.expect(opts.ready, { timeoutMs }); }
@@ -167,7 +178,7 @@ export class Tab {
         }
       }
       await this.harvest(page);
-      return this.info(page);
+      return { ...await this.info(page), ...(content === 'empty' || content === 'placeholder' ? { content } : {}) };
     });
   }
 

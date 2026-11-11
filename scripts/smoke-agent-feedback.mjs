@@ -32,6 +32,9 @@ const pages = {
     <ul class="panel cur"><li><p class="name">Sales lead</p><p class="salary"></p><i class="icon" style="display:inline-block;width:12px;height:12px;background:#888"></i><p>Hangzhou</p></li></ul>
     <ul class="panel" style="display:none"><li><p class="name">Support agent</p><p class="salary">10-15K</p></li></ul>
     <ul class="panel" style="display:none"><li><p class="name">Product designer</p><p class="salary">20-30K</p></li></ul>`,
+  '/late': `<title>Late</title><div id="app"></div><script>setTimeout(()=>{document.querySelector('#app').innerHTML='<h1>Release notes</h1><p>Version 9.4.1 shipped</p>'},800)</script>`,
+  '/spinner': `<title>Spinner</title><div id="app">Loading…</div><script>setTimeout(()=>{document.querySelector('#app').textContent='Order 7731 confirmed'},1500)</script>`,
+  '/blank': `<title>Blank</title><div style="width:100px;height:100px;background:#ccc"></div>`,
   '/xhr': `<title>Async</title><button id="load" onclick="fetch('/slow').then(r=>r.text()).then(t=>{document.querySelector('#out').textContent=t})">Load</button><div id="out"></div>`,
 };
 const fixture = createServer((req, res) => {
@@ -137,6 +140,17 @@ try {
     await page.close();
   }
 
+  // 1c. A script-rendered page is empty at its load event: wait for content before reading.
+  for (const [path, expected, want] of [['/late', 'Version 9.4.1 shipped', 'ready'], ['/spinner', 'Order 7731 confirmed', 'ready'], ['/blank', null, 'empty']]) {
+    const { page, tab } = await open(path);
+    const before = (await tab.read()).text;
+    const t0 = Date.now();
+    const state = await tab.use(p => tab.waitForContentOn(p));
+    const text = (await tab.read()).text;
+    record(`content${path}`, { emptyAtLoad: !expected || !before.includes(expected), state, waitedMs: Date.now() - t0, readsContent: expected ? text.includes(expected) : text === '' });
+    await page.close();
+  }
+
   // 2. The agent learns from the action itself whether the page reacted.
   {
     const { page, tab } = await open('/effects');
@@ -184,6 +198,14 @@ try {
     assert.equal(results['opacity.expectHonorsVisibilityOverride'], true, 'visibility:visible inside visibility:hidden is on screen');
     console.log('Passed: transparent text is neither observed nor accepted as evidence.');
     for (const key of ['record.emptySlot', 'record.decorationNotEmpty', 'record.selectedHint', 'record.currentLink', 'record.hiddenPanelsOut', 'record.switchObserved']) assert.equal(results[key], true, key);
+    for (const path of ['/late', '/spinner', '/blank']) {
+      const r = results[`content${path}`];
+      assert.equal(r.emptyAtLoad, true, `${path} must start empty, or the case tests nothing`);
+      assert.equal(r.readsContent, true, `${path}: ${JSON.stringify(r)}`);
+    }
+    assert.equal(results['content/late'].state, 'ready'); assert.equal(results['content/spinner'].state, 'ready'); assert.equal(results['content/blank'].state, 'empty');
+    assert(results['content/blank'].waitedMs < 3000, 'a page without text is released after about 2 s');
+    console.log('Passed: after a load the wait returns once script-rendered content and placeholders have resolved.');
     console.log('Passed: empty fields, class-marked selection and aria-current are in the snapshot; hidden panels are not.');
     assert.equal(results['effect.noop'].effect, 'none');
     assert.equal(results['effect.grow'].effect, 'changed');

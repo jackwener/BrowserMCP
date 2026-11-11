@@ -83,6 +83,8 @@ export interface PointInfo { tag: string; editable: boolean; isSelect: boolean }
 export interface FrameProbeResult { found: boolean; sameOrigin?: boolean; x?: number; y?: number; src?: string }
 
 /** Page activity in the action's document: `n` counts real changes, `idleMs` is the time since the last one. */
+/** Rendered content of a document: its own URL, parse state, visible text length and first 200 characters. */
+export interface ContentProbe { href: string; ready: DocumentReadyState; chars: number; head: string }
 export interface ActivityInfo { n: number; idleMs: number; ready: DocumentReadyState; url: string; doc: string }
 
 export interface SelectResult { selected?: string[]; error?: string; available?: string[] }

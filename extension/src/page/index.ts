@@ -7,7 +7,7 @@
 import {
   ENGINE_GLOBAL, PAGE_GLOBAL,
   type ResolveArgs, type ResolveOutcome, type ResolveFail, type Candidate, type FindArgs, type FindResult, type FindEntry, type QueryFindResult, type UploadTarget,
-  type AriaArgs, type PointInfo, type FrameProbeResult, type ActivityInfo, type SelectResult, type ElementAtResult, type Box, type CheckArgs, type CheckResult,
+  type AriaArgs, type PointInfo, type FrameProbeResult, type ActivityInfo, type ContentProbe, type SelectResult, type ElementAtResult, type Box, type CheckArgs, type CheckResult,
   type ReadTextArgs, type ReadTextResult, type DomClickArgs, type DomClickResult, type DomSnapshot, type ObserveFrameArgs, type FrameObservation, type ElementDetails,
 } from '../../../src/shared/page-contract.js';
 import { ARIA_REF_LINE } from '../../../src/shared/element-ref.js';
@@ -316,6 +316,13 @@ function watchFrames(doc: Document, counted: boolean): void {
 }
 watchDocument(document, false);
 watchFrames(document, false);
+
+/** What has rendered so far: the document's own URL (a new tab first shows the browser's placeholder page under the
+ * target URL), its parse state, and the length and head of its visible text. Cheap enough to poll. */
+export function contentProbe(): ContentProbe {
+  const text = (document.body?.innerText ?? '').replace(/\s+/g, ' ').trim();
+  return { href: location.href, ready: document.readyState, chars: text.length, head: text.slice(0, 200) };
+}
 
 /** A document identity shared by every world of one document: it changes when the frame navigates to a new document. */
 const documentId = (): string => String(performance.timeOrigin);
@@ -906,7 +913,7 @@ export function check(args: CheckArgs): CheckResult {
   return { ok: failed.length === 0, failed, url: location.href, title: document.title, actual };
 }
 
-export const api = { check, resolve, resolveUpload, fileSelectionCount, pointInfo, focus, readValue, fill, isChecked, select, caretToEnd, actionTarget, clearActionTarget, activity, frameProbe, frameElement, clearFrameProbe, aria, observeFrame, visibleDom, readElement, find, findByQuery, elementAt, annotate, unannotate, armClickProbe, readClickProbe, domClick, readText };
+export const api = { check, resolve, resolveUpload, fileSelectionCount, pointInfo, focus, readValue, fill, isChecked, select, caretToEnd, actionTarget, clearActionTarget, activity, contentProbe, frameProbe, frameElement, clearFrameProbe, aria, observeFrame, visibleDom, readElement, find, findByQuery, elementAt, annotate, unannotate, armClickProbe, readClickProbe, domClick, readText };
 export type PageApi = typeof api;
 
 (globalThis as any)[PAGE_GLOBAL] = api;
