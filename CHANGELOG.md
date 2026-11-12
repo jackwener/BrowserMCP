@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.0.42 — 2026-11-12
+
+- chore(extension): 0.0.30
+- feat: report each js call's side effects, page issues and site commands
+- feat: point js syntax errors at the cell's line
+
 ## 0.0.41 — 2026-11-12
 
 Unify single-target name disambiguation across actions, DOM clicks, upload, targeted observation, reading, and expectations. Improve child-frame recovery hints, including frames inside shadow roots. Includes Chrome extension 0.0.29.
