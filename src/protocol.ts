@@ -207,6 +207,8 @@ export type BrowserEvent =
   | { kind: 'download'; state: string; filename?: string; url?: string }
   | { kind: 'dialog'; page?: string; dialogType: string; message?: string }
   | { kind: 'webmcp_changed'; page?: string }
+  /** A session tab needs the user (waiting:true) or no longer does (waiting:false). Emitted by the host runtime, never by the browser. */
+  | { kind: 'attention'; session: string; page: string; tabId?: number; reason: 'auth_required' | 'blocked' | 'rate_limited' | 'http_error' | 'error_page'; waiting: boolean; url?: string; note?: string }
   | { kind: 'session_released'; session: string; reason: string };
 
 export type HostToExt = { type: 'command'; command: Command } | { type: 'ready'; version: string };

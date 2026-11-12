@@ -34,6 +34,29 @@ Semantic targets (`role/name`, `label`, `text`, `testid`, `selector`) resolve th
 
 `fill` replaces; `type` inserts text without individual key presses; `press` sends a specified key or shortcut. A formatted/rejected input reports `controlState:'unverified'` and its actual value rather than overwriting it through a fallback. `method:'dom'` is explicit click activation, suitable only after a real click was not delivered or the element has no box.
 
+## Read what the call changed
+
+Every `js` result carries `changes` when the call had side effects you did not necessarily ask about. Read it before the value:
+
+```js
+// result: {ok:true, changes:{opened:[{tab:'p7', url:'https://example.com/receipt'}],
+//          issues:[{tab:'p3', code:'auth_required', source:'detected', status:401, url:'https://example.com/me'}]}, value:...}
+let child = await browser.tabs.get('p7'); // a popup the click opened
+```
+
+- `opened` / `closed` / `navigated`: tabs this call opened, closed or moved (final URL).
+- `dialogs`: native dialogs that appeared; answer them with `tab.dialog`.
+- `issues`: the page's own document answered 401 (`auth_required`), 403 (`blocked`), 429 (`rate_limited`, with `retryAfterMs` when the site said) or another 4xx/5xx (`http_error`). A login wall needs the user: do not type credentials you were not given.
+- `sites`: ready-made commands for a site the call just reached, shown once per session. Prefer `site_run` over clicking through the same flow.
+
+When the page shows a login form, captcha or error without an HTTP error, say so, then stop and tell the user which tab needs them:
+
+```js
+await tab.reportIssue('auth_required', {note: 'Sign-in form shown'}); // or 'blocked', 'error_page'
+```
+
+The browser marks that tab for the user; the mark clears the next time a later call uses the tab.
+
 ## Choose the evidence needed
 
 - `observe()` provides a compact viewport ARIA overview and child frames; use `{viewport:false}` for the rendered document. Child-frame content is in `frames[]` (each with its `frame` path and `state`), not in the top-level `state`: read both. Refs from a frame route there automatically; a semantic locator searches only the top document unless you pass `target.frame`. It is not full HTML. Keep headings, messages and surrounding context when choosing an action.

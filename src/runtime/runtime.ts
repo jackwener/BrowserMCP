@@ -54,7 +54,34 @@ export interface SessionState {
   lastObserve: Map<string, { id: string; text: string }>;
   /** Network entries seen per tab, with monotonically increasing sequence numbers for cursor-based reads. */
   netLog: Map<string, { seq: number; entries: Array<Record<string, unknown> & { seq: number }>; seen: Set<string>; bodyChars: number }>;
+  /** Side effects seen in this session, in order; each js call reports the ones recorded while it ran. */
+  changes: { seq: number; entries: Array<SessionChange & { seq: number }> };
+  /** Sites whose adapters were already suggested to this session. */
+  suggestedSites: Set<string>;
+  /** Tabs this session flagged as needing the user (reportIssue); cleared when the agent next uses the tab. */
+  attention: Map<string, PageIssue & { atRun: number }>;
   finalized: boolean;
+}
+
+/** A problem a page shows the agent: detected from the main document's HTTP status, or reported by the agent with tab.reportIssue. */
+export type IssueCode = 'auth_required' | 'blocked' | 'rate_limited' | 'http_error' | 'error_page';
+export interface PageIssue { code: IssueCode; source: 'detected' | 'agent'; url?: string; status?: number; retryAfterMs?: number; note?: string }
+export type SessionChange =
+  | { kind: 'opened'; tab: string; tabId: number; url?: string }
+  | { kind: 'closed'; tab: string; tabId: number }
+  | { kind: 'navigated'; tab: string; url?: string }
+  | { kind: 'dialog'; tab: string; dialogType: string; message?: string }
+  | { kind: 'issue'; tab: string; issue: PageIssue };
+const MAX_CHANGES = 200;
+/** Reported with each js call that caused it. Absent fields mean nothing of that kind happened. */
+export interface ChangeSummary {
+  opened?: Array<{ tab: string; url?: string }>;
+  navigated?: Array<{ tab: string; url?: string }>;
+  closed?: string[];
+  dialogs?: Array<{ tab: string; type: string; message?: string }>;
+  issues?: Array<PageIssue & { tab: string }>;
+  /** Ready-made commands for a site this session just reached; suggested once per session. */
+  sites?: Array<{ site: string; commands: string[]; more?: number }>;
 }
 
 export interface DoctorReport {
@@ -109,6 +136,15 @@ export class Runtime extends EventEmitter<RuntimeEvents> implements PageProvider
         const id = e.session.replace(/^mcp:/, ''); const state = this.sessions.get(id);
         if (e.kind === 'tab_closed' || e.kind === 'tab_released' || e.kind === 'tab_detached' || e.kind === 'tab_attached') this.forgetPage(id, e.page);
         if (e.kind === 'tab_navigated' && state) for (const key of state.lastObserve.keys()) if (key.startsWith(`${e.page}:`)) state.lastObserve.delete(key);
+        if (state) {
+          if (e.kind === 'tab_created') this.recordChange(id, { kind: 'opened', tab: e.page, tabId: e.tabId, ...(e.url && { url: e.url }) });
+          else if (e.kind === 'tab_closed') { this.recordChange(id, { kind: 'closed', tab: e.page, tabId: e.tabId }); this.clearAttention(id, e.page); }
+          else if (e.kind === 'tab_released') this.clearAttention(id, e.page);
+          else if (e.kind === 'tab_navigated') this.recordChange(id, { kind: 'navigated', tab: e.page, ...(e.url && { url: e.url }) });
+        }
+      }
+      if (e.kind === 'dialog' && e.page) {
+        for (const state of this.sessions.values()) if (state.pages.has(e.page) || state.changes.entries.some(c => c.tab === e.page)) { this.recordChange(state.id, { kind: 'dialog', tab: e.page, dialogType: e.dialogType, ...(e.message && { message: e.message.slice(0, 200) }) }); break; }
       }
       this.emit('browser-event', e);
     };
@@ -141,7 +177,7 @@ export class Runtime extends EventEmitter<RuntimeEvents> implements PageProvider
   session(id: string): SessionState {
     let s = this.sessions.get(id);
     if (!s) {
-      s = { id, createdAt: Date.now(), pages: new Map(), tabLocks: new Map(), enabledSites: new Map(), capabilities: new Set(), observationSeq: 0, observations: new Map(), refFrames: new Map(), webmcpCatalogs: new Map(), lastObserve: new Map(), netLog: new Map(), finalized: false };
+      s = { id, createdAt: Date.now(), pages: new Map(), tabLocks: new Map(), enabledSites: new Map(), capabilities: new Set(), observationSeq: 0, observations: new Map(), refFrames: new Map(), webmcpCatalogs: new Map(), lastObserve: new Map(), netLog: new Map(), changes: { seq: 0, entries: [] }, suggestedSites: new Set(), attention: new Map(), finalized: false };
       this.sessions.set(id, s);
     }
     return s;
@@ -165,6 +201,68 @@ export class Runtime extends EventEmitter<RuntimeEvents> implements PageProvider
     const page = await this.createPage({ session: `mcp:${sessionId}`, surface: 'browser', page: pageId });
     s.pages.set(pageId, page);
     return page;
+  }
+  recordChange(sessionId: string, change: SessionChange): void {
+    const state = this.sessions.get(sessionId);
+    if (!state) return;
+    const log = state.changes;
+    log.entries.push({ ...change, seq: ++log.seq });
+    if (log.entries.length > MAX_CHANGES) log.entries.splice(0, log.entries.length - MAX_CHANGES);
+  }
+  /** The agent says the tab needs the user (login, block, error page). The embedding browser shows it; the next use of the tab clears it. */
+  flagAttention(sessionId: string, page: { id: string; tabId?: number }, issue: PageIssue, atRun: number): void {
+    const state = this.session(sessionId);
+    state.attention.set(page.id, { ...issue, atRun });
+    this.emit('browser-event', { kind: 'attention', session: `mcp:${sessionId}`, page: page.id, ...(page.tabId !== undefined && { tabId: page.tabId }), reason: issue.code, waiting: true, ...(issue.url && { url: issue.url }), ...(issue.note && { note: issue.note }) });
+  }
+  clearAttention(sessionId: string, pageId: string, tabId?: number): void {
+    const state = this.sessions.get(sessionId);
+    const issue = state?.attention.get(pageId);
+    if (!state || !issue) return;
+    state.attention.delete(pageId);
+    this.emit('browser-event', { kind: 'attention', session: `mcp:${sessionId}`, page: pageId, ...(tabId !== undefined && { tabId }), reason: issue.code, waiting: false });
+  }
+  /** What happened in this session since change `from`: tabs opened/closed/navigated, dialogs, issues, and adapters for sites it reached. */
+  async changesSince(sessionId: string, from: number): Promise<ChangeSummary | undefined> {
+    const state = this.sessions.get(sessionId);
+    if (!state) return undefined;
+    const entries = state.changes.entries.filter((c) => c.seq > from);
+    const opened = new Map<string, { tab: string; url?: string }>();
+    const navigated = new Map<string, { tab: string; url?: string }>();
+    const closed: string[] = []; const dialogs: Array<{ tab: string; type: string; message?: string }> = []; const issues: Array<PageIssue & { tab: string }> = [];
+    for (const c of entries) {
+      if (c.kind === 'opened') opened.set(c.tab, { tab: c.tab, ...(c.url && { url: c.url }) });
+      else if (c.kind === 'navigated') {
+        const into = opened.get(c.tab) ?? navigated.get(c.tab) ?? { tab: c.tab };
+        if (c.url) into.url = c.url;
+        if (!opened.has(c.tab)) navigated.set(c.tab, into);
+      } else if (c.kind === 'closed') { if (!closed.includes(c.tab)) closed.push(c.tab); }
+      else if (c.kind === 'dialog') dialogs.push({ tab: c.tab, type: c.dialogType, ...(c.message && { message: c.message }) });
+      else if (c.kind === 'issue' && !issues.some((i) => i.tab === c.tab && i.code === c.issue.code && i.url === c.issue.url && i.source === c.issue.source)) issues.push({ tab: c.tab, ...c.issue });
+    }
+    const sites = await this.suggestSites(state, [...opened.values(), ...navigated.values()].map((t) => t.url).filter((u): u is string => Boolean(u)));
+    const summary: ChangeSummary = {
+      ...(opened.size && { opened: [...opened.values()] }),
+      ...(navigated.size && { navigated: [...navigated.values()] }),
+      ...(closed.length && { closed }),
+      ...(dialogs.length && { dialogs: dialogs.slice(0, 8) }),
+      ...(issues.length && { issues: issues.slice(0, 8) }),
+      ...(sites.length && { sites }),
+    };
+    return Object.keys(summary).length ? summary : undefined;
+  }
+  private async suggestSites(state: SessionState, urls: string[]): Promise<NonNullable<ChangeSummary['sites']>> {
+    const out: NonNullable<ChangeSummary['sites']> = [];
+    const hosts = urls.map((u) => { try { return new URL(u).hostname.toLowerCase(); } catch { return ''; } }).filter(Boolean);
+    if (!hosts.length) return out;
+    for (const site of this.registry.sites()) {
+      if (state.suggestedSites.has(site.site)) continue;
+      if (!site.domains.some((d) => hosts.some((h) => h === d.toLowerCase() || h.endsWith(`.${d.toLowerCase()}`)))) continue;
+      state.suggestedSites.add(site.site);
+      const commands = (await this.registry.commands(site.site).catch(() => [])).map((c) => c.access === 'write' ? `${c.name} (write)` : c.name);
+      out.push({ site: site.site, commands: commands.slice(0, 15), ...(commands.length > 15 && { more: commands.length - 15 }) });
+    }
+    return out;
   }
   forgetPage(sessionId: string, pageId: string): void {
     const state = this.sessions.get(sessionId);
@@ -212,6 +310,8 @@ export class Runtime extends EventEmitter<RuntimeEvents> implements PageProvider
 
   async runSite(site: string, name: string, args: Record<string, unknown>, opts: { timeoutMs?: number; signal?: AbortSignal; sessionId?: string } = {}): Promise<CommandRunResult | CommandRunError> {
     const cmd = await this.registry.resolve(site, name);
+    // a session already using this site's commands needs no suggestion of them
+    if (opts.sessionId) this.sessions.get(opts.sessionId)?.suggestedSites.add(cmd.site);
     return this.runCommand(cmd, args, opts);
   }
 

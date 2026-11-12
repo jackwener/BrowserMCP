@@ -49,7 +49,7 @@ export class Browser {
         const landed = await tab.url().catch(() => null);
         if (landed && /^(chrome-extension|chrome-error|chrome):/.test(landed)) { await tab.close().catch(() => {}); throw new ActionError('page_not_loaded', `navigation to ${url} ended on ${landed}`, 'Another Chrome extension intercepted this site (redirect or interstitial); disable it for this site or open the page manually and claim the tab.'); }
         // The first load of a script-rendered page has no content yet: an observe right after it would read nothing.
-        await tab.use(page => tab.waitForContentOn(page)).catch(() => {});
+        await tab.use(async page => { await tab.waitForContentOn(page).catch(() => {}); await tab.checkDocumentOn(page); }).catch(() => {});
       }
       return tab;
     },

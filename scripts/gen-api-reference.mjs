@@ -32,6 +32,7 @@ function memberLines(type, indent, depth) {
     if (name.startsWith('_') || ['constructor', 'use', 'toJSON'].includes(name)) continue; // runtime plumbing is not model surface
     const decl = m.valueDeclaration ?? m.declarations?.[0];
     if (decl && ts.canHaveModifiers(decl) && ts.getModifiers(decl)?.some((x) => x.kind === ts.SyntaxKind.PrivateKeyword)) continue;
+    if (decl && ts.getJSDocTags(decl).some((tag) => tag.tagName.text === 'internal')) continue; // host plumbing other API objects call
     const t = checker.getTypeOfSymbolAtLocation(m, decl ?? sf);
     const sigs = t.getCallSignatures();
     const comment = doc(m);

@@ -55,11 +55,16 @@ const pages = {
   '/cards': `<title>Cards</title><ul>${Array.from({length: 12}, (_, i) => `<li><a href="/effects#job${i + 1}"><h3>Senior Product Designer ${i + 1}</h3><p>Hangzhou</p></a></li>`).join('')}</ul>`,
   '/framed': `<title>Framed</title><p>Outer</p><iframe srcdoc="<button>Inner action</button>"></iframe><div id="sh"></div>
     <script>document.querySelector('#sh').attachShadow({mode:'open'}).innerHTML='<iframe srcdoc="<p>In shadow</p>"></iframe>'</script>`,
+  '/to-denied': `<title>Links</title><a href="/denied">Admin area</a>`,
+  '/denied': `<title>Forbidden</title><h1>Access denied</h1>`,
+  '/login-required': `<title>Sign in</title><h1>Please sign in</h1>`,
   '/xhr': `<title>Async</title><button id="load" onclick="fetch('/slow').then(r=>r.text()).then(t=>{document.querySelector('#out').textContent=t})">Load</button><div id="out"></div>`,
 };
 const fixture = createServer((req, res) => {
   if (req.url === '/slow') return setTimeout(() => res.end('Loaded data'), 700);
   res.setHeader('content-type', 'text/html');
+  if (req.url === '/denied') res.statusCode = 403;
+  if (req.url === '/login-required') res.statusCode = 401;
   res.end(pages[req.url] ?? '<title>blank</title>');
 });
 let context;
@@ -329,6 +334,27 @@ try {
     await page.close();
   }
 
+  // HTTP failures of the page's own document are reported with the call; the agent can flag a tab for the user.
+  {
+    const { page, tab } = await open('/to-denied');
+    const events = []; const onEvent = (e) => events.push(e); rt.on('browser-event', onEvent);
+    const clicked = await tab.act({ action: 'click', target: { role: 'link', name: 'Admin area' } });
+    await page.goto(origin + '/login-required');
+    await tab.use((p) => tab.checkDocumentOn(p));
+    await page.goto(origin + '/effects');
+    await tab.use((p) => tab.checkDocumentOn(p));
+    const reported = await tab.reportIssue('auth_required', { note: 'Sign-in form shown' });
+    rt.off('browser-event', onEvent);
+    const changes = await rt.changesSince(`feedback-${tab.id}`, 0);
+    record('issues', {
+      clickNavigated: clicked.effect,
+      codes: (changes?.issues ?? []).map((i) => `${i.code}:${i.source}:${i.status ?? ''}`),
+      reported: reported.reported,
+      attention: events.filter((e) => e.kind === 'attention').map((e) => `${e.reason}:${e.waiting}:${e.url?.endsWith('/effects')}`),
+    });
+    await page.close();
+  }
+
   if (!REPORT) {
     assert.equal(results['opacity.observeShowsVisibleText'], true, 'visible text must be observed');
     assert.equal(results['opacity.observeShowsHiddenBanner'], false, 'opacity:0 text must not be observed as page content');
@@ -378,6 +404,8 @@ try {
     assert.equal(results['settle.animatedNoop'].effect, 'none', 'an animation loop is not the page reacting');
     assert.equal(results['settle.xhr'].resultPresentWhenActReturned, true, 'settle must wait for the request the click started');
     console.log('Passed: settle ignores animation noise and waits for fresh requests.');
+    assert.deepEqual(results.issues, { clickNavigated: 'navigated', codes: ['blocked:detected:403', 'auth_required:detected:401', 'auth_required:agent:'], reported: 'auth_required', attention: ['auth_required:true:true'] }, JSON.stringify(results.issues));
+    console.log('Passed: 401/403 documents become issues; an agent-flagged tab is announced to the embedding browser.');
   }
 } finally {
   await context?.close();

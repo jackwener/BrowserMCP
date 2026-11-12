@@ -34,6 +34,7 @@ await build({ entryPoints: ['extension/src/background.ts'], bundle: true, format
 const fixture = createServer((req, res) => {
   if (req.url === '/file') { res.setHeader('content-disposition', 'attachment; filename="browsermcp-smoke.txt"'); res.end('download fixture'); return; }
   res.setHeader('content-type', 'text/html');
+  if (req.url === '/denied') res.statusCode = 403;
   res.end(`<!doctype html><title>Native smoke</title><h1>Ready</h1><button onclick="document.querySelector('h1').textContent='Done'">Continue</button><script>window.mainWorldMarker=42</script>`);
 });
 await new Promise(r => fixture.listen(0, '127.0.0.1', r));
@@ -166,6 +167,13 @@ try {
   const groupRef = await js('await browser.chrome.describe("tabGroups.update")');
   assert.equal(groupRef.parameters.groupId, undefined);
   assert.equal(groupRef.resultFields['title?'], 'string');
+  // Each js result reports the tabs it opened or closed and HTTP failures of their documents.
+  const probe = await call('js', { code: `let probe = await browser.tabs.new(${JSON.stringify(url + 'denied')}); probe.id` });
+  assert.deepEqual(probe.changes?.opened?.map(t => t.tab), [probe.value], JSON.stringify(probe));
+  assert.deepEqual(probe.changes?.issues?.map(i => `${i.tab}:${i.code}:${i.status}`), [`${probe.value}:blocked:403`], JSON.stringify(probe));
+  const closing = await call('js', { code: 'await probe.close(); 1' });
+  assert.deepEqual(closing.changes?.closed, [probe.value], JSON.stringify(closing));
+  assert.equal((await call('js', { code: '1' })).changes, undefined, 'a call without side effects reports no changes');
   await js(`let temporary = await browser.tabs.new(${JSON.stringify(url)});
     let temporaryId = (await browser.tabs.list()).find(t=>t.id===temporary.id).tabId;
     let temporaryGroup = (await browser.chrome.call('tabs.get',[temporaryId])).groupId;`);

@@ -109,16 +109,19 @@ export function createMcpServer(rt: Runtime, sessionId: string, opts: { version?
     annotations: { openWorldHint: true, destructiveHint: true },
   }, async ({ code, timeoutMs, maxChars }, extra) => run(async () => {
     if (!state.js) state.js = new JsSession(jsGlobals, async () => { if (rt.hasFeature('streams')) await rt.browserCommand('streams-reset', { session: `mcp:${sessionId}` }); });
+    const changesFrom = state.changes.seq;
     const r = await state.js.run(code, { timeoutMs, signal: ctxExtra(extra).signal });
     await syncSiteTools();
+    const changes = await rt.changesSince(sessionId, changesFrom).catch(() => undefined);
+    const sitesHint = changes?.sites ? { sitesHint: 'Run a listed command with site_run (or await sites.<site>.<command>(args) in js); sites_search returns its arguments.' } : {};
     const content: Content = [];
     if (r.error) {
       // Same coded envelope as every other tool: branchable code/hint/data when the throw was an ActionError, else a generic js_error.
       const e = r.error;
-      const env = { ok: false as const, error: { code: e.code ?? 'js_error', message: e.message, ...(e.hint && { hint: e.hint }), ...(e.data && { ...e.data }), ...(!e.code && e.stack && { stack: e.stack.split('\n').slice(0, 4).join('\n') }) } };
+      const env = { ok: false as const, error: { code: e.code ?? 'js_error', message: e.message, ...(e.hint && { hint: e.hint }), ...(e.data && { ...e.data }), ...(!e.code && e.stack && e.name !== 'SyntaxError' && { stack: e.stack.split('\n').slice(0, 4).join('\n') }) }, ...(changes && { changes, ...sitesHint }) };
       content.push(text(safeStringify(env, maxChars)));
-    } else if (r.value !== undefined) content.push(text(safeStringify({ ok: true, value: r.value }, maxChars)));
-    else content.push(text(safeStringify({ ok: true, value: null }, maxChars)));
+      // changes go before value: a truncated envelope keeps them in its preview
+    } else content.push(text(safeStringify({ ok: true, ...(changes && { changes, ...sitesHint }), value: r.value === undefined ? null : r.value }, maxChars)));
     if (r.writes.length) {
       const joined = r.writes.join('\n');
       content.push(text(joined.length > 24_000 ? `${joined.slice(0, 24_000)}\n…(truncated ${joined.length - 24_000} chars)` : joined));

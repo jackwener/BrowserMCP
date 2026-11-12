@@ -95,7 +95,7 @@ export class SessionManager {
     chrome.tabs.onUpdated.addListener((tabId, info, tab) => {
       const owner = this.ownerOf(tabId); const lease = owner?.leases.get(tabId);
       if (lease) { lease.url = tab.url; lease.title = tab.title; void this.persist(); }
-      if (info.status === 'loading' || info.url) this.emit({ kind: 'tab_navigated', session: owner?.key ?? '', page: identity.pageId(tabId), tabId });
+      if (info.status === 'loading' || info.url) this.emit({ kind: 'tab_navigated', session: owner?.key ?? '', page: identity.pageId(tabId), tabId, ...(tab.url && { url: tab.url }) });
     });
     chrome.tabs.onActivated.addListener(({ tabId }) => { void this.unmuteIfOurs(tabId); void this.publishCursor(tabId); });
     chrome.windows.onFocusChanged.addListener(() => { for (const tabId of this.cursorState.keys()) void this.publishCursor(tabId); });

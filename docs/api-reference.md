@@ -67,8 +67,8 @@ class Browser {
 class Tab {
   tabId?: number; // `id` is the stable backend page handle; `tabId` is the numeric backend id when claimed from a user tab.
   id: string;
-  waitForContentOn(page: RuntimePage): Promise<ContentState>;
   goto(url: string, opts?: { waitUntil?: "load" | "none"; settleMs?: number; ready?: Expectation; timeoutMs?: number; }): Promise<{ url: string | null; title: string | null; content?: "empty" | "placeholder"; }>; // Navigate and wait for the page's content, not only its load event. `content` is present when the page still had no text (`empty`) or only a loading placeholder (`placeholder`) after the bounded wait.
+  reportIssue(code: "auth_required" | "blocked" | "error_page", opts?: { note?: string; }): Promise<{ reported: "auth_required" | "blocked" | "error_page"; tab: string; }>; // Say this tab needs the user: a login wall, a block or an error page the HTTP status did not reveal. It is reported with this js call, and the embedding browser can show the user which tab to handle. The flag clears the next time a later js call uses this tab.
   markDeliverable(): Promise<void>; // Preserve this tab for the user when the session is finalized.
   markHandoff(): Promise<void>; // Preserve this tab for a subsequent turn; the same session handle remains usable after finalization.
   clearRetention(): Promise<void>; // Restore default cleanup: close agent tabs, release borrowed user tabs.

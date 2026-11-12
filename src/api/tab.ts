@@ -19,6 +19,7 @@ import { targetToSelector, fallbackSelector, frameSteps } from '../shared/engine
 import type { ContentProbe, Target, FindResult, QueryFindResult, ElementAtResult, Expectation, CheckResult, ReadTextResult, FrameObservation, FrameOwner, DomSnapshot, ElementDetails, ResolveFail } from '../shared/page-contract.js';
 import type { DialogInfo, DownloadWaitResult, FrameStep } from '../protocol.js';
 import type { SessionContext } from './context.js';
+import type { IssueCode, PageIssue } from '../runtime/runtime.js';
 
 export type { Target } from '../shared/page-contract.js';
 
@@ -125,6 +126,8 @@ export class Tab {
       if (this.closed) throw new ActionError('stale_page', `tab ${this.id} was closed`, 'This Tab object is dead; open or claim another tab.');
       if (state.finalized && !state.pages.has(this.id)) throw new ActionError('page_released', `tab ${this.id} was released by finalize`, 'finalize ends the session\'s control of its tabs; open a new tab or claim the tab again (browser.user.claimTab).');
       const page = this.bound ?? await this.ctx.rt.pageFor(this.ctx.sessionId, this.id);
+      const flagged = state.attention.get(this.id);
+      if (flagged && flagged.atRun !== (state.js?.runs ?? 0)) this.ctx.rt.clearAttention(this.ctx.sessionId, this.id, this.tabId);
       return await fn(page);
     } finally { release(); }
   }
@@ -167,6 +170,7 @@ export class Tab {
     return this.use(async (page) => {
       await page.goto(url, opts);
       const content = opts.waitUntil === 'none' || opts.ready ? 'unknown' : await this.waitForContentOn(page);
+      if (opts.waitUntil !== 'none') await this.checkDocumentOn(page);
       if (opts.ready) {
         const timeoutMs = opts.timeoutMs ?? 15000;
         try { await page.expect(opts.ready, { timeoutMs }); }
@@ -187,7 +191,42 @@ export class Tab {
    */
   private async harvest(page: RuntimePage): Promise<Array<Record<string, unknown> & { seq: number }>> {
     // best effort: harvesting must never fail the step that just succeeded
-    try { const captured = await page.readNetworkCapture().catch(() => [] as unknown[]) as Array<Record<string, unknown>>; return this.logNetwork(captured); } catch { return []; }
+    try {
+      const captured = await page.readNetworkCapture().catch(() => [] as unknown[]) as Array<Record<string, unknown>>;
+      const fresh = this.logNetwork(captured);
+      await this.detectIssues(page, fresh);
+      return fresh;
+    } catch { return []; }
+  }
+  /** Requests the page's scripts made that the site answered with 429: the site is rate limiting this session. */
+  private async detectIssues(_page: RuntimePage, entries: Array<Record<string, unknown>>): Promise<void> {
+    for (const e of entries) {
+      if (Number(e.responseStatus ?? e.status) !== 429 || String(e.resourceType ?? e.type) === 'Document') continue;
+      const retryAfterMs = parseRetryAfter((e.responseHeaders as Record<string, unknown> | undefined)?.['retry-after']);
+      this.ctx.rt.recordChange(this.ctx.sessionId, { kind: 'issue', tab: this.id, issue: { code: 'rate_limited', source: 'detected', status: 429, url: String(e.url ?? '').slice(0, 300), ...(retryAfterMs !== undefined && { retryAfterMs }) } });
+    }
+  }
+  /** @internal After a navigation: an HTTP error status of the document itself (401 login, 403 blocked, 429, other 4xx/5xx) becomes an issue. */
+  async checkDocumentOn(page: RuntimePage): Promise<void> {
+    const doc = await page.evaluate<{ status: number; url: string } | null>('(() => { const n = performance.getEntriesByType("navigation")[0]; return n ? { status: n.responseStatus || 0, url: location.href } : null; })()').catch(() => null);
+    const status = doc?.status ?? 0;
+    if (status < 400) return;
+    const code: IssueCode = status === 401 ? 'auth_required' : status === 403 ? 'blocked' : status === 429 ? 'rate_limited' : 'http_error';
+    this.ctx.rt.recordChange(this.ctx.sessionId, { kind: 'issue', tab: this.id, issue: { code, source: 'detected', status, url: doc!.url.slice(0, 300) } });
+  }
+  /**
+   * Say this tab needs the user: a login wall, a block or an error page the HTTP status did not reveal.
+   * It is reported with this js call, and the embedding browser can show the user which tab to handle.
+   * The flag clears the next time a later js call uses this tab.
+   */
+  async reportIssue(code: 'auth_required' | 'blocked' | 'error_page', opts: { note?: string } = {}): Promise<{ reported: 'auth_required' | 'blocked' | 'error_page'; tab: string }> {
+    if (!['auth_required', 'blocked', 'error_page'].includes(code)) throw new ActionError('invalid_args', `Unknown issue "${String(code)}".`, "Use 'auth_required' (login needed), 'blocked' (access denied, captcha) or 'error_page' (the site shows an error).");
+    if (opts.note !== undefined && typeof opts.note !== 'string') throw new ActionError('invalid_args', 'note must be a string.');
+    const url = await this.use((p) => p.getCurrentUrl()).catch(() => null);
+    const issue: PageIssue = { code, source: 'agent', ...(url && { url }), ...(opts.note && { note: opts.note.slice(0, 200) }) };
+    this.ctx.rt.recordChange(this.ctx.sessionId, { kind: 'issue', tab: this.id, issue });
+    this.ctx.rt.flagAttention(this.ctx.sessionId, { id: this.id, tabId: this.tabId }, issue, this.ctx.state.js?.runs ?? 0);
+    return { reported: code, tab: this.id };
   }
   private logNetwork(entries: Array<Record<string, unknown>>): Array<Record<string, unknown> & { seq: number }> {
     let log = this.ctx.state.netLog.get(this.id);
@@ -392,6 +431,7 @@ export class Tab {
         if (action === 'back' || action === 'forward' || action === 'reload') {
           const h = await page.history(action);
           if (capture) await this.harvest(page);
+          await this.checkDocumentOn(page);
           return { action, ...h, delivery: 'applied', controlState: 'unverified', ...(capture && { network: { afterSequence: networkFrom, cursor: this.ctx.state.netLog.get(this.id)?.seq ?? networkFrom } }) };
         }
         if (action === 'scroll' && !opts.target) {
@@ -402,6 +442,7 @@ export class Tab {
         if (!opts.target) throw new ActionError('missing_target', `action "${action}" needs a target`, 'Pass a target: a {ref} from observe, or a selector/role+name/label/text/testid.');
         const r = await page.act({ kind: action, target: opts.target as Record<string, unknown>, value: opts.value, files: opts.files, to: opts.to as Record<string, unknown> | undefined, direction: opts.direction, amount: opts.amount, timeoutMs: opts.timeoutMs, settleMs: opts.settleMs, cursor: this.ctx.rt.cursorEnabled, ...(opts.method ? { method: opts.method } : {}) });
         if (capture) await this.harvest(page);
+        if (r.navigated || r.effect === 'navigated') await this.checkDocumentOn(page);
         if (r.ref) this.rememberRefs([r.ref], frameSteps(opts.target.frame));
         const delivery = action === 'fill' || action === 'type' ? (r.verified ? 'applied' : 'dispatched') : r.method === 'dom' || ['check', 'uncheck', 'select', 'upload', 'focus'].includes(action) ? 'applied' : action === 'click' || action === 'dblclick' ? 'received' : 'dispatched';
         const controlVerified = r.verified === true || (action === 'check' && r.checked === true) || (action === 'uncheck' && r.checked === false) || (action === 'select' && Array.isArray(r.selected) && r.selected.length > 0);
@@ -556,4 +597,12 @@ export class Tab {
     if (!download || download.tab !== this.id || !Number.isSafeInteger(download.afterSequence) || download.afterSequence < 0) throw new ActionError('invalid_args', 'Pass the download object returned by an action on this tab.', 'Use await tab.download(result.download).');
     return this.use((p) => p.waitForDownload(download.afterSequence, timeoutMs));
   }
+}
+
+/** Retry-After as delay seconds or an HTTP date; anything else is ignored. */
+function parseRetryAfter(value: unknown): number | undefined {
+  if (typeof value !== 'string') return undefined;
+  const v = value.trim();
+  const ms = /^\d+$/.test(v) ? Number(v) * 1000 : /^[A-Za-z]{3},/.test(v) ? Date.parse(v) - Date.now() : NaN;
+  return Number.isFinite(ms) ? Math.max(0, Math.round(ms)) : undefined;
 }
