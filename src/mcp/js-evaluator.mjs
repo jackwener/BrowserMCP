@@ -54,12 +54,27 @@ export async function createEvaluator() {
           expression: code, contextId, objectGroup, replMode: true, awaitPromise: true,
         });
         if (result.exceptionDetails) {
-          return { ok: false, error: result.exceptionDetails.exception
-            ? await unwrap(result.exceptionDetails.exception)
-            : new Error(result.exceptionDetails.text) };
+          const details = result.exceptionDetails;
+          const error = details.exception ? await unwrap(details.exception) : new Error(details.text);
+          if (error?.name === 'SyntaxError' && Number.isInteger(details.lineNumber)) locateSyntaxError(error, code, details.lineNumber, details.columnNumber ?? 0);
+          return { ok: false, error };
         }
         return { ok: true, value: await unwrap(result.result) };
       } finally { await post('Runtime.releaseObjectGroup', { objectGroup }); }
     },
   };
+}
+
+/** Point a syntax error at the cell's own line, with two lines of context on each side. */
+function locateSyntaxError(error, code, line, column) {
+  const lines = code.split(/\r?\n/);
+  if (line < 0 || line >= lines.length) return;
+  const first = Math.max(0, line - 2), last = Math.min(lines.length - 1, line + 2);
+  const width = String(last + 1).length;
+  const excerpt = [];
+  for (let i = first; i <= last; i++) {
+    excerpt.push(`${String(i + 1).padStart(width)} | ${lines[i]}`);
+    if (i === line) excerpt.push(`${' '.repeat(width)} | ${' '.repeat(Math.max(0, column))}^`);
+  }
+  try { error.message = `${error.message} (line ${line + 1}, column ${column + 1})\n${excerpt.join('\n')}`; } catch { /* frozen error */ }
 }
