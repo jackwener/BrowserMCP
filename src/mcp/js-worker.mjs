@@ -51,6 +51,10 @@ async function drain(run, outcome) {
 }
 const errorData = e => ({ name: e?.name ?? 'Error', message: e?.message ?? String(e), stack: e?.stack, code: e?.code, hint: e?.hint ?? (e?.name === 'SyntaxError' && /Illegal return statement/.test(e.message)
   ? 'This cell runs at REPL top level. Replace `return value;` with `value;` or use `nodeRepl.write(value)`. `return` is valid inside functions.'
+  : e?.name === 'ReferenceError' && /^(page|context|locator) is not defined/.test(e.message)
+    ? 'There is no Playwright page/context here. Open or get a Tab: let tab = await browser.tabs.new(url) (or browser.tabs.selected(), browser.user.claimTab({active:true})), then tab.observe() / tab.act({target, action}) / tab.expect({...}) / tab.read().'
+  : e?.name === 'TypeError' && /\b(locator|getBy\w+|\$\$?|frameLocator|first|last|nth)\(\.\.\.\)\.\w+ is not a function/.test(e.message)
+    ? 'Tab methods return promises, not Playwright locators. Act in one call: await tab.act({target:{role:"button", name:"Save"}, action:"click"}) (target can also be {ref} from tab.observe(), {selector} or {text}).'
   : undefined), data: e?.data });
 
 function encode(value, seen = new WeakSet()) {

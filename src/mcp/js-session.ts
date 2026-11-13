@@ -183,12 +183,13 @@ export class JsSession {
         const depth = path.length > 1 ? 4 : 2;
         const signatures = reference?.split('\n').filter(line => new RegExp(`^ {${depth}}[a-zA-Z]\\w*\\(`).test(line)) ?? [];
         const query = path.at(-1)?.toLowerCase() ?? '';
-        const preferred = query === 'open' ? 'goto' : query === 'current' ? 'selected' : query;
+        const playwright = className === 'Tab' && path.length === 1 ? PLAYWRIGHT_ON_TAB[path[0]] : undefined;
+        const preferred = playwright?.method ?? (query === 'open' ? 'goto' : query === 'current' ? 'selected' : query);
         signatures.sort((a, b) => Number(b.trimStart().startsWith(preferred)) - Number(a.trimStart().startsWith(preferred)));
         const methods = signatures.slice(0, 6).map(line => line.trim().slice(0, 280));
         throw Object.assign(new Error(`Unknown API method ${path.join('.')}`), {
           code: 'unknown_method',
-          hint: methods.length ? `Use a method signature from methods for ${member}.${query === 'current' ? ' selected() only searches session-owned tabs; claim the user’s foreground tab with browser.user.claimTab({active:true}).' : ''}` : 'Read docs_get api-reference for the relevant API object.',
+          hint: playwright ? `Tab is not a Playwright Page. ${playwright.use}` : methods.length ? `Use a method signature from methods for ${member}.${query === 'current' ? ' selected() only searches session-owned tabs; claim the user’s foreground tab with browser.user.claimTab({active:true}).' : ''}` : 'Read docs_get api-reference for the relevant API object.',
           data: { dispatched: false, ...(methods.length ? { methods } : {}) },
         });
       }
@@ -264,3 +265,21 @@ export function safeStringify(v: unknown, limit = 200_000): string {
   }
   return out;
 }
+
+/** Playwright Page/Locator names models reach for on a Tab, mapped to the Tab call that does the job. */
+const act = (action: string, value = '') => ({ method: 'act', use: `Use await tab.act({target:'e1_3', action:'${action}'${value}}) with a ref from tab.observe(), or target {role, name} / {selector}.` });
+const PLAYWRIGHT_ON_TAB: Record<string, { method: string; use: string }> = {
+  click: act('click'), dblclick: act('dblclick'), hover: act('hover'), focus: act('focus'),
+  fill: act('fill', ", value:'text'"), type: act('type', ", value:'text'"), pressSequentially: act('type', ", value:'text'"), press: act('press', ", value:'Enter'"),
+  check: act('check'), uncheck: act('uncheck'), setChecked: act('check'), selectOption: act('select', ", value:'Option label'"),
+  setInputFiles: act('upload', ", files:['/path/file']"), dragTo: act('drag', ", to:'e1_7'"), dragAndDrop: act('drag', ", to:'e1_7'"), tap: act('click'),
+  goBack: { method: 'back', use: 'Use await tab.back().' }, goForward: { method: 'forward', use: 'Use await tab.forward().' },
+  ...Object.fromEntries(['locator', 'getByRole', 'getByText', 'getByLabel', 'getByPlaceholder', 'getByTestId', 'getByTitle', 'getByAltText', '$', '$$', 'querySelector', 'querySelectorAll'].map(name => [name,
+    { method: 'observe', use: 'There are no locator objects: await tab.observe() returns refs (e1_3) for tab.act; await tab.find({selector}) or tab.find({role, name}) lists matches. Act directly with target {role, name} or {selector}.' }])),
+  ...Object.fromEntries(['textContent', 'innerText', 'innerHTML', 'content', 'allTextContents', 'allInnerTexts', 'inputValue', 'getAttribute'].map(name => [name,
+    { method: 'read', use: 'Use await tab.read({target}) for one element (text, attributes, live value), await tab.read() for page text, or await tab.observe() for the structure.' }])),
+  ...Object.fromEntries(['$eval', '$$eval', 'evaluateHandle'].map(name => [name, { method: 'evaluate', use: 'Use await tab.evaluate((arg) => …, arg); it runs in the page and returns JSON.' }])),
+  ...Object.fromEntries(['waitForSelector', 'waitForURL', 'waitForLoadState', 'waitForFunction', 'waitForNavigation', 'waitForTimeout', 'waitFor', 'isVisible', 'isEnabled', 'isChecked'].map(name => [name,
+    { method: 'expect', use: 'Actions already wait for the page to settle. To wait for or check a state use await tab.expect({text|url|title|target, visible|enabled|checked|value…}); it retries until timeoutMs.' }])),
+  ...Object.fromEntries(['mainFrame', 'frame', 'frameLocator'].map(name => [name, { method: 'frames', use: 'Use await tab.frames() to list frames, then pass frame to observe/act/read.' }])),
+};

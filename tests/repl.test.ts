@@ -100,6 +100,13 @@ it('runs discovery → observe → act → verify → cleanup through MCP and th
     expect(opened.body, opened.text).toEqual({ ok: true, value: { type: 'Tab', id: 'page-one' } });
     expect((await call('js', { code: 'typeof tab' })).body.value).toBe('object');
     expect((await call('js', { code: 'await tab.observe()' })).body.value.state).toContain('[ref=e1]');
+    const pwClick = await call('js', { code: 'await tab.click("text=Continue")' });
+    expect(pwClick.body.error).toMatchObject({ code: 'unknown_method', hint: expect.stringContaining("action:'click'") });
+    expect(pwClick.body.error.methods[0]).toMatch(/^act\(/);
+    expect((await call('js', { code: 'await tab.getByRole("button").click()' })).body.error.hint).toContain('not Playwright locators');
+    expect((await call('js', { code: 'await tab.waitForSelector("h1")' })).body.error.hint).toContain('tab.expect(');
+    expect((await call('js', { code: 'await page.goto("https://example.com/")' })).body.error.hint).toContain('browser.tabs.new(url)');
+    expect(clicked).toBe(false);
     const invalid = await call('js', { code: 'await tab.act({action:"press", target:{ref:"e1"}})' });
     expect(invalid.body.error.code).toBe('invalid_args');
     expect(clicked).toBe(false);
