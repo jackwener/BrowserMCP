@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- feat: Playwright-style calls in js (`tab.click`, `tab.locator(...).click()`, `page.goto`, `waitForSelector` …) fail with a hint naming the Tab call that does the job
+
 ## 0.0.43-embedded.0 — 2026-11-13
 
 - feat: embed Electron browser MCP with host-owned logical tabs
