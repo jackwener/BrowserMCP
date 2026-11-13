@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.0.43 — 2026-11-13
+
+- feat: report tool errors and fallbacks with each js call
+- chore: add AX feedback issue form
+
 ## 0.0.42 — 2026-11-12
 
 - chore(extension): 0.0.30
