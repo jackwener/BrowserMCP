@@ -606,3 +606,64 @@ function parseRetryAfter(value: unknown): number | undefined {
   const ms = /^\d+$/.test(v) ? Number(v) * 1000 : /^[A-Za-z]{3},/.test(v) ? Date.parse(v) - Date.now() : NaN;
   return Number.isFinite(ms) ? Math.max(0, Math.round(ms)) : undefined;
 }
+
+// ── tool friction: every coded error a Tab method raises during a js call, and fallbacks after a failed act ──
+
+/** Codes where the same call can succeed after the recovery its hint names (observe again, wait, dismiss, reconnect). */
+const RETRYABLE = new Set(['stale_ref', 'not_found', 'snapshot_ref_unavailable', 'not_visible', 'not_enabled', 'intercepted', 'not_delivered', 'timeout', 'frame_not_found', 'frame_unreachable', 'expectation_failed', 'dialog_open', 'stale_read', 'stale_cursor', 'tab_pending', 'page_not_loaded', 'host_unavailable', 'session_restarted', 'js_busy', 'rate_limited']);
+const RECORDED = Symbol('browsermcp.toolErrorRecorded');
+
+/** A short, stable description of what the call aimed at: a ref, role+name, or locator. Never page text beyond the given name. */
+export function describeTarget(target: unknown): string | undefined {
+  if (!target || typeof target !== 'object') return undefined;
+  const t = target as Record<string, unknown>;
+  const clip = (v: unknown) => String(v).slice(0, 80);
+  const parts: string[] = [];
+  if (t.ref !== undefined) parts.push(`ref=${clip(t.ref)}`);
+  if (t.role !== undefined) parts.push(`role=${clip(t.role)}`);
+  if (t.name !== undefined) parts.push(`name=${clip(t.name)}`);
+  for (const key of ['selector', 'label', 'text', 'placeholder', 'testid', 'within'] as const) if (t[key] !== undefined) parts.push(`${key}=${clip(t[key])}`);
+  if (t.x !== undefined && t.y !== undefined) parts.push(`x=${t.x},y=${t.y}`);
+  return parts.length ? parts.join(' ').slice(0, 160) : undefined;
+}
+
+function retryable(err: { code?: string; data?: Record<string, unknown> }): boolean {
+  const declared = err.data?.retryable;
+  return typeof declared === 'boolean' ? declared : RETRYABLE.has(err.code ?? '');
+}
+
+const TRACKED = ['goto', 'observe', 'find', 'read', 'act', 'expect', 'evaluate', 'screenshot', 'back', 'forward', 'reload', 'close', 'release', 'url', 'title', 'cookies', 'cookie', 'fetchJson', 'frames', 'download', 'reportIssue'] as const;
+for (const name of TRACKED) {
+  const original = (Tab.prototype as unknown as Record<string, (...args: unknown[]) => Promise<unknown>>)[name]!;
+  Object.defineProperty(Tab.prototype, name, {
+    configurable: true, writable: true,
+    value: async function tracked(this: Tab, ...args: unknown[]): Promise<unknown> {
+      const ctx = (this as unknown as { ctx?: SessionContext }).ctx;
+      if (!ctx?.state || !ctx.rt) return original.apply(this, args);
+      const run = ctx.state.js?.runs ?? 0;
+      const opts = (args[0] && typeof args[0] === 'object' ? args[0] : {}) as Record<string, unknown>;
+      const target = name === 'act' || name === 'read' || name === 'expect' ? describeTarget(opts.target) : name === 'find' ? describeTarget(opts) : undefined;
+      const tab = this.id;
+      if (name === 'evaluate' || (name === 'act' && opts.method === 'dom')) {
+        const failed = ctx.state.actFailures.get(tab);
+        if (failed && run - failed.run <= 1) {
+          ctx.state.actFailures.delete(tab);
+          ctx.rt.recordChange(ctx.sessionId, { kind: 'fallback', fallback: { from: 'tab.act', to: name === 'evaluate' ? 'tab.evaluate' : 'tab.act(method:dom)', tab, code: failed.code, ...(failed.target && { target: failed.target }) } });
+        }
+      }
+      try {
+        const result = await original.apply(this, args);
+        if (name === 'act') ctx.state.actFailures.delete(tab);
+        return result;
+      } catch (error) {
+        const e = error as { code?: string; data?: Record<string, unknown>; [RECORDED]?: boolean };
+        if (e && typeof e === 'object' && e.code && !e[RECORDED]) {
+          try { Object.defineProperty(e, RECORDED, { value: true }); } catch { /* frozen error: may be recorded twice */ }
+          ctx.rt.recordChange(ctx.sessionId, { kind: 'toolError', error: { code: e.code, api: `tab.${name}`, tab, ...(name === 'act' && typeof opts.action === 'string' && { action: opts.action }), ...(target && { target }), retryable: retryable(e) } });
+          if (name === 'act' && opts.method !== 'dom') ctx.state.actFailures.set(tab, { run, code: e.code, ...(target && { target }) });
+        }
+        throw error;
+      }
+    },
+  });
+}

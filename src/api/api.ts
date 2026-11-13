@@ -47,7 +47,10 @@ export function createAgentApi(rt: Runtime, sessionId: string): AgentApi & { com
     disable: async (site: string) => { const ok = state.enabledSites.delete(site); if (ok) rt.emit('tools-changed', { site }); return ok; },
     run: async (site: string, name: string, args: Record<string, unknown> = {}) => {
       const r = await rt.runSite(site, name, args, { sessionId });
-      if (!r.ok) throw new ActionError(r.error.code, r.error.message, r.error.hint, { site, command: name , ...(r.error.details && { details: r.error.details }) });
+      if (!r.ok) {
+        rt.recordChange(sessionId, { kind: 'toolError', error: { code: r.error.code, api: `sites.${site}.${name}`, retryable: ['rate_limited', 'timeout', 'host_unavailable', 'page_not_loaded'].includes(r.error.code) } });
+        throw new ActionError(r.error.code, r.error.message, r.error.hint, { site, command: name , ...(r.error.details && { details: r.error.details }) });
+      }
       return r.nextCursor ? { rows: r.rows, nextCursor: r.nextCursor } : (r.rows ?? r.value);
     },
   };

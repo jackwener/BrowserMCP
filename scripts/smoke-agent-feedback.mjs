@@ -227,6 +227,11 @@ try {
     record('secrets', { snapshot: !/hunter2|4242424242424242/.test(state) && state.includes('Hangzhou'), dom: !/hunter2|4242424242424242/.test(dom) && dom.includes('Hangzhou'), expectActual: !/hunter2/.test(actual ?? '') });
     let blocked; try { await tab.act({ action: 'click', target: { role: 'button', name: 'Accept' }, timeoutMs: 800 }); blocked = { code: 'clicked' }; } catch (e) { blocked = { code: e.code, message: e.message }; }
     record('covered', { code: blocked.code, namesCover: /veil|Cookie banner/.test(blocked.message ?? '') });
+    // the failed act above is reported as a tool error; the evaluate that clicks around the veil is a fallback
+    await tab.act({ action: 'click', target: { role: 'button', name: 'Accept' }, timeoutMs: 400 }).catch(() => {});
+    await tab.evaluate(() => document.title);
+    const friction = rt.frictionSince(`feedback-${tab.id}`, 0);
+    record('friction', { errors: (friction?.toolErrors ?? []).map((e) => `${e.api}:${e.action}:${e.code}:${e.retryable}:${e.count ?? 1}:${e.target}`), fallbacks: (friction?.fallbacks ?? []).map((f) => `${f.from}>${f.to}:${f.code}`) });
     await page.close();
   }
 
@@ -379,6 +384,8 @@ try {
     assert.equal(results['closed.pageSeesNothing'], true, 'page scripts must still see closed roots as closed');
     assert.deepEqual(results.secrets, { snapshot: true, dom: true, expectActual: true }, 'credential values must never reach the agent');
     assert.deepEqual(results.covered, { code: 'intercepted', namesCover: true }, JSON.stringify(results.covered));
+    assert.deepEqual(results.friction, { errors: ['tab.expect:undefined:expectation_failed:true:1:label=Password', 'tab.act:click:intercepted:true:2:role=button name=Accept'], fallbacks: ['tab.act>tab.evaluate:intercepted'] }, JSON.stringify(results.friction));
+    console.log('Passed: failed API calls are reported as tool errors, and an evaluate after a failed act as a fallback.');
     assert.deepEqual(results.exactName, { 'Senior Product Designer 1': `${origin}/effects#job1`, 'senior  product designer 1': `${origin}/effects#job1`, 'Senior Product Designer': 'selector_ambiguous (substring hint)' });
     assert.deepEqual(results.frameHint, { miss: 'not_found (frame hint)', withFrame: true });
     assert.deepEqual(results.ambig, { code: 'selector_ambiguous', namesBoth: true, refs: 2 });

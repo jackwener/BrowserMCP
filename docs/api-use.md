@@ -57,6 +57,8 @@ await tab.reportIssue('auth_required', {note: 'Sign-in form shown'}); // or 'blo
 
 The browser marks that tab for the user; the mark clears the next time a later call uses the tab.
 
+A call in which an API raised an error also carries `toolErrors`, in call order, including errors your code caught: `{code, api, tab, action?, target?, retryable, count?}` (`count` when the same error repeated). `fallbacks` lists `{from:'tab.act', to:'tab.evaluate' | 'tab.act(method:dom)', tab, code, target?}` when the code switched route on a tab after `act` failed there, in the same or the next call. They describe what went wrong, for you and for tools that review the run. Recover by `code` as in the error table; repeating a call whose error says `retryable:false` will fail the same way.
+
 ## Choose the evidence needed
 
 - `observe()` provides a compact viewport ARIA overview and child frames; use `{viewport:false}` for the rendered document. Child-frame content is in `frames[]` (each with its `frame` path and `state`), not in the top-level `state`: read both. Refs from a frame route there automatically; a semantic locator searches only the top document unless you pass `target.frame`. It is not full HTML. Keep headings, messages and surrounding context when choosing an action.

@@ -60,6 +60,8 @@ export interface SessionState {
   suggestedSites: Set<string>;
   /** Tabs this session flagged as needing the user (reportIssue); cleared when the agent next uses the tab. */
   attention: Map<string, PageIssue & { atRun: number }>;
+  /** Last failed tab.act per tab, so a following evaluate or dom click on that tab is reported as a fallback. */
+  actFailures: Map<string, { run: number; code: string; target?: string }>;
   finalized: boolean;
 }
 
@@ -71,8 +73,16 @@ export type SessionChange =
   | { kind: 'closed'; tab: string; tabId: number }
   | { kind: 'navigated'; tab: string; url?: string }
   | { kind: 'dialog'; tab: string; dialogType: string; message?: string }
-  | { kind: 'issue'; tab: string; issue: PageIssue };
+  | { kind: 'issue'; tab: string; issue: PageIssue }
+  | { kind: 'toolError'; error: ToolError }
+  | { kind: 'fallback'; fallback: ToolFallback };
 const MAX_CHANGES = 200;
+/** An error a browser API call raised during a js call, whether or not the code caught it. */
+export interface ToolError { code: string; api: string; tab?: string; action?: string; target?: string; retryable: boolean }
+/** The code took another route after a tool failed on the same tab, e.g. tab.act failed and tab.evaluate followed. */
+export interface ToolFallback { from: string; to: string; tab: string; code: string; target?: string }
+/** What a js call's result reports about tool friction; absent when nothing failed. */
+export interface ToolFriction { toolErrors?: ToolError[]; fallbacks?: ToolFallback[] }
 /** Reported with each js call that caused it. Absent fields mean nothing of that kind happened. */
 export interface ChangeSummary {
   opened?: Array<{ tab: string; url?: string }>;
@@ -144,7 +154,7 @@ export class Runtime extends EventEmitter<RuntimeEvents> implements PageProvider
         }
       }
       if (e.kind === 'dialog' && e.page) {
-        for (const state of this.sessions.values()) if (state.pages.has(e.page) || state.changes.entries.some(c => c.tab === e.page)) { this.recordChange(state.id, { kind: 'dialog', tab: e.page, dialogType: e.dialogType, ...(e.message && { message: e.message.slice(0, 200) }) }); break; }
+        for (const state of this.sessions.values()) if (state.pages.has(e.page) || state.changes.entries.some(c => 'tab' in c && c.tab === e.page)) { this.recordChange(state.id, { kind: 'dialog', tab: e.page, dialogType: e.dialogType, ...(e.message && { message: e.message.slice(0, 200) }) }); break; }
       }
       this.emit('browser-event', e);
     };
@@ -177,7 +187,7 @@ export class Runtime extends EventEmitter<RuntimeEvents> implements PageProvider
   session(id: string): SessionState {
     let s = this.sessions.get(id);
     if (!s) {
-      s = { id, createdAt: Date.now(), pages: new Map(), tabLocks: new Map(), enabledSites: new Map(), capabilities: new Set(), observationSeq: 0, observations: new Map(), refFrames: new Map(), webmcpCatalogs: new Map(), lastObserve: new Map(), netLog: new Map(), changes: { seq: 0, entries: [] }, suggestedSites: new Set(), attention: new Map(), finalized: false };
+      s = { id, createdAt: Date.now(), pages: new Map(), tabLocks: new Map(), enabledSites: new Map(), capabilities: new Set(), observationSeq: 0, observations: new Map(), refFrames: new Map(), webmcpCatalogs: new Map(), lastObserve: new Map(), netLog: new Map(), changes: { seq: 0, entries: [] }, suggestedSites: new Set(), attention: new Map(), actFailures: new Map(), finalized: false };
       this.sessions.set(id, s);
     }
     return s;
@@ -238,6 +248,7 @@ export class Runtime extends EventEmitter<RuntimeEvents> implements PageProvider
         if (!opened.has(c.tab)) navigated.set(c.tab, into);
       } else if (c.kind === 'closed') { if (!closed.includes(c.tab)) closed.push(c.tab); }
       else if (c.kind === 'dialog') dialogs.push({ tab: c.tab, type: c.dialogType, ...(c.message && { message: c.message }) });
+      else if (c.kind === 'toolError' || c.kind === 'fallback') continue;
       else if (c.kind === 'issue' && !issues.some((i) => i.tab === c.tab && i.code === c.issue.code && i.url === c.issue.url && i.source === c.issue.source)) issues.push({ tab: c.tab, ...c.issue });
     }
     const sites = await this.suggestSites(state, [...opened.values(), ...navigated.values()].map((t) => t.url).filter((u): u is string => Boolean(u)));
@@ -250,6 +261,22 @@ export class Runtime extends EventEmitter<RuntimeEvents> implements PageProvider
       ...(sites.length && { sites }),
     };
     return Object.keys(summary).length ? summary : undefined;
+  }
+  /** Tool errors and fallbacks recorded since change `from`, in call order. Repeats of one error collapse into a count. */
+  frictionSince(sessionId: string, from: number): ToolFriction | undefined {
+    const state = this.sessions.get(sessionId);
+    if (!state) return undefined;
+    const toolErrors: Array<ToolError & { count?: number }> = []; const fallbacks: ToolFallback[] = [];
+    for (const c of state.changes.entries) {
+      if (c.seq <= from) continue;
+      if (c.kind === 'toolError') {
+        const last = toolErrors[toolErrors.length - 1];
+        if (last && last.code === c.error.code && last.api === c.error.api && last.tab === c.error.tab && last.target === c.error.target && last.action === c.error.action) last.count = (last.count ?? 1) + 1;
+        else toolErrors.push({ ...c.error });
+      } else if (c.kind === 'fallback') fallbacks.push(c.fallback);
+    }
+    if (!toolErrors.length && !fallbacks.length) return undefined;
+    return { ...(toolErrors.length && { toolErrors: toolErrors.slice(0, 12) }), ...(fallbacks.length && { fallbacks: fallbacks.slice(0, 8) }) };
   }
   private async suggestSites(state: SessionState, urls: string[]): Promise<NonNullable<ChangeSummary['sites']>> {
     const out: NonNullable<ChangeSummary['sites']> = [];

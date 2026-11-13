@@ -3,6 +3,9 @@ import { Runtime } from '../src/runtime/runtime.js';
 import { BUILTIN_ADAPTERS_DIR } from '../src/lib/sources.js';
 import type { BrowserEvent } from '../src/protocol.js';
 import type { BrowserBackend } from '../src/backends/backend.js';
+import type { RuntimePage } from '../src/backends/page-types.js';
+import { Tab } from '../src/api/tab.js';
+import { ActionError } from '../src/api/errors.js';
 
 /** A backend that only relays events the test pushes, like the extension or Electron would. */
 async function runtime() {
@@ -78,5 +81,41 @@ describe('changes reported with each js call', () => {
       { kind: 'attention', session: 'mcp:s1', page: 'p1', reason: 'auth_required', waiting: true, url: 'https://example.com/login' },
       { kind: 'attention', session: 'mcp:s1', page: 'p1', reason: 'auth_required', waiting: false },
     ]);
+  });
+
+  it('reports tool errors raised in a call, caught or not, and an evaluate that follows a failed act', async () => {
+    const { rt } = await runtime();
+    const state = rt.session('s1');
+    state.js = { runs: 1 } as never;
+    let clicks = 0;
+    const page = {
+      getActivePage: () => 'p1',
+      act: async () => { clicks++; throw Object.assign(new Error('Element is covered'), { code: 'intercepted' }); },
+      evaluate: async () => 'clicked',
+    } as unknown as RuntimePage;
+    const tab = new Tab('p1', { rt, sessionId: 's1', state }, page);
+    const from = state.changes.seq;
+    for (let i = 0; i < 3; i++) await tab.act({ action: 'click', target: { role: 'button', name: 'Save' } }).catch(() => {});
+    await expect(tab.act({ action: 'fill', target: { role: 'textbox', name: 'Amount' } } as never)).rejects.toBeInstanceOf(ActionError);
+    await tab.evaluate(() => 1);
+    expect(clicks).toBe(3);
+    expect(rt.frictionSince('s1', from)).toEqual({
+      toolErrors: [
+        { code: 'intercepted', api: 'tab.act', tab: 'p1', action: 'click', target: 'role=button name=Save', retryable: true, count: 3 },
+        { code: 'invalid_args', api: 'tab.act', tab: 'p1', action: 'fill', target: 'role=textbox name=Amount', retryable: false },
+      ],
+      fallbacks: [{ from: 'tab.act', to: 'tab.evaluate', tab: 'p1', code: 'invalid_args', target: 'role=textbox name=Amount' }],
+    });
+    // side-effect summary is unaffected, and a quiet call reports nothing
+    expect(await rt.changesSince('s1', from)).toBeUndefined();
+    const quiet = state.changes.seq;
+    await tab.evaluate(() => 1);
+    expect(rt.frictionSince('s1', quiet)).toBeUndefined();
+    // a successful act clears the pending fallback; an evaluate two runs later is not one
+    await tab.act({ action: 'click', target: { role: 'button', name: 'Save' } }).catch(() => {});
+    state.js = { runs: 3 } as never;
+    const later = state.changes.seq;
+    await tab.evaluate(() => 1);
+    expect(rt.frictionSince('s1', later)).toBeUndefined();
   });
 });
