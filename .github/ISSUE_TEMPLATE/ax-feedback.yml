@@ -1,0 +1,48 @@
+name: Agent experience (AX) problem
+description: An agent struggled with BrowserMCP (retries, detours, unclear errors). Usually filed from Kaze's run review.
+title: "[AX] "
+labels: ["ax"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Describe where the tool made the agent work harder than it should. Page text, input values, cookies, tokens and query strings must not appear below.
+  - type: textarea
+    id: goal
+    attributes:
+      label: What the agent was trying to do
+      placeholder: e.g. fill the amount field and submit the form
+    validations:
+      required: true
+  - type: textarea
+    id: friction
+    attributes:
+      label: What went wrong
+      description: The calls involved, error codes, how many attempts, and how the agent finally got around it (if it did).
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Minimal reproduction
+      description: Page structure (roles, tag names, attribute names only), the js code, expected vs actual result.
+      render: markdown
+    validations:
+      required: true
+  - type: textarea
+    id: suggestion
+    attributes:
+      label: Suggested improvement
+      description: What the result, error message, docs or API could have said or offered so the agent would not take the detour.
+  - type: input
+    id: environment
+    attributes:
+      label: Environment
+      placeholder: "BrowserMCP 0.0.42-embedded.0 · Kaze 0.34.2 · site example.com/path/:id"
+    validations:
+      required: true
+  - type: input
+    id: fingerprint
+    attributes:
+      label: Fingerprint
+      description: Stable hash used for de-duplication.
